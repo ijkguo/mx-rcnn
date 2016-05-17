@@ -11,6 +11,7 @@ config.TRAIN = edict()
 config.TRAIN.SCALES = (600, )
 config.TRAIN.MAX_SIZE = 1000
 
+config.TRAIN.BATCH_IMAGES = 2
 config.TRAIN.BATCH_SIZE = 128
 config.TRAIN.FG_FRACTION = 0.25
 config.TRAIN.FG_THRESH = 0.5

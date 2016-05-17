@@ -16,18 +16,20 @@ from voc_eval import voc_eval
 
 
 class PascalVOC(IMDB):
-    def __init__(self, image_set, year, devkit_path):
+    def __init__(self, image_set, year, root_path, devkit_path):
         """
         fill basic information to initialize imdb
         :param image_set: train or val or trainval
-        :param year: 2007, 2012
-        :param devkit_path: 'VOCdevkit' this will be used as root path
+        :param year: 2007, 2010, 2012
+        :param root_path: 'selective_search_data' and 'cache'
+        :param devkit_path: data and results
         :return: imdb object
         """
         super(PascalVOC, self).__init__('voc_' + year + '_' + image_set)  # set self.name
         self.image_set = image_set
         self.year = year
-        self.root_path = devkit_path  # for writing caches and results
+        self.root_path = root_path
+        self.devkit_path = devkit_path
         self.data_path = os.path.join(devkit_path, 'VOC' + year)
 
         self.classes = ['__background__',  # always index 0
@@ -188,13 +190,13 @@ class PascalVOC(IMDB):
         :return: None
         """
         # make all these folders for results
-        result_dir = os.path.join(self.root_path, 'results')
+        result_dir = os.path.join(self.devkit_path, 'results')
         if not os.path.exists(result_dir):
             os.mkdir(result_dir)
-        year_folder = os.path.join(self.root_path, 'results', 'VOC' + self.year)
+        year_folder = os.path.join(self.devkit_path, 'results', 'VOC' + self.year)
         if not os.path.exists(year_folder):
             os.mkdir(year_folder)
-        res_file_folder = os.path.join(self.root_path, 'results', 'VOC' + self.year, 'Main')
+        res_file_folder = os.path.join(self.devkit_path, 'results', 'VOC' + self.year, 'Main')
         if not os.path.exists(res_file_folder):
             os.mkdir(res_file_folder)
 
@@ -207,7 +209,7 @@ class PascalVOC(IMDB):
         VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
         :return: a string template
         """
-        res_file_folder = os.path.join(self.root_path, 'results', 'VOC' + self.year, 'Main')
+        res_file_folder = os.path.join(self.devkit_path, 'results', 'VOC' + self.year, 'Main')
         comp_id = self.config['comp_id']
         filename = comp_id + '_det_' + self.image_set + '_{:s}.txt'
         path = os.path.join(res_file_folder, filename)

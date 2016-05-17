@@ -16,7 +16,7 @@ class Detector(object):
         self.aux_params = aux_params
         self.executor = None
 
-    def detect(self, im_array, roi_array):
+    def im_detect(self, im_array, roi_array):
         """
         perform detection of designated im, box, must follow minibatch.get_testbatch format
         :param im_array: numpy.ndarray [b c h w]
@@ -33,31 +33,23 @@ class Detector(object):
             _, index, inv_index = np.unique(hashes, return_index=True, return_inverse=True)
             roi_array = roi_array[np.newaxis, index, :]
 
-        # cuda kernel griddim (number of blocks) is limited to 65536
-        cuda_max_size = 2000
-        scores_list = []
-        bbox_deltas_list = []
-        for i in range(0, roi_array.shape[1], cuda_max_size):
-            self.arg_params['data'] = mx.nd.array(im_array, self.ctx)
-            self.arg_params['rois'] = mx.nd.array(roi_array[:, i:i + cuda_max_size], self.ctx)
+        self.arg_params['data'] = mx.nd.array(im_array, self.ctx)
+        self.arg_params['rois'] = mx.nd.array(roi_array, self.ctx)
+        arg_shapes, out_shapes, aux_shapes = \
+            self.symbol.infer_shape(data=self.arg_params['data'].shape, rois=self.arg_params['rois'].shape)
+        arg_shapes_dict = {name: shape for name, shape in zip(self.symbol.list_arguments(), arg_shapes)}
+        self.arg_params['cls_prob_label'] = mx.nd.zeros(arg_shapes_dict['cls_prob_label'], self.ctx)
 
-            arg_shapes, out_shapes, aux_shapes = \
-                self.symbol.infer_shape(data=self.arg_params['data'].shape, rois=self.arg_params['rois'].shape)
-            arg_shapes_dict = {name: shape for name, shape in zip(self.symbol.list_arguments(), arg_shapes)}
-            self.arg_params['cls_prob_label'] = mx.nd.zeros(arg_shapes_dict['cls_prob_label'], self.ctx)
+        aux_names = self.symbol.list_auxiliary_states()
+        self.aux_params = {k: mx.nd.zeros(s, self.ctx) for k, s in zip(aux_names, aux_shapes)}
+        self.executor = self.symbol.bind(self.ctx, self.arg_params, args_grad=None,
+                                         grad_req='null', aux_states=self.aux_params)
+        output_dict = {name: nd for name, nd in zip(self.symbol.list_outputs(), self.executor.outputs)}
 
-            aux_names = self.symbol.list_auxiliary_states()
-            self.aux_params = {k: mx.nd.zeros(s, self.ctx) for k, s in zip(aux_names, aux_shapes)}
-            self.executor = self.symbol.bind(self.ctx, self.arg_params, args_grad=None,
-                                             grad_req='null', aux_states=self.aux_params)
-            output_dict = {name: nd for name, nd in zip(self.symbol.list_outputs(), self.executor.outputs)}
+        self.executor.forward(is_train=False)
+        scores = output_dict['cls_prob_output'].asnumpy()
+        bbox_deltas = output_dict['bbox_pred_output'].asnumpy()
 
-            self.executor.forward(is_train=False)
-            scores_list.append(output_dict['cls_prob_output'].asnumpy())
-            bbox_deltas_list.append(output_dict['bbox_pred_output'].asnumpy())
-
-        scores = np.vstack(scores_list)
-        bbox_deltas = np.vstack(bbox_deltas_list)
         pred_boxes = bbox_pred(roi_array[0][:, 1:], bbox_deltas)
         pred_boxes = clip_boxes(pred_boxes, im_array[0].shape[-2:])
 

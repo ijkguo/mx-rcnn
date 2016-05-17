@@ -24,25 +24,30 @@ def load_checkpoint(prefix, epoch):
     return arg_params, aux_params
 
 
-def load_param(prefix, epoch, convert=False, context=None):
+def convert_context(params, ctx):
+    """
+    :param params: dict of str to NDArray
+    :param ctx: the context to convert to
+    :return: dict of str of NDArray with context ctx
+    """
+    new_params = dict()
+    for k, v in params.items():
+        new_params[k] = v.as_in_context(ctx)
+    return new_params
+
+
+def load_param(prefix, epoch, convert=False, ctx=None):
     """
     wrapper for load checkpoint
     :param prefix: Prefix of model name.
     :param epoch: Epoch number of model we would like to load.
     :param convert: reference model should be converted to GPU NDArray first
-    :param context: if convert then context must be designated.
+    :param ctx: if convert then ctx must be designated.
     :return: (arg_params, aux_params)
     """
-    def convert_to_gpu(array_dict):
-        result_dict = dict()
-        for name, nd in array_dict.items():
-            result_dict[name] = nd.as_in_context(context)
-        return result_dict
-
     arg_params, aux_params = load_checkpoint(prefix, epoch)
     if convert:
-        assert context is not None
-        arg_params = convert_to_gpu(arg_params)
-        aux_params = convert_to_gpu(aux_params)
-
+        assert ctx is not None
+        arg_params = convert_context(arg_params, ctx)
+        aux_params = convert_context(aux_params, ctx)
     return arg_params, aux_params
