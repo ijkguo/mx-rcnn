@@ -18,7 +18,7 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
 http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
 http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar
 Ross's precomputed object proposals
-http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/selective_search_data.tgz
+https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_selective_search_data.sh
 ```
 * Data Folder Structure (suppose root is `data`)
 ```
@@ -40,3 +40,93 @@ VOCdevkit
 ```
 https://github.com/rbgirshick/fast-rcnn/tree/master/data/demo
 ```
+
+## Training
+* Start training by run `python train.py`. Variable args can be found by run
+`python train.py --help`.
+* Training can be done in cpu, modify `train.py` accordingly.
+```
+usage: train.py [-h] [--image_set IMAGE_SET] [--year YEAR]
+                [--root_path ROOT_PATH] [--devkit_path DEVKIT_PATH]
+                [--pretrained PRETRAINED] [--epoch EPOCH] [--prefix PREFIX]
+                [--gpu GPU_ID] [--begin_epoch BEGIN_EPOCH]
+                [--end_epoch END_EPOCH] [--frequent FREQUENT]
+
+Train a Fast R-CNN network
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --image_set IMAGE_SET
+                        can be trainval or train
+  --year YEAR           can be 2007, 2010, 2012
+  --root_path ROOT_PATH
+                        output data folder
+  --devkit_path DEVKIT_PATH
+                        VOCdevkit path
+  --pretrained PRETRAINED
+                        pretrained model prefix
+  --epoch EPOCH         epoch of pretrained model
+  --prefix PREFIX       new model prefix
+  --gpu GPU_ID          GPU device to train with
+  --begin_epoch BEGIN_EPOCH
+                        begin epoch of training
+  --end_epoch END_EPOCH
+                        end epoch of training
+  --frequent FREQUENT   frequency of logging
+```
+
+## Testing
+* Start testing by run `python test.py`. Variable args can be found by run
+`python test.py --help`.
+* Testing can be done in cpu, modify `test.py` accordingly.
+```
+usage: test.py [-h] [--image_set IMAGE_SET] [--year YEAR]
+               [--root_path ROOT_PATH] [--devkit_path DEVKIT_PATH]
+               [--prefix PREFIX] [--epoch EPOCH] [--gpu GPU_ID]
+
+Test a Fast R-CNN network
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --image_set IMAGE_SET
+                        can be test
+  --year YEAR           can be 2007, 2010, 2012
+  --root_path ROOT_PATH
+                        output data folder
+  --devkit_path DEVKIT_PATH
+                        VOCdevkit path
+  --prefix PREFIX       new model prefix
+  --epoch EPOCH         epoch of pretrained model
+  --gpu GPU_ID          GPU device to test with
+```
+
+## Demonstration
+* If no training has been done, download reference model from Ross Girshick and use
+`mxnet/caffe/caffe_converter` to convert it to MXNet.
+```
+https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_fast_rcnn_models.sh
+```
+* Run demo by `demo.py --gpu 0 --prefix path-to-model --epoch 0`, in which
+`path-to-model + '%4d' % epoch.params` will be the params file and
+`path-to-model + '-symbol.json'` will be the symbol json.
+* Demo can be run in cpu, modify `demo.py` accordingly.
+```
+usage: demo.py [-h] [--prefix PREFIX] [--epoch EPOCH] [--gpu GPU_ID]
+
+Demonstrate a Fast R-CNN network
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --prefix PREFIX  new model prefix
+  --epoch EPOCH    epoch of pretrained model
+  --gpu GPU_ID     GPU device to test with
+```
+
+## Disclaimer
+This repository used code from [MXNet](https://github.com/dmlc/mxnet),
+[Fast R-CNN](https://github.com/rbgirshick/fast-rcnn),
+[Faster R-CNN](https://github.com/rbgirshick/py-faster-rcnn),
+[caffe](https://github.com/BVLC/caffe). Training data are from
+[Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/),
+[ImageNet](http://image-net.org/). Model comes from
+[VGG16](http://www.robots.ox.ac.uk/~vgg/research/very_deep/).
