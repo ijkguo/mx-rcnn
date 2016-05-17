@@ -71,7 +71,7 @@ def pred_eval(detector, test_data, imdb, vis=False):
     cache_folder = os.path.join(imdb.cache_path, imdb.name)
     if not os.path.exists(cache_folder):
         os.mkdir(cache_folder)
-    det_file = os.path.join(cache_folder, imdb.name, 'detections.pkl')
+    det_file = os.path.join(cache_folder, 'detections.pkl')
     with open(det_file, 'wb') as f:
         cPickle.dump(all_boxes, f)
 

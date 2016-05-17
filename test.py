@@ -5,8 +5,8 @@ from tools.test_net import test_net
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
-    parser.add_argument('--image_set', dest='image_set', help='can be trainval or train',
+    parser = argparse.ArgumentParser(description='Test a Fast R-CNN network')
+    parser.add_argument('--image_set', dest='image_set', help='can be test',
                         default='test', type=str)
     parser.add_argument('--year', dest='year', help='can be 2007, 2010, 2012',
                         default='2007', type=str)

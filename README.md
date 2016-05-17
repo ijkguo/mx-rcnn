@@ -20,8 +20,9 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar
 Ross's precomputed object proposals
 http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/selective_search_data.tgz
 ```
-* Data Folder Structure
+* Data Folder Structure (suppose root is `data`)
 ```
+demo
 selective_search_data
 cache (created by imdb)
 -- name + source + roidb.pkl (create by imdb)
@@ -35,3 +36,7 @@ VOCdevkit
 ```
 * Download VGG16 pretrained model, use `mxnet/tools/caffe_converter` to convert it,
   rename to `vgg16-symbol.json` and `vgg16-0001.params` and place it in `model` folder
+* Download 'demo' data and put it in `data/demo` from
+```
+https://github.com/rbgirshick/fast-rcnn/tree/master/data/demo
+```

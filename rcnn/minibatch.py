@@ -2,16 +2,16 @@
 To construct data iterator from imdb, batch sampling procedure are defined here
 training minibatch =
     {'data': [num_images, c, h, w],
-    'rois': [num_images * num_rois, 5],
-    'labels': [num_images * num_rois],
-    'bbox_targets': [num_images * num_rois, 4 * num_classes],
-    'bbox_inside_weights': [num_images * num_rois, 4 * num_classes],
-    'bbox_outside_weights': [num_images * num_rois, 4 * num_classes]}
+    'rois': [num_rois, 5],
+    'labels': [num_rois],
+    'bbox_targets': [num_rois, 4 * num_classes],
+    'bbox_inside_weights': [num_rois, 4 * num_classes],
+    'bbox_outside_weights': [num_rois, 4 * num_classes]}
     num_images should divide config['TRAIN_BATCH_SIZE'] and num_rois = config['TRAIN_BATCH_SIZE'] / num_images
 validation minibatch is similar except num_images = 1 and num_rois = all rois
 testing minibatch =
     {'data': [num_images, c, h, w],
-    'rois': [num_images, num_rois, 5]}
+    'rois': [num_rois, 5]}
     num_images = 1 and num_rois = all rois
 """
 
