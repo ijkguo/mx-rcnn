@@ -1,7 +1,7 @@
 import mxnet as mx
 import numpy as np
 
-from rcnn import config
+from rcnn.config import config
 
 
 class LogLossMetric(mx.metric.EvalMetric):
@@ -12,7 +12,7 @@ class LogLossMetric(mx.metric.EvalMetric):
         pred_cls = preds[0].asnumpy()
         label = labels[0].asnumpy().astype('int32')
         cls = pred_cls[np.arange(label.shape[0]), label]
-        cls += config['EPS']
+        cls += config.EPS
         cls_loss = -1 * np.log(cls)
         cls_loss = np.sum(cls_loss)
         self.sum_metric += cls_loss

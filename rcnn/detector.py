@@ -24,14 +24,14 @@ class Detector(object):
         :return: scores, pred_boxes
         """
         # remove duplicate feature rois
-        if config['TEST_DEDUP_BOXES'] > 0:
-            roi_array = roi_array[0]
+        if config.TEST.DEDUP_BOXES > 0:
+            roi_array = roi_array
             # rank roi by v .* (b, dx, dy, dw, dh)
             v = np.array([1, 1e3, 1e6, 1e9, 1e12])
             # create hash and inverse index for rois
-            hashes = np.round(roi_array * config['TEST_DEDUP_BOXES']).dot(v)
+            hashes = np.round(roi_array * config.TEST.DEDUP_BOXES).dot(v)
             _, index, inv_index = np.unique(hashes, return_index=True, return_inverse=True)
-            roi_array = roi_array[np.newaxis, index, :]
+            roi_array = roi_array[index, :]
 
         self.arg_params['data'] = mx.nd.array(im_array, self.ctx)
         self.arg_params['rois'] = mx.nd.array(roi_array, self.ctx)
@@ -50,10 +50,10 @@ class Detector(object):
         scores = output_dict['cls_prob_output'].asnumpy()
         bbox_deltas = output_dict['bbox_pred_output'].asnumpy()
 
-        pred_boxes = bbox_pred(roi_array[0][:, 1:], bbox_deltas)
+        pred_boxes = bbox_pred(roi_array[:, 1:], bbox_deltas)
         pred_boxes = clip_boxes(pred_boxes, im_array[0].shape[-2:])
 
-        if config['TEST_DEDUP_BOXES'] > 0:
+        if config.TEST.DEDUP_BOXES > 0:
             # map back to original
             scores = scores[inv_index, :]
             pred_boxes = pred_boxes[inv_index, :]

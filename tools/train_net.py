@@ -37,7 +37,7 @@ def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
     # load pretrained
     args, auxs = load_param(pretrained, epoch, convert=True, ctx=ctx)
     del args['fc8_bias']
-    del auxs['fc8_weight']
+    del args['fc8_weight']
 
     # load symbol
     sym = get_symbol_vgg()
@@ -53,7 +53,7 @@ def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
     # train
     solver = Solver(prefix, sym, ctx, begin_epoch, end_epoch, args, auxs, momentum=0.9, wd=0.0005,
                     learning_rate=0.001, lr_scheduler=mx.lr_scheduler.FactorScheduler(30000, 0.1))
-    solver.fit(train_data, frequent=frequent, logger=logger)
+    solver.fit(train_data, frequent=frequent)
 
     # edit params and save
     for epoch in range(begin_epoch + 1, end_epoch + 1):

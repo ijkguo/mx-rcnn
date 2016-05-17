@@ -39,7 +39,7 @@ def get_minibatch(roidb, num_classes):
     fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
 
     # im_array: [num_images, c, h, w]
-    im_array, im_scales = get_image_array(roidb, random_scale_indexes)
+    im_array, im_scales = get_image_array(roidb, config.TRAIN.SCALES, random_scale_indexes)
 
     rois_array = list()
     labels_array = list()
@@ -63,7 +63,7 @@ def get_minibatch(roidb, num_classes):
         bbox_inside_array.append(bbox_inside_weights)
 
     rois_array = np.vstack(rois_array)
-    labels_array = np.vstack(labels_array)
+    labels_array = np.hstack(labels_array)
     bbox_targets_array = np.vstack(bbox_targets_array)
     bbox_inside_array = np.vstack(bbox_inside_array)
     bbox_outside_array = np.array(bbox_inside_array > 0).astype(np.float32)
@@ -86,8 +86,8 @@ def get_testbatch(roidb, num_classes):
     :return: minibatch: {'data', 'rois'}
     """
     num_images = len(roidb)
-    random_scale_indexes = npr.randint(0, high=len(config['TRAIN_SCALES']), size=num_images)
-    im_array, im_scales = get_image_array(roidb, random_scale_indexes)
+    random_scale_indexes = npr.randint(0, high=len(config.TEST.SCALES), size=num_images)
+    im_array, im_scales = get_image_array(roidb, config.TEST.SCALES, random_scale_indexes)
 
     rois_array = list()
     for im_i in range(num_images):
@@ -104,10 +104,11 @@ def get_testbatch(roidb, num_classes):
     return testbatch
 
 
-def get_image_array(roidb, scale_indexes):
+def get_image_array(roidb, scales, scale_indexes):
     """
     build image array from specific roidb
     :param roidb: images to be processed
+    :param scales: scale list
     :param scale_indexes: indexes
     :return: array [b, c, h, w], list of scales
     """
@@ -118,7 +119,7 @@ def get_image_array(roidb, scale_indexes):
         im = cv2.imread(roidb[i]['image'])
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
-        target_size = config.TRAIN.SCALES[scale_indexes[i]]
+        target_size = scales[scale_indexes[i]]
         im, im_scale = image_processing.resize(im, target_size, config.TRAIN.MAX_SIZE)
         im_tensor = image_processing.transform(im, config.PIXEL_MEANS)
         processed_ims.append(im_tensor)

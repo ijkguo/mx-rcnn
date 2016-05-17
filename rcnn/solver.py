@@ -23,9 +23,9 @@ class Solver(object):
         self.arg_params = arg_params
         self.aux_params = aux_params
         self.grad_params = None
-        self.optimizer = mx.optimizer.create(optimizer, rescale_grad=(1.0/config.TRAIN.BATCH_SIZE), **self.kwargs)
-        self.updater = mx.optimizer.get_updater(self.optimizer)
         self.executor = None
+        self.optimizer = optimizer
+        self.updater = None
         self.kwargs = kwargs.copy()
 
     def get_params(self, grad_req):
@@ -55,6 +55,9 @@ class Solver(object):
         epoch_end_callback = mx.callback.do_checkpoint(self.prefix)
 
         self.get_params(grad_req)
+        self.optimizer = mx.optimizer.create(self.optimizer, rescale_grad=(1.0 / config.TRAIN.BATCH_SIZE), **self.kwargs)
+        self.updater = mx.optimizer.get_updater(self.optimizer)
+
         eval_metric = mx.metric.create("accuracy")
         cls_metric = metric.LogLossMetric()
         bbox_metric = metric.SmoothL1LossMetric()

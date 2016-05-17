@@ -1,10 +1,10 @@
-import mxnet as mx
 import logging
 from load_data import load_test_roidb
 from rcnn.data_iter import ROIIter
 from rcnn.symbol import get_symbol_vgg_test
 from load_model import load_param
 from rcnn.detector import Detector
+from rcnn.tester import pred_eval
 
 
 def test_net(imageset, year, root_path, devkit_path, prefix, epoch, ctx):
@@ -35,3 +35,4 @@ def test_net(imageset, year, root_path, devkit_path, prefix, epoch, ctx):
 
     # detect
     detector = Detector(sym, ctx, args, auxs)
+    pred_eval(detector, test_data, voc, vis=False)
