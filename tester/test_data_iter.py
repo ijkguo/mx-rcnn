@@ -1,7 +1,8 @@
 import os
+
 from helper.dataset import pascal_voc
 from helper.processing import roidb
-import data_iter
+from rcnn import data_iter
 
 # test flip
 devkit_path = os.path.join(os.path.expanduser('~'), 'Dataset', 'VOCdevkit')

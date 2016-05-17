@@ -15,12 +15,13 @@ testing minibatch =
     num_images = 1 and num_rois = all rois
 """
 
+import cv2
 import numpy as np
 import numpy.random as npr
-import cv2
-from helper.config import config
+
 from helper.processing import image_processing
 from helper.processing.bbox_regression import expand_bbox_regression_targets
+from rcnn.config import config
 
 
 def get_minibatch(roidb, num_classes):

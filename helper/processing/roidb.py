@@ -5,8 +5,9 @@ extended ['image', 'max_classes', 'max_overlaps', 'bbox_targets']
 """
 
 import numpy as np
-from helper.config import config
+
 from bbox_regression import compute_bbox_regression_targets
+from rcnn.config import config
 
 
 def prepare_roidb(imdb, roidb):

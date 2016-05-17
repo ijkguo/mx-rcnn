@@ -10,7 +10,8 @@ are simultaneously learned in the training process.
 ## Getting Started
 
 * MXNet with `ROIPooling` and `smooth_l1` operators are required
-* Download data and place theme according to `Data Folder Summary`
+* Download data and place them to `data` folder according to `Data Folder Structure`.
+  You might want to create a symbolic link to VOCdevkit folder
 ```
 Pascal VOCdevkit
 http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
@@ -21,25 +22,16 @@ http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/selective_search_data.tgz
 ```
 * Data Folder Structure
 ```
+selective_search_data
+cache (created by imdb)
+-- name + source + roidb.pkl (create by imdb)
+-- name (created by detection and evaluation)
 VOCdevkit
--- selective_search_data
--- cache (created by imdb)
----- name + source + roidb.pkl (create by imdb)
----- name (created by detection and evaluation)
------- {detector name}_detections.pkl
------- annotations.pkl
+-- VOC + year (JPEG images and annotations)
 -- results (created by evaluation)
 ---- VOC + year
 ------ main
 -------- comp4_det_val_aeroplane.txt
--- VOC + year # original VOC data
 ```
-* Download pretrained models
-```
-ImageNet pretrained model
-http://www.robots.ox.ac.uk/~vgg/software/very_deep/caffe/VGG_ILSVRC_16_layers.caffemodel
-Ross's reference model (trained on PASCAL VOC07 trainval)
-http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/fast_rcnn_models.tgz
-```
-* Use Caffe Converter to convert these models. Use `symbol.get_symbol_vgg_test()`
-for model construction.
+* Download VGG16 pretrained model, use `mxnet/tools/caffe_converter` to convert it,
+  rename to `vgg16-symbol.json` and `vgg16-0001.params` and place it in `model` folder

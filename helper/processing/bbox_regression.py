@@ -3,7 +3,8 @@ This file has functions about generating bounding box regression targets
 """
 
 import numpy as np
-from helper.config import config
+
+from rcnn.config import config
 
 
 def bbox_overlaps(boxes, query_boxes):
