@@ -7,9 +7,12 @@ detection results. Cropping feature maps instead of image input accelerates
 computation utilizing shared convolution maps. Bounding box displacements
 are simultaneously learned in the training process.
 
+This repository may reflect experimental changes. Refer to `mxnet/example/rcnn/` as a tested example.
+
 ## Getting Started
 
-* MXNet with `ROIPooling` and `smooth_l1` operators are required
+* Install MXNet with a version that has operators `ROIPooling` and 
+  `smooth_l1` appeared, preferably the lastest version from DMLC.
 * Download data and place them to `data` folder according to `Data Folder Structure`.
   You might want to create a symbolic link to VOCdevkit folder
 ```
@@ -102,7 +105,8 @@ optional arguments:
 
 ## Demonstration
 * If no training has been done, download reference model from Ross Girshick and use
-`mxnet/caffe/caffe_converter` to convert it to MXNet.
+`mxnet/caffe/caffe_converter` to convert it to MXNet. A script in `tools` is also 
+provided for your convienience.
 ```
 https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_fast_rcnn_models.sh
 ```
