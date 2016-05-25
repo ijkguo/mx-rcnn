@@ -1,10 +1,11 @@
 # This script will not work unless all paths are set right
 
+import os
 import sys
 import mxnet as mx
 import numpy as np
 fast_rcnn_path = None
-sys.path.insert(0, os.path.join(fast_rcnn_path, 'caffe-fast-rcnn', 'python')
+sys.path.insert(0, os.path.join(fast_rcnn_path, 'caffe-fast-rcnn', 'python'))
 sys.path.insert(0, os.path.join(fast_rcnn_path, 'lib'))
 import caffe
 from rcnn.symbol import get_symbol_vgg_test
@@ -70,4 +71,4 @@ arg_params = load_model(proto_path, model_path, arg_shape_dic)
 model = mx.model.FeedForward(ctx=mx.cpu(), symbol=symbol, arg_params=arg_params,
                              aux_params={}, num_epoch=1,
                              learning_rate=0.01, momentum=0.9, wd=0.0001)
-model.save('ref')
+model.save('model/ref')
