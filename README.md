@@ -11,8 +11,7 @@ This repository may reflect experimental changes. Refer to `mxnet/example/rcnn/`
 
 ## Getting Started
 
-* Install MXNet with a version that has operators `ROIPooling` and 
-  `smooth_l1` appeared, preferably the lastest version from DMLC.
+* Install the lastest version of MXNet from DMLC. Follow the instructions at http://mxnet.readthedocs.io/en/latest/how_to/build.html. Install the python interface.
 * Download data and place them to `data` folder according to `Data Folder Structure`.
   You might want to create a symbolic link to VOCdevkit folder
 ```
@@ -22,6 +21,8 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
 http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar
 Ross's precomputed object proposals
 https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_selective_search_data.sh
+Demo data (put in `data/demo` folder)
+https://github.com/rbgirshick/fast-rcnn/tree/master/data/demo
 ```
 * Data Folder Structure (suppose root is `data`)
 ```
@@ -39,10 +40,6 @@ VOCdevkit
 ```
 * Download VGG16 pretrained model, use `mxnet/tools/caffe_converter` to convert it,
   rename to `vgg16-symbol.json` and `vgg16-0001.params` and place it in `model` folder
-* Download 'demo' data and put it in `data/demo` from
-```
-https://github.com/rbgirshick/fast-rcnn/tree/master/data/demo
-```
 
 ## Training
 * Start training by run `python train.py`. Variable args can be found by run
@@ -104,15 +101,15 @@ optional arguments:
 ```
 
 ## Demonstration
-* If no training has been done, download reference model from Ross Girshick and use
-`mxnet/caffe/caffe_converter` to convert it to MXNet. A script in `tools` is also 
-provided for your convienience.
-```
-https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_fast_rcnn_models.sh
-```
 * Run demo by `demo.py --gpu 0 --prefix path-to-model --epoch 0`, in which
 `path-to-model + '%4d' % epoch.params` will be the params file and
 `path-to-model + '-symbol.json'` will be the symbol json.
+* If no training has been done, download reference model from Ross Girshick and use
+`mxnet/caffe/caffe_converter` to convert it to MXNet. A script in `tools` is also 
+provided for your convienience. This script need to be modified in your environment.
+```
+https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_fast_rcnn_models.sh
+```
 * Demo can be run in cpu, modify `demo.py` accordingly.
 ```
 usage: demo.py [-h] [--prefix PREFIX] [--epoch EPOCH] [--gpu GPU_ID]
@@ -134,3 +131,13 @@ This repository used code from [MXNet](https://github.com/dmlc/mxnet),
 [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/),
 [ImageNet](http://image-net.org/). Model comes from
 [VGG16](http://www.robots.ox.ac.uk/~vgg/research/very_deep/).
+
+## References
+1. Tianqi Chen, Mu Li, Yutian Li, Min Lin, Naiyan Wang, Minjie Wang, Tianjun Xiao, Bing Xu, Chiyuan Zhang, and Zheng Zhang. MXNet: A Flexible and Efficient Machine Learning Library for Heterogeneous Distributed Systems. In Neural Information Processing Systems, Workshop on Machine Learning Systems, 2015
+2. Ross Girshick. "Fast R-CNN." In Proceedings of the IEEE International Conference on Computer Vision, 2015.
+3. Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun. "Faster R-CNN: Towards real-time object detection with region proposal networks." In Advances in Neural Information Processing Systems, 2015.
+4. Yangqing Jia, Evan Shelhamer, Jeff Donahue, Sergey Karayev, Jonathan Long, Ross Girshick, Sergio Guadarrama, and Trevor Darrell. "Caffe: Convolutional architecture for fast feature embedding." In Proceedings of the ACM International Conference on Multimedia, 2014.
+5. Mark Everingham, Luc Van Gool, Christopher KI Williams, John Winn, and Andrew Zisserman. "The pascal visual object classes (voc) challenge." International journal of computer vision 88, no. 2 (2010): 303-338.
+6. Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. "ImageNet: A large-scale hierarchical image database." In Computer Vision and Pattern Recognition, IEEE Conference on, 2009.
+7. Karen Simonyan, and Andrew Zisserman. "Very deep convolutional networks for large-scale image recognition." arXiv preprint arXiv:1409.1556 (2014).
+
