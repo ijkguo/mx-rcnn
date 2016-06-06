@@ -30,15 +30,21 @@ class Solver(object):
 
     def get_params(self, grad_req):
         arg_names = self.symbol.list_arguments()
-        arg_shapes, out_shapes, aux_shapes = self.symbol.infer_shape(data=(1, 3, 224, 224), rois=(1, 5))
+        if config.TRAIN.HAS_RPN:
+            arg_shapes, out_shapes, aux_shapes = \
+                self.symbol.infer_shape(data=(1, 3, 224, 224))
+        else:
+            arg_shapes, out_shapes, aux_shapes = self.symbol.infer_shape(data=(1, 3, 224, 224), rois=(1, 5))
         if grad_req != 'null':
             self.grad_params = {}
             for name, shape in zip(arg_names, arg_shapes):
                 if not (name.endswith('data') or name.endswith('rois') or
+                        name.endswith('im_info') or name.endswith('gt_boxes') or
                         name.endswith('inside_weight') or name.endswith('outside_weight') or
                         name.endswith('label') or name.endswith('target') or
                         name.startswith('conv1') or name.startswith('conv2')):
-                    self.grad_params[name] = mx.nd.zeros(shape, self.ctx)
+                    if not (config.TRAIN.FINETUNE and name.startswith('conv')):
+                        self.grad_params[name] = mx.nd.zeros(shape, self.ctx)
         aux_names = self.symbol.list_auxiliary_states()
         self.aux_params = {k: mx.nd.zeros(s, self.ctx) for k, s in zip(aux_names, aux_shapes)}
 
@@ -88,9 +94,9 @@ class Solver(object):
                 for key, arr in update_dict.items():
                     self.updater(key, arr, self.arg_params[key])
 
-                label = self.arg_params['cls_prob_label']
+                label = self.arg_params['label']
                 pred = output_dict['cls_prob_output']
-                bb_target = self.arg_params['bbox_loss_target']
+                bb_target = None
                 bb_loss = output_dict['bbox_loss_output']
                 eval_metric.update([label], [pred])
                 cls_metric.update([label], [pred])

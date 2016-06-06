@@ -8,6 +8,9 @@ config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
 
 config.TRAIN = edict()
 
+config.TRAIN.HAS_RPN = False
+config.TRAIN.FINETUNE = False
+
 config.TRAIN.SCALES = (600, )
 config.TRAIN.MAX_SIZE = 1000
 
@@ -18,11 +21,34 @@ config.TRAIN.FG_THRESH = 0.5
 config.TRAIN.BG_THRESH_HI = 0.5
 config.TRAIN.BG_THRESH_LO = 0.1
 
+config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = False
+config.TRAIN.BBOX_MEANS = (0.0, 0.0, 0.0, 0.0)
+config.TRAIN.BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
+
 config.TRAIN.BBOX_REGRESSION_THRESH = 0.5
 config.TRAIN.BBOX_INSIDE_WEIGHTS = np.array([1.0, 1.0, 1.0, 1.0])
 
+config.TRAIN.RPN_CLOBBER_POSITIVES = False
+config.TRAIN.RPN_POSITIVE_OVERLAP = 0.7
+config.TRAIN.RPN_NEGATIVE_OVERLAP = 0.3
+config.TRAIN.RPN_FG_FRACTION = 0.5
+config.TRAIN.RPN_BATCH_SIZE = 256
+config.TRAIN.RPN_BBOX_INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
+config.TRAIN.RPN_POSITIVE_WEIGHT = -1.0
+
+config.TRAIN.RPN_NMS_THRESH = 0.7
+config.TRAIN.RPN_PRE_NMS_TOP_N = 12000
+config.TRAIN.RPN_POST_NMS_TOP_N = 6000
+config.TRAIN.RPN_MIN_SIZE = 16
+
 config.TEST = edict()
 
+config.TEST.HAS_RPN = False
 config.TEST.SCALES = (600, )
 config.TEST.NMS = 0.3
 config.TEST.DEDUP_BOXES = 1. / 16.
+
+config.TEST.RPN_NMS_THRESH = 0.7
+config.TEST.RPN_PRE_NMS_TOP_N = 6000
+config.TEST.RPN_POST_NMS_TOP_N = 300
+config.TEST.RPN_MIN_SIZE = 16

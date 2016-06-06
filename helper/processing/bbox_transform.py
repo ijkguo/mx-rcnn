@@ -1,8 +1,35 @@
 """
-This file has functions about bounding box post processing.
+This file has functions about bounding box processing.
 """
 
 import numpy as np
+
+
+def bbox_transform(ex_rois, gt_rois):
+    """
+    compute bounding box regression targets from ex_rois to gt_rois
+    :param ex_rois: [N, 4]
+    :param gt_rois: [N, 4]
+    :return: [N, 4]
+    """
+    ex_widths = ex_rois[:, 2] - ex_rois[:, 0] + 1.0
+    ex_heights = ex_rois[:, 3] - ex_rois[:, 1] + 1.0
+    ex_ctr_x = ex_rois[:, 0] + 0.5 * ex_widths
+    ex_ctr_y = ex_rois[:, 1] + 0.5 * ex_heights
+
+    gt_widths = gt_rois[:, 2] - gt_rois[:, 0] + 1.0
+    gt_heights = gt_rois[:, 3] - gt_rois[:, 1] + 1.0
+    gt_ctr_x = gt_rois[:, 0] + 0.5 * gt_widths
+    gt_ctr_y = gt_rois[:, 1] + 0.5 * gt_heights
+
+    targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
+    targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
+    targets_dw = np.log(gt_widths / ex_widths)
+    targets_dh = np.log(gt_heights / ex_heights)
+
+    targets = np.vstack(
+        (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
+    return targets
 
 
 def bbox_pred(boxes, box_deltas):
@@ -17,8 +44,8 @@ def bbox_pred(boxes, box_deltas):
         return np.zeros((0, box_deltas.shape[1]))
 
     boxes = boxes.astype(np.float, copy=False)
-    widths = boxes[:, 2] - boxes[:, 0] + 1e-14
-    heights = boxes[:, 3] - boxes[:, 1] + 1e-14
+    widths = boxes[:, 2] - boxes[:, 0] + 1.0
+    heights = boxes[:, 3] - boxes[:, 1] + 1.0
     ctr_x = boxes[:, 0] + 0.5 * widths
     ctr_y = boxes[:, 1] + 0.5 * heights
 
@@ -53,11 +80,11 @@ def clip_boxes(boxes, im_shape):
     :return: [N, 4* num_classes]
     """
     # x1 >= 0
-    boxes[:, 0::4] = np.maximum(boxes[:, 0::4], 0)
+    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
     # y1 >= 0
-    boxes[:, 1::4] = np.maximum(boxes[:, 1::4], 0)
+    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
     # x2 < im_shape[1]
-    boxes[:, 2::4] = np.minimum(boxes[:, 2::4], im_shape[1] - 1)
+    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
     # y2 < im_shape[0]
-    boxes[:, 3::4] = np.minimum(boxes[:, 3::4], im_shape[0] - 1)
+    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
     return boxes
