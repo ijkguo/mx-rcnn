@@ -4,7 +4,7 @@ import os
 import mxnet as mx
 
 from rcnn.config import config
-from rcnn.data_iter import ROIIter
+from rcnn.loader import ROIIter
 from rcnn.rpn.generate import Detector, generate_detections
 from rcnn.symbol import get_vgg_rpn_test
 from utils.load_data import load_gt_roidb

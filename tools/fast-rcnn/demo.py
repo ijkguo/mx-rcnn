@@ -59,7 +59,7 @@ def demo_net(detector, image_name):
         cls_boxes = cls_boxes[keep, :]
         cls_scores = cls_scores[keep]
         dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32)
-        keep = nms(dets, NMS_THRESH)
+        keep = nms(dets.astype(np.float32), NMS_THRESH)
         all_boxes[cls_ind] = dets[keep, :]
 
     boxes_this_image = [[]] + [all_boxes[j] for j in range(1, len(CLASSES))]

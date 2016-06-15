@@ -213,7 +213,7 @@ def get_vgg_rpn_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     group = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), output_score=True)
+        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2), output_score=True)
     # rois = group[0]
     # score = group[1]
 
@@ -251,7 +251,7 @@ def get_vgg_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     rois = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32))
+        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2))
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(

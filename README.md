@@ -1,4 +1,4 @@
-# Faster R-CNN in MXNet
+# Faster R-CNN in MXNet with distributed implementation and data parallelization
 
 Region Proposal Network solves object detection as a regression problem 
 from the objectness perspective. Bounding boxes are predicted by applying 
@@ -16,13 +16,10 @@ are simultaneously learned in the training process.
 Faster R-CNN utilize an alternate optimization training process between RPN 
 and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
 
-This repository may reflect experimental changes. Refer to `mxnet/example/rcnn/` 
-as a tested example.
-
 ## Getting Started
 
-* Install the lastest version of MXNet from DMLC. Follow the instructions at 
-http://mxnet.readthedocs.io/en/latest/how_to/build.html. Install the python interface.
+* Install a forked MXNet at [MXNet-detection](https://github.com/precedenceguo/mxnet/tree/detection).
+Follow the instructions at http://mxnet.readthedocs.io/en/latest/how_to/build.html. Install the python interface.
 * Download data and place them to `data` folder according to `Data Folder Structure`.
   You might want to create a symbolic link to VOCdevkit folder
 ```
@@ -35,7 +32,7 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar
 ```
 demo
 rpn_data (created by rpn)
-selective_search_data
+selective_search_data (can be omitted)
 cache (created by imdb)
 -- name + source + roidb.pkl (create by imdb)
 -- name (created by detection and evaluation)

@@ -4,6 +4,27 @@ import numpy as np
 from rcnn.config import config
 
 
+class AccuracyMetric(mx.metric.EvalMetric):
+    def __init__(self, use_ignore=False, ignore=None):
+        super(AccuracyMetric, self).__init__('Accuracy')
+        self.use_ignore = use_ignore
+        self.ignore = ignore
+        if self.use_ignore:
+            assert self.ignore is not None
+
+    def update(self, labels, preds):
+        pred_label = mx.ndarray.argmax_channel(preds[0]).asnumpy().astype('int32')
+        label = labels[0].asnumpy().astype('int32')
+
+        if self.use_ignore:
+            non_ignore_inds = np.where(label != self.ignore)
+            pred_label = pred_label[non_ignore_inds]
+            label = label[non_ignore_inds]
+
+        self.sum_metric += (pred_label.flat == label.flat).sum()
+        self.num_inst += len(pred_label.flat)
+
+
 class LogLossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(LogLossMetric, self).__init__('LogLoss')
@@ -31,7 +52,7 @@ class SmoothL1LossMetric(mx.metric.EvalMetric):
         super(SmoothL1LossMetric, self).__init__('SmoothL1Loss')
 
     def update(self, labels, preds):
-        bbox_loss = preds[0].asnumpy()
+        bbox_loss = preds[1].asnumpy()
         bbox_loss = bbox_loss.reshape((bbox_loss.shape[0], -1))
         self.num_inst += bbox_loss.shape[0]
         bbox_loss = np.sum(bbox_loss)

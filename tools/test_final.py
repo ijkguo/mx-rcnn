@@ -5,7 +5,7 @@ import os
 import mxnet as mx
 
 from rcnn.config import config
-from rcnn.data_iter import ROIIter
+from rcnn.loader import ROIIter
 from rcnn.detector import Detector
 from rcnn.symbol import get_vgg_test
 from rcnn.tester import pred_eval

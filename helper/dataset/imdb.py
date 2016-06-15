@@ -32,7 +32,7 @@ class IMDB(object):
     def create_roidb_from_box_list(self, box_list, gt_roidb):
         """
         given ground truth, prepare roidb
-        :param box_list: [image_index][box_index][x1, x2, y1, y2]
+        :param box_list: [image_index] ndarray of [box_index][x1, x2, y1, y2]
         :param gt_roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
         :return: roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
         """
@@ -43,7 +43,7 @@ class IMDB(object):
             num_boxes = boxes.shape[0]
             overlaps = np.zeros((num_boxes, self.num_classes), dtype=np.float32)
 
-            if gt_roidb is not None:
+            if gt_roidb is not None and gt_roidb[i]['boxes'].size > 0:
                 gt_boxes = gt_roidb[i]['boxes']
                 gt_classes = gt_roidb[i]['gt_classes']
                 # n boxes and k gt_boxes => n * k overlap

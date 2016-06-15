@@ -41,15 +41,10 @@ def get_minibatch(roidb, num_classes, mode='test'):
     :param mode: controls whether blank label are returned
     :return: data, label
     """
+    # build im_array: [num_images, c, h, w]
     num_images = len(roidb)
-    random_scale_indexes = npr.randint(0, high=len(config.TRAIN.SCALES), size=num_images)
-    assert config.TRAIN.BATCH_SIZE % num_images == 0, \
-        'num_images {} must devide BATCHSIZE {}'.format(num_images, config.TRAIN.BATCH_SIZE)
-    rois_per_image = config.TRAIN.BATCH_SIZE / num_images
-    fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
-
-    # im_array: [num_images, c, h, w]
-    im_array, im_scales = get_image_array(roidb, config.TRAIN.SCALES, random_scale_indexes)
+    random_scale_indexes = npr.randint(0, high=len(config.SCALES), size=num_images)
+    im_array, im_scales = get_image_array(roidb, config.SCALES, random_scale_indexes)
 
     if mode == 'train':
         cfg_key = 'TRAIN'
@@ -74,6 +69,11 @@ def get_minibatch(roidb, num_classes, mode='test'):
             label = {'gt_boxes': gt_boxes}
     else:
         if mode == 'train':
+            assert config.TRAIN.BATCH_SIZE % config.TRAIN.BATCH_IMAGES == 0, \
+                'BATCHIMAGES {} must devide BATCHSIZE {}'.format(config.TRAIN.BATCH_IMAGES, config.TRAIN.BATCH_SIZE)
+            rois_per_image = config.TRAIN.BATCH_SIZE / config.TRAIN.BATCH_IMAGES
+            fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
+
             rois_array = list()
             labels_array = list()
             bbox_targets_array = list()
@@ -140,7 +140,7 @@ def get_image_array(roidb, scales, scale_indexes):
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         target_size = scales[scale_indexes[i]]
-        im, im_scale = image_processing.resize(im, target_size, config.TRAIN.MAX_SIZE)
+        im, im_scale = image_processing.resize(im, target_size, config.MAX_SIZE)
         im_tensor = image_processing.transform(im, config.PIXEL_MEANS)
         processed_ims.append(im_tensor)
         im_scales.append(im_scale)
@@ -201,7 +201,8 @@ def sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     return rois, labels, bbox_targets, bbox_inside_weights, overlaps
 
 
-def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16, scales=(8, 16, 32), allowed_border=0):
+def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16,
+                  scales=(8, 16, 32), ratios=(0.5, 1, 2), allowed_border=0):
     """
     assign ground truth boxes to anchor positions
     :param feat_shape: infer output shape
@@ -209,6 +210,7 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16, scales=(8, 16, 
     :param im_info: filter out anchors overlapped with edges
     :param feat_stride: anchor position step
     :param scales: used to generate anchors, affects num_anchors (per location)
+    :param ratios: aspect ratios of generated anchors
     :param allowed_border: filter out anchors with edge overlap > allowed_border
     :return: dict of label
     'label': of shape (batch_size, 1) <- (batch_size, num_anchors, feat_height, feat_width)
@@ -239,7 +241,7 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16, scales=(8, 16, 
     DEBUG = False
     im_info = im_info[0]
     scales = np.array(scales, dtype=np.float32)
-    base_anchors = generate_anchors(base_size=16, ratios=[0.5, 1, 2], scales=scales)
+    base_anchors = generate_anchors(base_size=16, ratios=list(ratios), scales=scales)
     num_anchors = base_anchors.shape[0]
     feat_height, feat_width = feat_shape[-2:]
 
@@ -287,28 +289,31 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16, scales=(8, 16, 
     labels = np.empty((len(inds_inside),), dtype=np.float32)
     labels.fill(-1)
 
-    # overlap between the anchors and the gt boxes
-    # overlaps (ex, gt)
-    overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes.astype(np.float))
-    argmax_overlaps = overlaps.argmax(axis=1)
-    max_overlaps = overlaps[np.arange(len(inds_inside)), argmax_overlaps]
-    gt_argmax_overlaps = overlaps.argmax(axis=0)
-    gt_max_overlaps = overlaps[gt_argmax_overlaps, np.arange(overlaps.shape[1])]
-    gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
+    if gt_boxes.size > 0:
+        # overlap between the anchors and the gt boxes
+        # overlaps (ex, gt)
+        overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes.astype(np.float))
+        argmax_overlaps = overlaps.argmax(axis=1)
+        max_overlaps = overlaps[np.arange(len(inds_inside)), argmax_overlaps]
+        gt_argmax_overlaps = overlaps.argmax(axis=0)
+        gt_max_overlaps = overlaps[gt_argmax_overlaps, np.arange(overlaps.shape[1])]
+        gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
-    if not config.TRAIN.RPN_CLOBBER_POSITIVES:
-        # assign bg labels first so that positive labels can clobber them
-        labels[max_overlaps < config.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
+        if not config.TRAIN.RPN_CLOBBER_POSITIVES:
+            # assign bg labels first so that positive labels can clobber them
+            labels[max_overlaps < config.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
 
-    # fg label: for each gt, anchor with highest overlap
-    labels[gt_argmax_overlaps] = 1
+        # fg label: for each gt, anchor with highest overlap
+        labels[gt_argmax_overlaps] = 1
 
-    # fg label: above threshold IoU
-    labels[max_overlaps >= config.TRAIN.RPN_POSITIVE_OVERLAP] = 1
+        # fg label: above threshold IoU
+        labels[max_overlaps >= config.TRAIN.RPN_POSITIVE_OVERLAP] = 1
 
-    if config.TRAIN.RPN_CLOBBER_POSITIVES:
-        # assign bg labels last so that negative labels can clobber positives
-        labels[max_overlaps < config.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
+        if config.TRAIN.RPN_CLOBBER_POSITIVES:
+            # assign bg labels last so that negative labels can clobber positives
+            labels[max_overlaps < config.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
+    else:
+        labels[:] = 0
 
     # subsample positive labels if we have too many
     num_fg = int(config.TRAIN.RPN_FG_FRACTION * config.TRAIN.RPN_BATCH_SIZE)
@@ -329,7 +334,8 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16, scales=(8, 16, 
         labels[disable_inds] = -1
 
     bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
-    bbox_targets[:] = _compute_targets(anchors, gt_boxes[argmax_overlaps, :])
+    if gt_boxes.size > 0:
+        bbox_targets[:] = _compute_targets(anchors, gt_boxes[argmax_overlaps, :])
 
     bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
     bbox_inside_weights[labels == 1, :] = np.array(config.TRAIN.RPN_BBOX_INSIDE_WEIGHTS)
