@@ -41,7 +41,8 @@ def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
 
     # initialize params
     if not resume:
-        arg_shape, _, _ = sym.infer_shape(data=(1, 3, 224, 224), rois=(1, 5))
+        input_shapes = {k: v for k, v in train_data.provide_data + train_data.provide_label}
+        arg_shape, _, _ = sym.infer_shape(**input_shapes)
         arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
         args['cls_score_weight'] = mx.random.normal(mean=0, stdvar=0.01, shape=arg_shape_dict['cls_score_weight'])
         args['cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['cls_score_bias'])

@@ -4,6 +4,7 @@ basic format [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
 extended ['image', 'max_classes', 'max_overlaps', 'bbox_targets']
 """
 
+import cv2
 import numpy as np
 
 from bbox_regression import compute_bbox_regression_targets
@@ -20,6 +21,10 @@ def prepare_roidb(imdb, roidb):
     print 'prepare roidb'
     for i in range(len(roidb)):  # image_index
         roidb[i]['image'] = imdb.image_path_from_index(imdb.image_set_index[i])
+        if config.TRAIN.ASPECT_GROUPING:
+            size = cv2.imread(roidb[i]['image']).shape
+            roidb[i]['height'] = size[0]
+            roidb[i]['width'] = size[1]
         gt_overlaps = roidb[i]['gt_overlaps'].toarray()
         max_overlaps = gt_overlaps.max(axis=1)
         max_classes = gt_overlaps.argmax(axis=1)

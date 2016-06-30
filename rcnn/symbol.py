@@ -114,7 +114,7 @@ def get_vgg_rcnn_test(num_classes=21):
     """
     data = mx.symbol.Variable(name="data")
     rois = mx.symbol.Variable(name='rois')
-    
+
     # shared convolutional layer
     relu5_3 = get_vgg_conv(data)
     
