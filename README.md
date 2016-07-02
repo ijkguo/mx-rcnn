@@ -20,6 +20,8 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
 
 * Install a forked MXNet at [MXNet-detection](https://github.com/precedenceguo/mxnet/tree/detection).
 Follow the instructions at http://mxnet.readthedocs.io/en/latest/how_to/build.html. Install the python interface.
+Note that the link refers to `detection` branch of the fork. Use `git clone -b detection https://github.com/precedenceguo/mxnet.git`
+to clone or `git checkout detection` if you checked out the master.
 * Download data and place them to `data` folder according to `Data Folder Structure`.
   You might want to create a symbolic link to VOCdevkit folder
 ```
