@@ -109,7 +109,7 @@ def train_rcnn(image_set, year, root_path, devkit_path, pretrained, epoch,
     args['bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['bbox_pred_bias'])
 
     # train
-    solver = Solver(prefix, sym, ctx, begin_epoch, kv_store, end_epoch, args, auxs, momentum=0.9, wd=0.0005,
+    solver = Solver(prefix, sym, ctx, begin_epoch, end_epoch, kv_store, args, auxs, momentum=0.9, wd=0.0005,
                     learning_rate=1e-3, lr_scheduler=mx.lr_scheduler.FactorScheduler(30000, 0.1),
                     mutable_data_shape=True, max_data_shape=max_data_shape)
     solver.fit(train_data, frequent=frequent)

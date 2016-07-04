@@ -16,11 +16,12 @@ DEBUG = False
 
 
 class ProposalOperator(mx.operator.CustomOp):
-    def __init__(self, feat_stride, scales, is_train=False, output_score=False):
+    def __init__(self, feat_stride, scales, ratios, is_train=False, output_score=False):
         super(ProposalOperator, self).__init__()
         self._feat_stride = float(feat_stride)
         self._scales = np.fromstring(scales[1:-1], dtype=float, sep=',')
-        self._anchors = generate_anchors(scales=self._scales)
+        self._ratios = np.fromstring(ratios[1:-1], dtype=float, sep=',').tolist()
+        self._anchors = generate_anchors(base_size=self._feat_stride, scales=self._scales, ratios=self._ratios)
         self._num_anchors = self._anchors.shape[0]
         self._output_score = output_score
 
@@ -157,10 +158,11 @@ class ProposalOperator(mx.operator.CustomOp):
 
 @mx.operator.register("proposal")
 class ProposalProp(mx.operator.CustomOpProp):
-    def __init__(self, feat_stride, scales, is_train=False, output_score=False):
+    def __init__(self, feat_stride, scales, ratios, is_train=False, output_score=False):
         super(ProposalProp, self).__init__(need_top_grad=False)
         self._feat_stride = feat_stride
         self._scales = scales
+        self._ratios = ratios
         self._is_train = is_train
         self._output_score = output_score
 
@@ -198,7 +200,7 @@ class ProposalProp(mx.operator.CustomOpProp):
             return [cls_prob_shape, bbox_pred_shape, im_info_shape], [output_shape]
 
     def create_operator(self, ctx, shapes, dtypes):
-        return ProposalOperator(self._feat_stride, self._scales, self._is_train, self._output_score)
+        return ProposalOperator(self._feat_stride, self._scales, self._ratios, self._is_train, self._output_score)
 
     def declare_backward_dependency(self, out_grad, in_data, out_data):
         return []
