@@ -11,6 +11,7 @@ from rcnn.symbol import get_vgg_rpn, get_vgg_rpn_test, get_vgg_rcnn
 from utils.load_data import load_gt_roidb, load_rpn_roidb
 from utils.load_model import load_checkpoint, load_param
 from utils.save_model import save_checkpoint
+from utils.combine_model import combine_model
 
 
 def train_rpn(image_set, year, root_path, devkit_path, pretrained, epoch,
@@ -161,11 +162,17 @@ def alternate_train(image_set, year, root_path, devkit_path, pretrained, epoch,
     config.TEST.RPN_POST_NMS_TOP_N = 2000
     test_rpn(image_set, year, root_path, devkit_path, 'model/rpn2', rpn_epoch, ctx)
 
+    logger.info('########## COMBINE RPN2 WITH RCNN1')
+    combine_model('model/rpn2', rpn_epoch, 'model/rcnn1', rcnn_epoch, 'model/rcnn2', 0)
+
     logger.info('########## TRAIN RCNN WITH RPN INIT AND DETECTION')
     config.TRAIN.HAS_RPN = False
     config.TRAIN.BATCH_SIZE = 128
-    train_rcnn(image_set, year, root_path, devkit_path, 'model/rpn2', rpn_epoch,
+    train_rcnn(image_set, year, root_path, devkit_path, 'model/rcnn2', 0,
                'model/rcnn2', ctx, begin_epoch, rcnn_epoch, frequent, kv_store, work_load_list)
+
+    logger.info('########## COMBINE RPN2 WITH RCNN2')
+    combine_model('model/rpn2', rpn_epoch, 'model/rcnn2', rcnn_epoch, 'model/final', 0)
 
 
 def parse_args():
