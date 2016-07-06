@@ -13,12 +13,12 @@ final:  {'label': [batch_size, 1] <- [batch_size, num_anchors, feat_height, feat
 Fast R-CNN:
 data =
     {'data': [num_images, c, h, w],
-    'rois': [num_rois, 5]}
+    'rois': [num_images, num_rois, 5]}
 label =
-    {'label': [num_rois],
-    'bbox_target': [num_rois, 4 * num_classes],
-    'bbox_inside_weight': [num_rois, 4 * num_classes],
-    'bbox_outside_weight': [num_rois, 4 * num_classes]}
+    {'label': [num_images, num_rois],
+    'bbox_target': [num_images, num_rois, 4 * num_classes],
+    'bbox_inside_weight': [num_images, num_rois, 4 * num_classes],
+    'bbox_outside_weight': [num_images, num_rois, 4 * num_classes]}
 """
 
 import cv2
@@ -95,10 +95,10 @@ def get_minibatch(roidb, num_classes, mode='test'):
                 bbox_targets_array.append(bbox_targets)
                 bbox_inside_array.append(bbox_inside_weights)
 
-            rois_array = np.vstack(rois_array)
-            labels_array = np.hstack(labels_array)
-            bbox_targets_array = np.vstack(bbox_targets_array)
-            bbox_inside_array = np.vstack(bbox_inside_array)
+            rois_array = np.array(rois_array)
+            labels_array = np.array(labels_array)
+            bbox_targets_array = np.array(bbox_targets_array)
+            bbox_inside_array = np.array(bbox_inside_array)
             bbox_outside_array = np.array(bbox_inside_array > 0).astype(np.float32)
 
             data = {'data': im_array,

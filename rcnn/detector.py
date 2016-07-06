@@ -59,8 +59,8 @@ class Detector(object):
         self.executor.forward(is_train=False)
 
         # save output
-        scores = output_dict['cls_prob_output'].asnumpy()
-        bbox_deltas = output_dict['bbox_pred_output'].asnumpy()
+        scores = output_dict['cls_prob_reshape_output'].asnumpy()[0]
+        bbox_deltas = output_dict['bbox_pred_reshape_output'].asnumpy()[0]
         if config.TEST.HAS_RPN:
             rois = output_dict['rois_output'].asnumpy()
             rois = rois[:, 1:].copy()  # scale back

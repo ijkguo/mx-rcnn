@@ -1,5 +1,6 @@
 import mxnet as mx
 import rpn.proposal
+from config import config
 
 
 def get_vgg_conv(data):
@@ -77,6 +78,13 @@ def get_vgg_rcnn(num_classes=21):
     bbox_inside_weight = mx.symbol.Variable(name='bbox_inside_weight')
     bbox_outside_weight = mx.symbol.Variable(name='bbox_outside_weight')
 
+    # reshape input
+    rois = mx.symbol.Reshape(data=rois, shape=(-1, 5), name='rois_reshape')
+    label = mx.symbol.Reshape(data=label, shape=(-1, ), name='label_reshape')
+    bbox_target = mx.symbol.Reshape(data=bbox_target, shape=(-1, 4 * num_classes), name='bbox_target_reshape')
+    bbox_inside_weight = mx.symbol.Reshape(data=bbox_inside_weight, shape=(-1, 4 * num_classes), name='bbox_inside_weight_reshape')
+    bbox_outside_weight = mx.symbol.Reshape(data=bbox_outside_weight, shape=(-1, 4 * num_classes), name='bbox_outside_weight_reshape')
+
     # shared convolutional layers
     relu5_3 = get_vgg_conv(data)
 
@@ -101,6 +109,11 @@ def get_vgg_rcnn(num_classes=21):
                  mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0,
                                      data=bbox_inside_weight * (bbox_pred - bbox_target))
     bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_)
+
+    # reshape output
+    cls_prob = mx.symbol.Reshape(data=cls_prob, shape=(config.TRAIN.BATCH_IMAGES, -1, num_classes), name='cls_prob_reshape')
+    bbox_loss = mx.symbol.Reshape(data=bbox_loss, shape=(config.TRAIN.BATCH_IMAGES, -1, 4 * num_classes), name='bbox_loss_reshape')
+
     # group output
     group = mx.symbol.Group([cls_prob, bbox_loss])
     return group
@@ -114,6 +127,9 @@ def get_vgg_rcnn_test(num_classes=21):
     """
     data = mx.symbol.Variable(name="data")
     rois = mx.symbol.Variable(name='rois')
+
+    # reshape rois
+    rois = mx.symbol.Reshape(data=rois, shape=(-1, 5), name='rois_reshape')
 
     # shared convolutional layer
     relu5_3 = get_vgg_conv(data)
@@ -135,6 +151,11 @@ def get_vgg_rcnn_test(num_classes=21):
     cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score)
     # bounding box regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
+
+    # reshape output
+    cls_prob = mx.symbol.Reshape(data=cls_prob, shape=(config.TEST.BATCH_IMAGES, -1, num_classes), name='cls_prob_reshape')
+    bbox_pred = mx.symbol.Reshape(data=bbox_pred, shape=(config.TEST.BATCH_IMAGES, -1, 4 * num_classes), name='bbox_pred_reshape')
+
     # group output
     group = mx.symbol.Group([cls_prob, bbox_pred])
     return group
@@ -270,6 +291,11 @@ def get_vgg_test(num_classes=21, num_anchors=9):
     cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score)
     # bounding box regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
+
+    # reshape output
+    cls_prob = mx.symbol.Reshape(data=cls_prob, shape=(config.TEST.BATCH_IMAGES, -1, num_classes), name='cls_prob_reshape')
+    bbox_pred = mx.symbol.Reshape(data=bbox_pred, shape=(config.TEST.BATCH_IMAGES, -1, 4 * num_classes), name='bbox_pred_reshape')
+
     # group output
     group = mx.symbol.Group([rois, cls_prob, bbox_pred])
     return group

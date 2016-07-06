@@ -36,15 +36,11 @@ class Solver(object):
         self.param_names = None
         self.aux_names = None
 
-    def get_params(self, grad_req):
+    def get_params(self, grad_req, data_shapes):
         arg_names = self.symbol.list_arguments()
         self.arg_names = arg_names
 
-        if config.TRAIN.HAS_RPN:
-            arg_shapes, out_shapes, aux_shapes = \
-                self.symbol.infer_shape(data=(1, 3, 224, 224))
-        else:
-            arg_shapes, out_shapes, aux_shapes = self.symbol.infer_shape(data=(1, 3, 224, 224), rois=(1, 5))
+        arg_shapes, out_shapes, aux_shapes = self.symbol.infer_shape(**dict(data_shapes))
         if grad_req != 'null':
             param_names = []
             for name, shape in zip(arg_names, arg_shapes):
@@ -77,13 +73,14 @@ class Solver(object):
         batch_end_callback = Speedometer(train_data.batch_size, frequent=frequent)
         epoch_end_callback = mx.callback.do_checkpoint(self.prefix)
 
-        self.get_params(grad_req)
+        self.get_params(grad_req, train_data.provide_data + train_data.provide_label)
 
         if config.TRAIN.HAS_RPN is True:
             eval_metric = metric.AccuracyMetric(use_ignore=True, ignore=-1)
+            cls_metric = metric.LogLossMetric(use_ignore=True, ignore=-1)
         else:
             eval_metric = metric.AccuracyMetric()
-        cls_metric = metric.LogLossMetric()
+            cls_metric = metric.LogLossMetric()
         bbox_metric = metric.SmoothL1LossMetric()
         eval_metrics = mx.metric.CompositeEvalMetric()
         for child_metric in [eval_metric, cls_metric, bbox_metric]:
