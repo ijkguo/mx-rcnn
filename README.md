@@ -51,6 +51,7 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
 * Download link to trained model
   Baidu Yun: http://pan.baidu.com/s/1boRhGvH (ixiw)
 * Download link to Pascal VOC and precomputed selective search proposals
+
   ```
   Pascal VOCdevkit
   http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
@@ -59,7 +60,9 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
   selective_search_data (by Ross Girshick)
   Download link accessible at https://github.com/rbgirshick/fast-rcnn/blob/master/data/scripts/fetch_selective_search_data.sh
   ```
-* Data Folder Structure (suppose root is `data`)
+
+* Data Folder Structure (create a `data` folder if there is none)
+
   ```
   VOCdevkit
   -- VOC + year (JPEG images and annotations)
