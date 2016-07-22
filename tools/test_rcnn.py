@@ -6,7 +6,7 @@ import mxnet as mx
 from rcnn.config import config
 from rcnn.loader import ROIIter
 from rcnn.detector import Detector
-from rcnn.symbol import get_vgg_rcnn_test
+from rcnn.symbol import get_vgg_test, get_vgg_rcnn_test
 from rcnn.tester import pred_eval
 from utils.load_data import load_gt_roidb, load_test_ss_roidb, load_test_rpn_roidb
 from utils.load_model import load_param
@@ -19,7 +19,7 @@ def test_rcnn(imageset, year, root_path, devkit_path, prefix, epoch, ctx, vis=Fa
         config.TEST.HAS_RPN = True
         config.TEST.RPN_PRE_NMS_TOP_N = 6000
         config.TEST.RPN_POST_NMS_TOP_N = 300
-        voc, roidb = load_gt_roidb(image_set, year, root_path, devkit_path)
+        voc, roidb = load_gt_roidb(imageset, year, root_path, devkit_path)
     else:
         sym = get_vgg_rcnn_test()
         voc, roidb = eval('load_test_' + proposal + '_roidb')(imageset, year, root_path, devkit_path)
