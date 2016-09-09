@@ -15,10 +15,10 @@ from utils.load_model import load_param
 def test_rcnn(imageset, year, root_path, devkit_path, prefix, epoch, ctx, vis=False, has_rpn=True, proposal='rpn'):
     # load symbol and testing data
     if has_rpn:
-        sym = get_vgg_test()
         config.TEST.HAS_RPN = True
         config.TEST.RPN_PRE_NMS_TOP_N = 6000
         config.TEST.RPN_POST_NMS_TOP_N = 300
+        sym = get_vgg_test()
         voc, roidb = load_gt_roidb(imageset, year, root_path, devkit_path)
     else:
         sym = get_vgg_rcnn_test()

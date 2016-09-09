@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import pprint
 
 import mxnet as mx
 
@@ -31,6 +32,9 @@ def train_rpn(image_set, year, root_path, devkit_path, pretrained, epoch,
     # setup multi-gpu
     config.TRAIN.BATCH_IMAGES *= len(ctx)
     config.TRAIN.BATCH_SIZE *= len(ctx)
+
+    # print config
+    pprint.pprint(config)
 
     # load training data
     voc, roidb = load_gt_roidb(image_set, year, root_path, devkit_path, flip=True)

@@ -69,9 +69,9 @@ def get_minibatch(roidb, num_classes, mode='test'):
             label = {'gt_boxes': gt_boxes}
     else:
         if mode == 'train':
-            assert config.TRAIN.BATCH_SIZE % config.TRAIN.BATCH_IMAGES == 0, \
-                'BATCHIMAGES {} must devide BATCHSIZE {}'.format(config.TRAIN.BATCH_IMAGES, config.TRAIN.BATCH_SIZE)
-            rois_per_image = config.TRAIN.BATCH_SIZE / config.TRAIN.BATCH_IMAGES
+            assert config.TRAIN.BATCH_ROIS % config.TRAIN.BATCH_IMAGES == 0, \
+                'BATCHIMAGES {} must devide BATCH_ROIS {}'.format(config.TRAIN.BATCH_IMAGES, config.TRAIN.BATCH_ROIS)
+            rois_per_image = config.TRAIN.BATCH_ROIS / config.TRAIN.BATCH_IMAGES
             fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
 
             rois_array = list()

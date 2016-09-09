@@ -102,13 +102,13 @@ def get_vgg_rcnn(num_classes=21):
     drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
     # classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=drop7, num_hidden=num_classes)
-    cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label)
+    cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='batch')
     # bounding box regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
     bbox_loss_ = bbox_outside_weight * \
                  mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0,
                                      data=bbox_inside_weight * (bbox_pred - bbox_target))
-    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_)
+    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / config.TRAIN.BATCH_ROIS)
 
     # reshape output
     cls_prob = mx.symbol.Reshape(data=cls_prob, shape=(config.TRAIN.BATCH_IMAGES, -1, num_classes), name='cls_prob_reshape')
@@ -234,7 +234,9 @@ def get_vgg_rpn_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     group = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2), output_score=True)
+        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2), output_score=True,
+        rpn_pre_nms_top_n=config.TEST.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TEST.RPN_POST_NMS_TOP_N,
+        threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
     # rois = group[0]
     # score = group[1]
 
@@ -272,7 +274,9 @@ def get_vgg_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     rois = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2))
+        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2),
+        rpn_pre_nms_top_n=config.TEST.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TEST.RPN_POST_NMS_TOP_N,
+        threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(

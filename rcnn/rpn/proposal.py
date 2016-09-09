@@ -7,7 +7,6 @@ import mxnet as mx
 import numpy as np
 import numpy.random as npr
 
-from rcnn.config import config
 from helper.processing.generate_anchor import generate_anchors
 from helper.processing.bbox_transform import bbox_pred, clip_boxes
 from helper.processing.nms import nms
@@ -16,24 +15,24 @@ DEBUG = False
 
 
 class ProposalOperator(mx.operator.CustomOp):
-    def __init__(self, feat_stride, scales, ratios, is_train=False, output_score=False):
+    def __init__(self, feat_stride, scales, ratios, output_score,
+                 rpn_pre_nms_top_n, rpn_post_nms_top_n, threshold, rpn_min_size):
         super(ProposalOperator, self).__init__()
-        self._feat_stride = float(feat_stride)
+        self._feat_stride = feat_stride
         self._scales = np.fromstring(scales[1:-1], dtype=float, sep=',')
-        self._ratios = np.fromstring(ratios[1:-1], dtype=float, sep=',').tolist()
+        self._ratios = np.fromstring(ratios[1:-1], dtype=float, sep=',')
         self._anchors = generate_anchors(base_size=self._feat_stride, scales=self._scales, ratios=self._ratios)
         self._num_anchors = self._anchors.shape[0]
         self._output_score = output_score
+        self._rpn_pre_nms_top_n = rpn_pre_nms_top_n
+        self._rpn_post_nms_top_n = rpn_post_nms_top_n
+        self._threshold = threshold
+        self._rpn_min_size = rpn_min_size
 
         if DEBUG:
             print 'feat_stride: {}'.format(self._feat_stride)
             print 'anchors:'
             print self._anchors
-
-        if is_train:
-            self.cfg_key = 'TRAIN'
-        else:
-            self.cfg_key = 'TEST'
 
     def forward(self, is_train, req, in_data, out_data, aux):
         # for each (H, W) location i
@@ -47,10 +46,10 @@ class ProposalOperator(mx.operator.CustomOp):
         # take after_nms_topN proposals after NMS
         # return the top proposals (-> RoIs top, scores top)
 
-        pre_nms_topN = config[self.cfg_key].RPN_PRE_NMS_TOP_N
-        post_nms_topN = config[self.cfg_key].RPN_POST_NMS_TOP_N
-        nms_thresh = config[self.cfg_key].RPN_NMS_THRESH
-        min_size = config[self.cfg_key].RPN_MIN_SIZE
+        pre_nms_topN = self._rpn_pre_nms_top_n
+        post_nms_topN = self._rpn_post_nms_top_n
+        nms_thresh = self._threshold
+        min_size = self._rpn_min_size
 
         # the first set of anchors are background probabilities
         # keep the second part
@@ -63,10 +62,12 @@ class ProposalOperator(mx.operator.CustomOp):
             print 'scale: {}'.format(im_info[2])
 
         # 1. Generate proposals from bbox_deltas and shifted anchors
-        height, width = scores.shape[-2:]
+        # use real image size instead of padded feature map sizes
+        height, width = int(im_info[0] / self._feat_stride), int(im_info[1] / self._feat_stride)
 
         if DEBUG:
             print 'score map size: {}'.format(scores.shape)
+            print "resudial: {}".format((scores.shape[2] - height, scores.shape[3] - width))
 
         # Enumerate all shifts
         shift_x = np.arange(0, width) * self._feat_stride
@@ -92,6 +93,7 @@ class ProposalOperator(mx.operator.CustomOp):
         # transpose to (1, H, W, 4 * A)
         # reshape to (1 * H * W * A, 4) where rows are ordered by (h, w, a)
         # in slowest to fastest order
+        bbox_deltas = self._clip_pad(bbox_deltas, (height, width))
         bbox_deltas = bbox_deltas.transpose((0, 2, 3, 1)).reshape((-1, 4))
 
         # Same story for the scores:
@@ -99,6 +101,7 @@ class ProposalOperator(mx.operator.CustomOp):
         # scores are (1, A, H, W) format
         # transpose to (1, H, W, A)
         # reshape to (1 * H * W * A, 1) where rows are ordered by (h, w, a)
+        scores = self._clip_pad(scores, (height, width))
         scores = scores.transpose((0, 2, 3, 1)).reshape((-1, 1))
 
         # Convert anchors into proposals via bbox transformations
@@ -109,7 +112,7 @@ class ProposalOperator(mx.operator.CustomOp):
 
         # 3. remove predicted boxes with either height or width < threshold
         # (NOTE: convert min_size to input image scale stored in im_info[2])
-        keep = ProposalOperator._filter_boxes(proposals, min_size * im_info[2])
+        keep = self._filter_boxes(proposals, min_size * im_info[2])
         proposals = proposals[keep, :]
         scores = scores[keep]
 
@@ -145,7 +148,8 @@ class ProposalOperator(mx.operator.CustomOp):
             self.assign(out_data[1], req[1], scores.astype(np.float32, copy=False))
 
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
-        pass
+        self.assign(in_grad[0], req[0], 0)
+        self.assign(in_grad[1], req[1], 0)
 
     @staticmethod
     def _filter_boxes(boxes, min_size):
@@ -155,21 +159,36 @@ class ProposalOperator(mx.operator.CustomOp):
         keep = np.where((ws >= min_size) & (hs >= min_size))[0]
         return keep
 
+    @staticmethod
+    def _clip_pad(tensor, pad_shape):
+        """
+        Clip boxes of the pad area.
+        :param tensor: [n, c, H, W]
+        :param pad_shape: [h, w]
+        :return: [n, c, h, w]
+        """
+        H, W = tensor.shape[2:]
+        h, w = pad_shape
+
+        if h < H or w < W:
+            tensor = tensor[:, :, :h, :w].copy()
+
+        return tensor
+
 
 @mx.operator.register("proposal")
 class ProposalProp(mx.operator.CustomOpProp):
-    def __init__(self, feat_stride, scales, ratios, is_train=False, output_score=False):
+    def __init__(self, feat_stride='16', scales='(8, 16, 32)', ratios='(0.5, 1, 2)', output_score=False,
+                 rpn_pre_nms_top_n='6000', rpn_post_nms_top_n='300', threshold='0.3', rpn_min_size='16'):
         super(ProposalProp, self).__init__(need_top_grad=False)
-        self._feat_stride = feat_stride
+        self._feat_stride = int(feat_stride)
         self._scales = scales
         self._ratios = ratios
-        self._is_train = is_train
         self._output_score = output_score
-
-        if self._is_train:
-            self.cfg_key = 'TRAIN'
-        else:
-            self.cfg_key = 'TEST'
+        self._rpn_pre_nms_top_n = int(rpn_pre_nms_top_n)
+        self._rpn_post_nms_top_n = int(rpn_post_nms_top_n)
+        self._threshold = float(threshold)
+        self._rpn_min_size = int(rpn_min_size)
 
     def list_arguments(self):
         return ['cls_prob', 'bbox_pred', 'im_info']
@@ -181,7 +200,6 @@ class ProposalProp(mx.operator.CustomOpProp):
             return ['output']
 
     def infer_shape(self, in_shape):
-        cfg_key = self.cfg_key
         cls_prob_shape = in_shape[0]
         bbox_pred_shape = in_shape[1]
         assert cls_prob_shape[0] == bbox_pred_shape[0], 'ROI number does not equal in cls and reg'
@@ -191,8 +209,8 @@ class ProposalProp(mx.operator.CustomOpProp):
             raise ValueError("Only single item batches are supported")
 
         im_info_shape = (batch_size, 3)
-        output_shape = (config[cfg_key].RPN_POST_NMS_TOP_N, 5)
-        score_shape = (config[cfg_key].RPN_POST_NMS_TOP_N, 1)
+        output_shape = (self._rpn_post_nms_top_n, 5)
+        score_shape = (self._rpn_post_nms_top_n, 1)
 
         if self._output_score:
             return [cls_prob_shape, bbox_pred_shape, im_info_shape], [output_shape, score_shape]
@@ -200,7 +218,8 @@ class ProposalProp(mx.operator.CustomOpProp):
             return [cls_prob_shape, bbox_pred_shape, im_info_shape], [output_shape]
 
     def create_operator(self, ctx, shapes, dtypes):
-        return ProposalOperator(self._feat_stride, self._scales, self._ratios, self._is_train, self._output_score)
+        return ProposalOperator(self._feat_stride, self._scales, self._ratios, self._output_score,
+                                self._rpn_pre_nms_top_n, self._rpn_post_nms_top_n, self._threshold, self._rpn_min_size)
 
     def declare_backward_dependency(self, out_grad, in_data, out_data):
         return []
