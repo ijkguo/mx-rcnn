@@ -80,8 +80,15 @@ def get_minibatch(roidb, num_classes, mode='test'):
             bbox_inside_array = list()
 
             for im_i in range(num_images):
-                im_rois, labels, bbox_targets, bbox_inside_weights, overlaps = \
-                    sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image, num_classes)
+                roi_rec = roidb[im_i]
+                rois = roi_rec['boxes']
+                labels = roi_rec['max_classes']
+                overlaps = roi_rec['max_overlaps']
+                bbox_targets = roi_rec['bbox_targets']
+
+                im_rois, labels, bbox_targets, bbox_inside_weights = \
+                    sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
+                                labels, overlaps, bbox_targets)
 
                 # project im_rois
                 # do not round roi
@@ -148,19 +155,39 @@ def get_image_array(roidb, scales, scale_indexes):
     return array, im_scales
 
 
-def sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
+def _compute_targets(ex_rois, gt_rois):
+    """
+    compute bbox targets for an image
+    :param ex_rois: [n, 4]
+    :param gt_rois: [n, 5] (x1, y1, x2, y2, cls)
+    :return: class-agnostic bbox_targets
+    """
+    assert ex_rois.shape[0] == gt_rois.shape[0]
+    assert ex_rois.shape[1] == 4
+    assert gt_rois.shape[1] == 5
+
+    return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
+
+
+def sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
+                labels=None, overlaps=None, bbox_targets=None, gt_boxes=None):
     """
     generate random sample of ROIs comprising foreground and background examples
-    :param roidb: database of selected rois
+    :param rois: all_rois [n, 4]; e2e: [n, 5] with batch_index
     :param fg_rois_per_image: foreground roi number
     :param rois_per_image: total roi number
     :param num_classes: number of classes
-    :return: (labels, rois, bbox_targets, bbox_inside_weights, overlaps)
+    :param labels: maybe precomputed
+    :param overlaps: maybe precomputed (max_overlaps)
+    :param bbox_targets: maybe precomputed
+    :param gt_boxes: optional for e2e [n, 5] (x1, y1, x2, y2, cls)
+    :return: (labels, rois, bbox_targets, bbox_inside_weights)
     """
-    # label = class RoI has max overlap with
-    labels = roidb['max_classes']
-    overlaps = roidb['max_overlaps']
-    rois = roidb['boxes']
+    if labels is None:
+        overlaps = bbox_overlaps(rois[:, 1:].astype(np.float), gt_boxes[:, :4].astype(np.float))
+        gt_assignment = overlaps.argmax(axis=1)
+        overlaps = overlaps.max(axis=1)
+        labels = gt_boxes[gt_assignment, 4]
 
     # foreground RoI with FG_THRESH overlap
     fg_indexes = np.where(overlaps >= config.TRAIN.FG_THRESH)[0]
@@ -192,13 +219,22 @@ def sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     labels = labels[keep_indexes]
     # set labels of bg_rois to be 0
     labels[fg_rois_per_this_image:] = 0
-    overlaps = overlaps[keep_indexes]
     rois = rois[keep_indexes]
 
-    bbox_targets, bbox_inside_weights = \
-        expand_bbox_regression_targets(roidb['bbox_targets'][keep_indexes, :], num_classes)
+    # load or compute bbox_target
+    if bbox_targets is not None:
+        bbox_target_data = bbox_targets[keep_indexes, :]
+    else:
+        targets = _compute_targets(rois[:, 1:], gt_boxes)
+        if config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED:
+            targets = ((targets - np.array(config.TRAIN.BBOX_MEANS))
+                       / np.array(config.TRAIN.BBOX_STDS))
+        bbox_target_data = np.hstack((gt_boxes[:, 4:], targets))
 
-    return rois, labels, bbox_targets, bbox_inside_weights, overlaps
+    bbox_targets, bbox_inside_weights = \
+        expand_bbox_regression_targets(bbox_target_data, num_classes)
+
+    return rois, labels, bbox_targets, bbox_inside_weights
 
 
 def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16,
@@ -229,14 +265,6 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16,
             ret.fill(fill)
             ret[inds, :] = data
         return ret
-
-    def _compute_targets(ex_rois, gt_rois):
-        """ compute bbox targets for an image """
-        assert ex_rois.shape[0] == gt_rois.shape[0]
-        assert ex_rois.shape[1] == 4
-        assert gt_rois.shape[1] == 5
-
-        return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
 
     DEBUG = False
     im_info = im_info[0]

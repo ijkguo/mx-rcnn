@@ -8,7 +8,7 @@ import mxnet as mx
 from rcnn.callback import Speedometer
 from rcnn.config import config
 from rcnn.loader import AnchorLoader
-from rcnn.metric import AccuracyMetric, LogLossMetric, SmoothL1LossMetric
+from rcnn.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric
 from rcnn.module import MutableModule
 from rcnn.symbol import get_vgg_rpn
 from utils.load_data import load_gt_roidb
@@ -78,13 +78,10 @@ def train_rpn(image_set, year, root_path, devkit_path, pretrained, epoch,
     label_names = [k[0] for k in train_data.provide_label]
     batch_end_callback = Speedometer(train_data.batch_size, frequent=frequent)
     epoch_end_callback = mx.callback.do_checkpoint(prefix)
-    if config.TRAIN.HAS_RPN is True:
-        eval_metric = AccuracyMetric(use_ignore=True, ignore=-1)
-        cls_metric = LogLossMetric(use_ignore=True, ignore=-1)
-    else:
-        eval_metric = AccuracyMetric()
-        cls_metric = LogLossMetric()
-    bbox_metric = SmoothL1LossMetric()
+    # metric
+    eval_metric = RPNAccMetric()
+    cls_metric = RPNLogLossMetric()
+    bbox_metric = RPNL1LossMetric()
     eval_metrics = mx.metric.CompositeEvalMetric()
     for child_metric in [eval_metric, cls_metric, bbox_metric]:
         eval_metrics.add(child_metric)
