@@ -1,5 +1,6 @@
 import mxnet as mx
 import rpn.proposal
+import rpn.proposal_target
 from config import config
 
 
@@ -302,4 +303,97 @@ def get_vgg_test(num_classes=21, num_anchors=9):
 
     # group output
     group = mx.symbol.Group([rois, cls_prob, bbox_pred])
+    return group
+
+
+def get_vgg_train(num_classes=21, num_anchors=9):
+    """
+    Faster R-CNN end-to-end with VGG 16 conv layers
+    :param num_classes: used to determine output size
+    :param num_anchors: used to determine output size
+    :return: Symbol
+    """
+    data = mx.symbol.Variable(name="data")
+    im_info = mx.symbol.Variable(name="im_info")
+    gt_boxes = mx.symbol.Variable(name="gt_boxes")
+    rpn_label = mx.symbol.Variable(name='label')
+    rpn_bbox_target = mx.symbol.Variable(name='bbox_target')
+    rpn_bbox_inside_weight = mx.symbol.Variable(name='bbox_inside_weight')
+    rpn_bbox_outside_weight = mx.symbol.Variable(name='bbox_outside_weight')
+
+    # shared convolutional layers
+    relu5_3 = get_vgg_conv(data)
+
+    # RPN layers
+    rpn_conv = mx.symbol.Convolution(
+        data=relu5_3, kernel=(3, 3), pad=(1, 1), num_filter=512, name="rpn_conv_3x3")
+    rpn_relu = mx.symbol.Activation(data=rpn_conv, act_type="relu", name="rpn_relu")
+    rpn_cls_score = mx.symbol.Convolution(
+        data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=2 * num_anchors, name="rpn_cls_score")
+    rpn_bbox_pred = mx.symbol.Convolution(
+        data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=4 * num_anchors, name="rpn_bbox_pred")
+
+    # prepare rpn data
+    rpn_cls_score_reshape = mx.symbol.Reshape(
+        data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
+
+    # classification
+    rpn_cls_prob = mx.symbol.SoftmaxOutput(data=rpn_cls_score_reshape, label=rpn_label, multi_output=True,
+                                           normalization='valid', use_ignore=True, ignore_label=-1, name="rpn_cls_prob")
+    # bounding box regression
+    rpn_bbox_loss_ = rpn_bbox_outside_weight * \
+                     mx.symbol.smooth_l1(name='rpn_bbox_loss_', scalar=3.0,
+                                         data=rpn_bbox_inside_weight * (rpn_bbox_pred - rpn_bbox_target))
+    rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_)
+
+    # ROI proposal
+    rpn_cls_act = mx.symbol.SoftmaxActivation(
+        data=rpn_cls_score_reshape, mode="channel", name="rpn_cls_act")
+    rpn_cls_act_reshape = mx.symbol.Reshape(
+        data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
+    rois = mx.symbol.Custom(
+        cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
+        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2),
+        rpn_pre_nms_top_n=config.TRAIN.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TRAIN.RPN_POST_NMS_TOP_N,
+        threshold=config.TRAIN.RPN_NMS_THRESH, rpn_min_size=config.TRAIN.RPN_MIN_SIZE)
+
+    # ROI proposal target
+    gt_boxes_reshape = mx.symbol.Reshape(data=gt_boxes, shape=(-1, 5), name='gt_boxes_reshape')
+    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes_reshape, op_type='proposal_target',
+                             num_classes=num_classes, batch_images=config.TRAIN.BATCH_IMAGES,
+                             batch_rois=config.TRAIN.BATCH_ROIS, fg_fraction=config.TRAIN.FG_FRACTION)
+    rois = group[0]
+    label = group[1]
+    bbox_target = group[2]
+    bbox_inside_weight = group[3]
+    bbox_outside_weight = group[4]
+
+    # Fast R-CNN
+    pool5 = mx.symbol.ROIPooling(
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=0.0625)
+    # group 6
+    flatten = mx.symbol.Flatten(data=pool5, name="flatten")
+    fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
+    relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
+    drop6 = mx.symbol.Dropout(data=relu6, p=0.5, name="drop6")
+    # group 7
+    fc7 = mx.symbol.FullyConnected(data=drop6, num_hidden=4096, name="fc7")
+    relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
+    drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
+    # classification
+    cls_score = mx.symbol.FullyConnected(name='cls_score', data=drop7, num_hidden=num_classes)
+    cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='batch')
+    # bounding box regression
+    bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
+    bbox_loss_ = bbox_outside_weight * \
+                 mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0,
+                                     data=bbox_inside_weight * (bbox_pred - bbox_target))
+    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / config.TRAIN.BATCH_ROIS)
+
+    # reshape output
+    label = mx.symbol.Reshape(data=label, shape=(config.TRAIN.BATCH_IMAGES, -1), name='label_reshape')
+    cls_prob = mx.symbol.Reshape(data=cls_prob, shape=(config.TRAIN.BATCH_IMAGES, -1, num_classes), name='cls_prob_reshape')
+    bbox_loss = mx.symbol.Reshape(data=bbox_loss, shape=(config.TRAIN.BATCH_IMAGES, -1, 4 * num_classes), name='bbox_loss_reshape')
+
+    group = mx.symbol.Group([rpn_cls_prob, rpn_bbox_loss, cls_prob, bbox_loss, mx.symbol.BlockGrad(label)])
     return group

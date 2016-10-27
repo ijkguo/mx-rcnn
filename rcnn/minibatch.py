@@ -162,9 +162,9 @@ def _compute_targets(ex_rois, gt_rois):
     :param gt_rois: [n, 5] (x1, y1, x2, y2, cls)
     :return: class-agnostic bbox_targets
     """
-    assert ex_rois.shape[0] == gt_rois.shape[0]
-    assert ex_rois.shape[1] == 4
-    assert gt_rois.shape[1] == 5
+    assert ex_rois.shape[0] == gt_rois.shape[0], 'inconsistent rois number'
+    assert ex_rois.shape[1] == 4, 'wrong rois format'
+    assert gt_rois.shape[1] == 5, 'wrong gt format'
 
     return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
 
@@ -194,7 +194,7 @@ def sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
     # guard against the case when an image has fewer than fg_rois_per_image foreground RoIs
     fg_rois_per_this_image = np.minimum(fg_rois_per_image, fg_indexes.size)
     # Sample foreground regions without replacement
-    if fg_indexes.size > 0:
+    if len(fg_indexes) > fg_rois_per_this_image:
         fg_indexes = npr.choice(fg_indexes, size=fg_rois_per_this_image, replace=False)
 
     # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
@@ -203,15 +203,15 @@ def sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
     bg_rois_per_this_image = rois_per_image - fg_rois_per_this_image
     bg_rois_per_this_image = np.minimum(bg_rois_per_this_image, bg_indexes.size)
     # Sample foreground regions without replacement
-    if bg_indexes.size > 0:
+    if len(bg_indexes) > bg_rois_per_this_image:
         bg_indexes = npr.choice(bg_indexes, size=bg_rois_per_this_image, replace=False)
 
     # indexes selected
     keep_indexes = np.append(fg_indexes, bg_indexes)
 
     # pad more to ensure a fixed minibatch size
-    if keep_indexes.shape[0] < rois_per_image:
-        gap = rois_per_image - keep_indexes.shape[0]
+    while keep_indexes.shape[0] < rois_per_image:
+        gap = np.minimum(len(rois), rois_per_image - keep_indexes.shape[0])
         gap_indexes = npr.choice(range(len(rois)), size=gap, replace=False)
         keep_indexes = np.append(keep_indexes, gap_indexes)
 
@@ -225,11 +225,11 @@ def sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
     if bbox_targets is not None:
         bbox_target_data = bbox_targets[keep_indexes, :]
     else:
-        targets = _compute_targets(rois[:, 1:], gt_boxes)
+        targets = _compute_targets(rois[:, 1:], gt_boxes[gt_assignment[keep_indexes], :])
         if config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED:
             targets = ((targets - np.array(config.TRAIN.BBOX_MEANS))
                        / np.array(config.TRAIN.BBOX_STDS))
-        bbox_target_data = np.hstack((gt_boxes[:, 4:], targets))
+        bbox_target_data = np.hstack((labels[:, np.newaxis], targets))
 
     bbox_targets, bbox_inside_weights = \
         expand_bbox_regression_targets(bbox_target_data, num_classes)

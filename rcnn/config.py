@@ -14,10 +14,11 @@ config.TRAIN = edict()
 # R-CNN and RPN
 config.TRAIN.FINETUNE = False
 config.TRAIN.BATCH_SIZE = 1  # used in grad_scale
+config.TRAIN.END2END = False
 
 # R-CNN
 config.TRAIN.HAS_RPN = False
-config.TRAIN.ASPECT_GROUPING = True
+config.TRAIN.ASPECT_GROUPING = False
 config.TRAIN.BATCH_IMAGES = 2
 config.TRAIN.BATCH_ROIS = 128
 config.TRAIN.FG_FRACTION = 0.25

@@ -172,31 +172,35 @@ class AnchorLoader(mx.io.DataIter):
         self.size = len(roidb)
         self.index = np.arange(self.size)
         self.num_classes = self.roidb[0]['gt_overlaps'].shape[1]
-        self.reset()
 
         self.batch = None
         self.data = None
         self.label = None
-        self.get_batch()
-        self.data_name = ['data', 'im_info']
+        if self.mode == 'train':
+            if config.TRAIN.END2END:
+                self.data_name = ['data', 'im_info', 'gt_boxes']
+            else:
+                self.data_name = ['data']
+        else:
+            self.data_name = ['data', 'im_info']
         self.label_name = ['label', 'bbox_target', 'bbox_inside_weight', 'bbox_outside_weight']
+
+        self.reset()
+        self.get_batch()
 
     @property
     def provide_data(self):
         if self.mode == 'train':
-            return [('data', self.data[0].shape)]
+            return [(k, v.shape) for k, v in zip(self.data_name, self.data)]
         else:
             return [(k, v.shape) for k, v in self.data.items()]
 
     @property
     def provide_label(self):
         if self.mode == 'train':
-            return [('label', self.label[0].shape),
-                    ('bbox_target', self.label[1].shape),
-                    ('bbox_inside_weight', self.label[2].shape),
-                    ('bbox_outside_weight', self.label[3].shape)]
+            return [(k, v.shape) for k, v in zip(self.label_name, self.label)]
         else:
-            return [(k, v.shape) for k, v in self.data.items()]
+            return [(k, v.shape) for k, v in self.label.items()]
 
     def reset(self):
         self.cur = 0
@@ -275,24 +279,20 @@ class AnchorLoader(mx.io.DataIter):
                 feat_shape = [int(i) for i in feat_shape[0]]
 
                 # assign anchor for label
+                data['gt_boxes'] = label['gt_boxes'][np.newaxis, :, :]
                 label = minibatch.assign_anchor(feat_shape, label['gt_boxes'], data['im_info'],
                                                 self.feat_stride, self.anchor_scales,
                                                 self.anchor_ratios, self.allowed_border)
-                del data['im_info']
                 new_label_list.append(label)
 
             all_data = dict()
-            for key in ['data']:
+            for key in self.data_name:
                 all_data[key] = tensor_vstack([batch[key] for batch in data_list])
 
             all_label = dict()
-            all_label['label'] = tensor_vstack([batch['label'] for batch in new_label_list], pad=-1)
-            for key in ['bbox_target', 'bbox_inside_weight', 'bbox_outside_weight']:
-                all_label[key] = tensor_vstack([batch[key] for batch in new_label_list])
+            for key in self.label_name:
+                pad = -1 if key == 'label' else 0
+                all_label[key] = tensor_vstack([batch[key] for batch in new_label_list], pad=pad)
 
-            self.data = [mx.nd.array(all_data['data'])]
-
-            self.label = [mx.nd.array(all_label['label']),
-                          mx.nd.array(all_label['bbox_target']),
-                          mx.nd.array(all_label['bbox_inside_weight']),
-                          mx.nd.array(all_label['bbox_outside_weight'])]
+            self.data = [mx.nd.array(all_data[key]) for key in self.data_name]
+            self.label = [mx.nd.array(all_label[key]) for key in self.label_name]

@@ -12,13 +12,16 @@ class RPNAccMetric(mx.metric.EvalMetric):
         pred = preds[0]
         label = labels[0]
 
+        # pred (b, c, p) or (b, c, h, w)
         pred_label = mx.ndarray.argmax_channel(pred).asnumpy().astype('int32')
+        pred_label = pred_label.reshape((pred_label.shape[0], -1))
+        # label (b, p)
         label = label.asnumpy().astype('int32')
         non_ignore_inds = np.where(label != -1)
         pred_label = pred_label[non_ignore_inds]
         label = label[non_ignore_inds]
 
-        self.sum_metric += (pred_label.flat == label.flat).sum()
+        self.sum_metric += np.sum(pred_label.flat == label.flat)
         self.num_inst += len(pred_label.flat)
 
 
@@ -27,14 +30,18 @@ class RCNNAccMetric(mx.metric.EvalMetric):
         super(RCNNAccMetric, self).__init__('RCNNAcc')
 
     def update(self, labels, preds):
-        pred = preds[0]
-        label = labels[0]
+        if config.TRAIN.END2END:
+            pred = preds[2]
+            label = preds[4]
+        else:
+            pred = preds[0]
+            label = labels[0]
 
         last_dim = pred.shape[-1]
         pred_label = pred.asnumpy().reshape(-1, last_dim).argmax(axis=1).astype('int32')
         label = label.asnumpy().reshape(-1,).astype('int32')
 
-        self.sum_metric += (pred_label.flat == label.flat).sum()
+        self.sum_metric += np.sum(pred_label.flat == label.flat)
         self.num_inst += len(pred_label.flat)
 
 
@@ -46,11 +53,14 @@ class RPNLogLossMetric(mx.metric.EvalMetric):
         pred = preds[0]
         label = labels[0]
 
-        pred = pred.asnumpy()[0]
-        label = label.asnumpy().astype('int32')[0]
+        # label (b, p)
+        label = label.asnumpy().astype('int32').reshape((-1))
+        # pred (b, c, p) or (b, c, h, w) --> (b, p, c) --> (b*p, c)
+        pred = pred.asnumpy().reshape((pred.shape[0], pred.shape[1], -1)).transpose((0, 2, 1))
+        pred = pred.reshape((label.shape[0], -1))
         non_ignore_inds = np.where(label != -1)[0]
         label = label[non_ignore_inds]
-        cls = pred[label, non_ignore_inds]
+        cls = pred[non_ignore_inds, label]
 
         cls += 1e-14
         cls_loss = -1 * np.log(cls)
@@ -64,8 +74,12 @@ class RCNNLogLossMetric(mx.metric.EvalMetric):
         super(RCNNLogLossMetric, self).__init__('RCNNLogLoss')
 
     def update(self, labels, preds):
-        pred = preds[0]
-        label = labels[0]
+        if config.TRAIN.END2END:
+            pred = preds[2]
+            label = preds[4]
+        else:
+            pred = preds[0]
+            label = labels[0]
 
         last_dim = pred.shape[-1]
         pred = pred.asnumpy().reshape(-1, last_dim)
@@ -99,7 +113,10 @@ class RCNNL1LossMetric(mx.metric.EvalMetric):
         self.has_rpn = config.TRAIN.HAS_RPN
 
     def update(self, labels, preds):
-        pred = preds[1]
+        if config.TRAIN.END2END:
+            pred = preds[3]
+        else:
+            pred = preds[1]
 
         bbox_loss = pred.asnumpy()
         first_dim = bbox_loss.shape[0] * bbox_loss.shape[1]
