@@ -24,16 +24,6 @@ class Detector(object):
         :param roi_array: numpy.ndarray [roi_num 5]
         :return: scores, pred_boxes
         """
-        # remove duplicate feature rois
-        if config.TEST.DEDUP_BOXES > 0 and not config.TEST.HAS_RPN:
-            roi_array = roi_array
-            # rank roi by v .* (b, dx, dy, dw, dh)
-            v = np.array([1, 1e3, 1e6, 1e9, 1e12])
-            # create hash and inverse index for rois
-            hashes = np.round(roi_array * config.TEST.DEDUP_BOXES).dot(v)
-            _, index, inv_index = np.unique(hashes, return_index=True, return_inverse=True)
-            roi_array = roi_array[index, :]
-
         # fill in data
         if config.TEST.HAS_RPN:
             self.arg_params['data'] = mx.nd.array(im_array, self.ctx)
@@ -70,10 +60,5 @@ class Detector(object):
         # post processing
         pred_boxes = bbox_pred(rois, bbox_deltas)
         pred_boxes = clip_boxes(pred_boxes, im_array[0].shape[-2:])
-
-        if config.TEST.DEDUP_BOXES > 0 and not config.TEST.HAS_RPN:
-            # map back to original
-            scores = scores[inv_index, :]
-            pred_boxes = pred_boxes[inv_index, :]
 
         return scores, pred_boxes
