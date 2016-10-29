@@ -3,59 +3,51 @@ import logging
 import os
 import pprint
 import mxnet as mx
-import numpy as np
 
-from rcnn.config import config
-from rcnn.symbol import *
-from rcnn.dataset import *
-from rcnn.core import callback, metric
-from rcnn.core.loader import AnchorLoader
-from rcnn.core.module import MutableModule
-from rcnn.utils.load_model import load_param
+from ..config import config
+from ..symbol import *
+from ..dataset import *
+from ..core import callback, metric
+from ..core.loader import ROIIter
+from ..core.module import MutableModule
+from ..processing.bbox_regression import add_bbox_regression_targets
+from ..utils.load_model import load_param
+
+# config.TRAIN.BG_THRESH_LO = 0.0 [not used for Fast R-CNN]
 
 
-def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
-              lr=0.001, lr_step=50000):
+def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
+               finetune=False, lr=0.001, lr_step=30000, proposal='rpn'):
     # set up logger
     logging.basicConfig()
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
-    # setup config
-    config.TRAIN.HAS_RPN = True
-    config.TRAIN.BATCH_SIZE = 1
-    config.TRAIN.BATCH_IMAGES = 1
-    config.TRAIN.BATCH_ROIS = 128
-    config.TRAIN.END2END = True
-    config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
-    config.TRAIN.BG_THRESH_LO = 0.0
-
     # load symbol
-    sym = get_vgg_train()
-    feat_sym = sym.get_internals()['rpn_cls_score_output']
+    sym = eval('get_' + args.network + '_rcnn')()
 
     # setup multi-gpu
     config.TRAIN.BATCH_IMAGES *= len(ctx)
     config.TRAIN.BATCH_SIZE *= len(ctx)
 
     # print config
+    pprint.pprint(args)
     pprint.pprint(config)
 
     # load dataset and prepare imdb for training
     imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
-    roidb = imdb.gt_roidb()
+    gt_roidb = imdb.gt_roidb()
+    roidb = eval('imdb.' + proposal + '_roidb')(gt_roidb)
     if args.flip:
         roidb = imdb.append_flipped_images(roidb)
+    means, stds = add_bbox_regression_targets(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
-                              ctx=ctx, work_load_list=args.work_load_list)
+    train_data = ROIIter(roidb, batch_size=config.TRAIN.BATCH_IMAGES, shuffle=True,
+                         ctx=ctx, work_load_list=args.work_load_list)
 
     # infer max shape
-    max_data_shape = [('data', (config.TRAIN.BATCH_SIZE, 3, 1000, 1000))]
-    max_data_shape, max_label_shape = train_data.infer_shape(max_data_shape)
-    max_data_shape.append(('gt_boxes', (config.TRAIN.BATCH_SIZE, 100, 5)))
-    print 'providing maximum shape', max_data_shape, max_label_shape
+    max_data_shape = [('data', (config.TRAIN.BATCH_IMAGES, 3, 1000, 1000))]
 
     # load pretrained
     arg_params, aux_params = load_param(pretrained, epoch, convert=True)
@@ -65,41 +57,33 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         input_shapes = {k: v for k, v in train_data.provide_data + train_data.provide_label}
         arg_shape, _, _ = sym.infer_shape(**input_shapes)
         arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
-        arg_params['rpn_conv_3x3_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_conv_3x3_weight'])
-        arg_params['rpn_conv_3x3_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_conv_3x3_bias'])
-        arg_params['rpn_cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_cls_score_weight'])
-        arg_params['rpn_cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_cls_score_bias'])
-        arg_params['rpn_bbox_pred_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_bbox_pred_weight'])
-        arg_params['rpn_bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_bbox_pred_bias'])
         arg_params['cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['cls_score_weight'])
         arg_params['cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['cls_score_bias'])
         arg_params['bbox_pred_weight'] = mx.random.normal(0, 0.001, shape=arg_shape_dict['bbox_pred_weight'])
         arg_params['bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['bbox_pred_bias'])
 
+    # prepare training
     # create solver
-    fixed_param_prefix = ['conv1', 'conv2']
     data_names = [k[0] for k in train_data.provide_data]
     label_names = [k[0] for k in train_data.provide_label]
+    if finetune:
+        fixed_param_prefix = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+    else:
+        fixed_param_prefix = ['conv1', 'conv2']
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
                         logger=logger, context=ctx, work_load_list=args.work_load_list,
-                        max_data_shapes=max_data_shape, max_label_shapes=max_label_shape,
-                        fixed_param_prefix=fixed_param_prefix)
+                        max_data_shapes=max_data_shape, fixed_param_prefix=fixed_param_prefix)
 
     # decide training params
     # metric
-    rpn_eval_metric = metric.RPNAccMetric()
-    rpn_cls_metric = metric.RPNLogLossMetric()
-    rpn_bbox_metric = metric.RPNL1LossMetric()
     eval_metric = metric.RCNNAccMetric()
-    cls_metric = metric.RCNNL1LossMetric()
+    cls_metric = metric.RCNNLogLossMetric()
     bbox_metric = metric.RCNNL1LossMetric()
     eval_metrics = mx.metric.CompositeEvalMetric()
-    for child_metric in [rpn_eval_metric, rpn_cls_metric, rpn_bbox_metric, eval_metric, cls_metric, bbox_metric]:
+    for child_metric in [eval_metric, cls_metric, bbox_metric]:
         eval_metrics.add(child_metric)
     # callback
     batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=args.frequent)
-    means = np.tile(np.array(config.TRAIN.BBOX_MEANS), imdb.num_classes)
-    stds = np.tile(np.array(config.TRAIN.BBOX_STDS), imdb.num_classes)
     epoch_end_callback = callback.do_checkpoint(prefix, means, stds)
     # optimizer
     optimizer_params = {'momentum': 0.9,
@@ -116,7 +100,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train a Region Proposal Network')
+    parser = argparse.ArgumentParser(description='Train a Fast R-CNN Network')
     # general
     parser.add_argument('--network', help='network name',
                         default='vgg', type=str)
@@ -137,7 +121,7 @@ def parse_args():
                         default=None, type=list)
     parser.add_argument('--flip', help='flip images', action='store_true', default=True)
     parser.add_argument('--resume', help='continue training', action='store_true')
-    # e2e
+    # rcnn
     parser.add_argument('--gpus', help='GPU device to train with',
                         default='0', type=str)
     parser.add_argument('--pretrained', help='pretrained model prefix',
@@ -145,18 +129,21 @@ def parse_args():
     parser.add_argument('--epoch', help='epoch of pretrained model',
                         default=1, type=int)
     parser.add_argument('--prefix', help='new model prefix',
-                        default=os.path.join('model', 'e2e'), type=str)
+                        default=os.path.join('model', 'rcnn'), type=str)
     parser.add_argument('--begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end_epoch', help='end epoch of training',
-                        default=10, type=int)
+                        default=8, type=int)
+    parser.add_argument('--finetune', help='second round finetune', action='store_true')
     parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate step', default=50000, type=int)
+    parser.add_argument('--lr_step', help='learning rate step', default=30000, type=int)
+    parser.add_argument('--proposal', help='can be ss for selective search or rpn',
+                        default='rpn', type=str)
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = parse_args()
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    train_net(args, ctx, args.pretrained, args.epoch, args.prefix, args.begin_epoch, args.end_epoch,
-              lr=args.lr, lr_step=args.lr_step)
+    train_rcnn(args, ctx, args.pretrained, args.epoch, args.prefix, args.begin_epoch, args.end_epoch,
+               finetune=args.finetune, lr=args.lr, lr_step=args.lr_step, proposal=args.proposal)

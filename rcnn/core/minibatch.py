@@ -13,146 +13,198 @@ final:  {'label': [batch_size, 1] <- [batch_size, num_anchors, feat_height, feat
 Fast R-CNN:
 data =
     {'data': [num_images, c, h, w],
-    'rois': [num_images, num_rois, 5]}
+    'rois': [num_rois, 5]}
 label =
-    {'label': [num_images, num_rois],
-    'bbox_target': [num_images, num_rois, 4 * num_classes],
-    'bbox_inside_weight': [num_images, num_rois, 4 * num_classes],
-    'bbox_outside_weight': [num_images, num_rois, 4 * num_classes]}
+    {'label': [num_rois],
+    'bbox_target': [num_rois, 4 * num_classes],
+    'bbox_inside_weight': [num_rois, 4 * num_classes],
+    'bbox_outside_weight': [num_rois, 4 * num_classes]}
+
+roidb basic format [image_index]
+['image', 'height', 'width', 'flipped',
+'boxes', 'gt_classes', 'gt_overlaps', 'max_classes', 'max_overlaps', 'bbox_targets']
 """
 
 import cv2
 import numpy as np
 import numpy.random as npr
+import random
+import os
 
-from helper.processing import image_processing
-from helper.processing.bbox_regression import expand_bbox_regression_targets
-from helper.processing.generate_anchor import generate_anchors
-from helper.processing.bbox_regression import bbox_overlaps
-from helper.processing.bbox_transform import bbox_transform
-from rcnn.config import config
+from ..config import config
+from ..processing import image_processing
+from ..processing.bbox_regression import bbox_overlaps
+from ..processing.bbox_regression import expand_bbox_regression_targets
+from ..processing.bbox_transform import bbox_transform
+from ..processing.generate_anchor import generate_anchors
 
 
-def get_minibatch(roidb, num_classes, mode='test'):
+def get_image(roidb):
     """
-    return minibatch of images in roidb
-    :param roidb: a list of dict, whose length controls batch size
-    :param num_classes: number of classes is used in bbox regression targets
-    :param mode: controls whether blank label are returned
+    preprocess image and return processed roidb
+    :param roidb: a list of roidb
+    :return: list of img as in mxnet format
+    roidb add new item['im_info']
+    0 --- x (width, second dim of im)
+    |
+    y (height, first dim of im)
+    """
+    num_images = len(roidb)
+    processed_ims = []
+    processed_roidb = []
+    for i in range(num_images):
+        roi_rec = roidb[i]
+        assert os.path.exists(roi_rec['image']), '%s does not exist'.format(roi_rec['image'])
+        im = cv2.imread(roi_rec['image'])
+        if roidb[i]['flipped']:
+            im = im[:, ::-1, :]
+        new_rec = roi_rec.copy()
+        scale_ind = random.randrange(len(config.SCALES))
+        target_size = config.SCALES[scale_ind][0]
+        max_size = config.SCALES[scale_ind][1]
+        im, im_scale = image_processing.resize(im, target_size, max_size, stride=config.IMAGE_STRIDE)
+        im_tensor = image_processing.transform(im, config.PIXEL_MEANS)
+        processed_ims.append(im_tensor)
+        im_info = [im_tensor.shape[2], im_tensor.shape[3], im_scale]
+        new_rec['boxes'] = roi_rec['boxes'].copy() * im_scale
+        new_rec['im_info'] = im_info
+        processed_roidb.append(new_rec)
+    return processed_ims, processed_roidb
+
+
+def get_rpn_testbatch(roidb):
+    """
+    return a dict of testbatch
+    :param roidb: ['image', 'flipped']
     :return: data, label
     """
-    # build im_array: [num_images, c, h, w]
-    num_images = len(roidb)
-    random_scale_indexes = npr.randint(0, high=len(config.SCALES), size=num_images)
-    im_array, im_scales = get_image_array(roidb, config.SCALES, random_scale_indexes)
+    assert len(roidb) == 1, 'Single batch only'
+    imgs, roidb = get_image(roidb)
+    im_array = imgs[0]
+    im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
 
-    if mode == 'train':
-        cfg_key = 'TRAIN'
-    else:
-        cfg_key = 'TEST'
-
-    if config[cfg_key].HAS_RPN:
-        assert len(roidb) == 1, 'Single batch only'
-        assert len(im_scales) == 1, 'Single batch only'
-        im_info = np.array([[im_array.shape[2], im_array.shape[3], im_scales[0]]], dtype=np.float32)
-
-        data = {'data': im_array,
-                'im_info': im_info}
-        label = {}
-
-        if mode == 'train':
-            # gt boxes: (x1, y1, x2, y2, cls)
-            gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
-            gt_boxes = np.empty((roidb[0]['boxes'].shape[0], 5), dtype=np.float32)
-            gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
-            gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
-            label = {'gt_boxes': gt_boxes}
-    else:
-        if mode == 'train':
-            assert config.TRAIN.BATCH_ROIS % config.TRAIN.BATCH_IMAGES == 0, \
-                'BATCHIMAGES {} must devide BATCH_ROIS {}'.format(config.TRAIN.BATCH_IMAGES, config.TRAIN.BATCH_ROIS)
-            rois_per_image = config.TRAIN.BATCH_ROIS / config.TRAIN.BATCH_IMAGES
-            fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
-
-            rois_array = list()
-            labels_array = list()
-            bbox_targets_array = list()
-            bbox_inside_array = list()
-
-            for im_i in range(num_images):
-                roi_rec = roidb[im_i]
-                rois = roi_rec['boxes']
-                labels = roi_rec['max_classes']
-                overlaps = roi_rec['max_overlaps']
-                bbox_targets = roi_rec['bbox_targets']
-
-                im_rois, labels, bbox_targets, bbox_inside_weights = \
-                    sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
-                                labels, overlaps, bbox_targets)
-
-                # project im_rois
-                # do not round roi
-                rois = im_rois * im_scales[im_i]
-                batch_index = im_i * np.ones((rois.shape[0], 1))
-                rois_array_this_image = np.hstack((batch_index, rois))
-                rois_array.append(rois_array_this_image)
-
-                # add labels
-                labels_array.append(labels)
-                bbox_targets_array.append(bbox_targets)
-                bbox_inside_array.append(bbox_inside_weights)
-
-            rois_array = np.array(rois_array)
-            labels_array = np.array(labels_array)
-            bbox_targets_array = np.array(bbox_targets_array)
-            bbox_inside_array = np.array(bbox_inside_array)
-            bbox_outside_array = np.array(bbox_inside_array > 0).astype(np.float32)
-
-            data = {'data': im_array,
-                    'rois': rois_array}
-            label = {'label': labels_array,
-                     'bbox_target': bbox_targets_array,
-                     'bbox_inside_weight': bbox_inside_array,
-                     'bbox_outside_weight': bbox_outside_array}
-        else:
-            rois_array = list()
-            for im_i in range(num_images):
-                im_rois = roidb[im_i]['boxes']
-                rois = im_rois * im_scales[im_i]
-                batch_index = im_i * np.ones((rois.shape[0], 1))
-                rois_array_this_image = np.hstack((batch_index, rois))
-                rois_array.append(rois_array_this_image)
-            rois_array = np.vstack(rois_array)
-
-            data = {'data': im_array,
-                    'rois': rois_array}
-            label = {}
+    data = {'data': im_array,
+            'im_info': im_info}
+    label = {}
 
     return data, label
 
 
-def get_image_array(roidb, scales, scale_indexes):
+def get_rcnn_testbatch(roidb):
     """
-    build image array from specific roidb
-    :param roidb: images to be processed
-    :param scales: scale list
-    :param scale_indexes: indexes
-    :return: array [b, c, h, w], list of scales
+    return a dict of testbatch
+    :param roidb: ['image', 'flipped'] + ['boxes']
+    :return: data, label
     """
     num_images = len(roidb)
-    processed_ims = []
-    im_scales = []
-    for i in range(num_images):
-        im = cv2.imread(roidb[i]['image'])
-        if roidb[i]['flipped']:
-            im = im[:, ::-1, :]
-        target_size = scales[scale_indexes[i]]
-        im, im_scale = image_processing.resize(im, target_size, config.MAX_SIZE)
-        im_tensor = image_processing.transform(im, config.PIXEL_MEANS)
-        processed_ims.append(im_tensor)
-        im_scales.append(im_scale)
-    array = image_processing.tensor_vstack(processed_ims)
-    return array, im_scales
+    imgs, roidb = get_image(roidb)
+    im_array = image_processing.tensor_vstack(imgs)
+    rois_array = list()
+    for im_i in range(num_images):
+        im_rois = roidb[im_i]['boxes']
+        rois = im_rois
+        batch_index = im_i * np.ones((rois.shape[0], 1))
+        rois_array_this_image = np.hstack((batch_index, rois))
+        rois_array.append(rois_array_this_image)
+    rois_array = np.vstack(rois_array)
+
+    data = {'data': im_array,
+            'rois': rois_array}
+    label = {}
+
+    return data, label
+
+
+def get_rpn_batch(roidb):
+    """
+    prototype for rpn batch: data, im_info, gt_boxes
+    :param roidb: ['image', 'flipped'] + ['gt_boxes', 'boxes', 'gt_classes']
+    :return: data, label
+    """
+    assert len(roidb) == 1, 'Single batch only'
+    imgs, roidb = get_image(roidb)
+    im_array = imgs[0]
+    im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
+
+    # gt boxes: (x1, y1, x2, y2, cls)
+    if roidb[0]['gt_classes'].size > 0:
+        gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
+        gt_boxes = np.empty((roidb[0]['boxes'].shape[0], 5), dtype=np.float32)
+        gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :]
+        gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
+    else:
+        gt_boxes = np.empty((0, 5), dtype=np.float32)
+
+    data = {'data': im_array,
+            'im_info': im_info}
+    label = {'gt_boxes': gt_boxes}
+
+    return data, label
+
+
+def get_rcnn_batch(roidb):
+    """
+    return a dict of multiple images
+    :param roidb: a list of dict, whose length controls batch size
+    ['images', 'flipped'] + ['gt_boxes', 'boxes', 'gt_overlap'] => ['bbox_targets']
+    :return: data, label
+    """
+    num_images = len(roidb)
+    imgs, roidb = get_image(roidb)
+    im_array = image_processing.tensor_vstack(imgs)
+
+    assert config.TRAIN.BATCH_ROIS % config.TRAIN.BATCH_IMAGES == 0, \
+        'BATCHIMAGES {} must divide BATCH_ROIS {}'.format(config.TRAIN.BATCH_IMAGES, config.TRAIN.BATCH_ROIS)
+    rois_per_image = config.TRAIN.BATCH_ROIS / config.TRAIN.BATCH_IMAGES
+    fg_rois_per_image = np.round(config.TRAIN.FG_FRACTION * rois_per_image).astype(int)
+
+    rois_array = list()
+    labels_array = list()
+    bbox_targets_array = list()
+    bbox_inside_array = list()
+
+    for im_i in range(num_images):
+        roi_rec = roidb[im_i]
+
+        # infer num_classes from gt_overlaps
+        num_classes = roi_rec['gt_overlaps'].shape[1]
+
+        # label = class RoI has max overlap with
+        rois = roi_rec['boxes']
+        labels = roi_rec['max_classes']
+        overlaps = roi_rec['max_overlaps']
+        bbox_targets = roi_rec['bbox_targets']
+
+        im_rois, labels, bbox_targets, bbox_inside_weights = \
+            sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
+                        labels, overlaps, bbox_targets)
+
+        # project im_rois
+        # do not round roi
+        rois = im_rois
+        batch_index = im_i * np.ones((rois.shape[0], 1))
+        rois_array_this_image = np.hstack((batch_index, rois))
+        rois_array.append(rois_array_this_image)
+
+        # add labels
+        labels_array.append(labels)
+        bbox_targets_array.append(bbox_targets)
+        bbox_inside_array.append(bbox_inside_weights)
+
+    rois_array = np.array(rois_array)
+    labels_array = np.array(labels_array)
+    bbox_targets_array = np.array(bbox_targets_array)
+    bbox_inside_array = np.array(bbox_inside_array)
+    bbox_outside_array = np.array(bbox_inside_array > 0).astype(np.float32)
+
+    data = {'data': im_array,
+            'rois': rois_array}
+    label = {'label': labels_array,
+             'bbox_target': bbox_targets_array,
+             'bbox_inside_weight': bbox_inside_array,
+             'bbox_outside_weight': bbox_outside_array}
+
+    return data, label
 
 
 def _compute_targets(ex_rois, gt_rois):

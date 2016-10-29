@@ -1,7 +1,7 @@
 import mxnet as mx
-import rpn.proposal
-import rpn.proposal_target
-from config import config
+import proposal
+import proposal_target
+from rcnn.config import config
 
 
 def get_vgg_conv(data):

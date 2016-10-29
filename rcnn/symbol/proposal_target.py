@@ -5,7 +5,7 @@ Proposal Target Operator selects foreground and background roi and assigns label
 import mxnet as mx
 import numpy as np
 
-from ..minibatch import sample_rois
+from rcnn.core.minibatch import sample_rois
 
 DEBUG = False
 

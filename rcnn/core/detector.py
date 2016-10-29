@@ -2,7 +2,7 @@ import mxnet as mx
 import numpy as np
 
 from rcnn.config import config
-from helper.processing.bbox_transform import bbox_pred, clip_boxes
+from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 
 
 class Detector(object):

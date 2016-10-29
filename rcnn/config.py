@@ -6,19 +6,17 @@ config = edict()
 # image processing config
 config.EPS = 1e-14
 config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
-config.SCALES = (600, )  # single scale training and testing
-config.MAX_SIZE = 1000
+config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
+config.IMAGE_STRIDE = 0
 
 config.TRAIN = edict()
 
 # R-CNN and RPN
-config.TRAIN.FINETUNE = False
 config.TRAIN.BATCH_SIZE = 1  # used in grad_scale
 config.TRAIN.END2END = False
 
 # R-CNN
 config.TRAIN.HAS_RPN = False
-config.TRAIN.ASPECT_GROUPING = False
 config.TRAIN.BATCH_IMAGES = 2
 config.TRAIN.BATCH_ROIS = 128
 config.TRAIN.FG_FRACTION = 0.25

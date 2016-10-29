@@ -1,7 +1,8 @@
+import cPickle
+import os
+
 import mxnet as mx
 import numpy as np
-import os
-import cPickle
 
 
 class Detector(object):
@@ -33,19 +34,21 @@ class Detector(object):
         output_dict = {name: nd for name, nd in zip(self.symbol.list_outputs(), self.executor.outputs)}
 
         self.executor.forward(is_train=False)
-        boxes = output_dict['rois_output'].asnumpy()
+        # drop the batch index
+        boxes = output_dict['rois_output'].asnumpy()[:, 1:]
         scores = output_dict['rois_score'].asnumpy()
 
         return boxes, scores
 
 
-def generate_detections(detector, test_data, imdb, vis=False):
+def generate_detections(detector, test_data, imdb, vis=False, thresh=0):
     """
     Generate detections results using RPN.
     :param detector: Detector
     :param test_data: data iterator, must be non-shuffled
     :param imdb: image database
     :param vis: controls visualization
+    :param thresh: thresh for valid detections
     :return: list of detected boxes
     """
     assert not test_data.shuffle
@@ -58,12 +61,13 @@ def generate_detections(detector, test_data, imdb, vis=False):
 
         boxes, scores = detector.im_detect(databatch.data['data'], databatch.data['im_info'])
         scale = databatch.data['im_info'][0, 2]
-        # drop the batch index
-        boxes = boxes[:, 1:].copy() / scale
-        imdb_boxes.append(boxes)
+        boxes = boxes / scale
+        keep = np.where(scores > thresh)[0]
+        imdb_boxes.append(boxes[keep, :])
+
         if vis:
-            dets = np.hstack((boxes * scale, scores))
-            vis_detection(databatch.data['data'], dets, thresh=0.9)
+            dets = np.hstack((boxes[keep, :] * scale, scores[keep, :]))
+            vis_detection(databatch.data['data'], dets, thresh)
         i += 1
 
     assert len(imdb_boxes) == imdb.num_images, 'calculations not complete'
@@ -77,7 +81,7 @@ def generate_detections(detector, test_data, imdb, vis=False):
     return imdb_boxes
 
 
-def vis_detection(im, dets, thresh=0.):
+def vis_detection(im, dets, thresh):
     """
     draw detected bounding boxes
     :param im: [b, c, h, w] oin rgb
@@ -86,19 +90,19 @@ def vis_detection(im, dets, thresh=0.):
     :return:
     """
     from rcnn.config import config
-    from helper.processing.image_processing import transform_inverse
+    from rcnn.processing.image_processing import transform_inverse
     import matplotlib.pyplot as plt
-    inds = np.where(dets[:, -1] >= thresh)[0]
-    if len(inds) == 0:
-        return
-    inds = np.argsort(dets[:, -1])[::-1]
-    inds = inds[:20]
+
+    if dets.shape[0] > 100:
+        inds = np.argsort(dets[:, -1])[::-1]
+        inds = inds[:100]
+        dets = dets[inds, :]
 
     class_name = 'obj'
     fig, ax = plt.subplots(figsize=(12, 12))
     im = transform_inverse(im, config.PIXEL_MEANS)
     ax.imshow(im, aspect='equal')
-    for i in inds:
+    for i in range(dets.shape[0]):
         bbox = dets[i, :4]
         score = dets[i, -1]
         rect = plt.Rectangle((bbox[0], bbox[1]),

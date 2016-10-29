@@ -6,28 +6,28 @@ function. Results are written as the Pascal VOC format. Evaluation is based on m
 criterion.
 """
 
+import cPickle
+import cv2
 import os
 import numpy as np
-import scipy.sparse
 import scipy.io
-import cPickle
+
 from imdb import IMDB
-from voc_eval import voc_eval
-from helper.processing.bbox_process import unique_boxes, filter_small_boxes
+from ..processing.bbox_process import unique_boxes, filter_small_boxes
+from ..utils.voc_eval import voc_eval
 
 
 class PascalVOC(IMDB):
-    def __init__(self, image_set, year, root_path, devkit_path):
+    def __init__(self, image_set, root_path, devkit_path):
         """
         fill basic information to initialize imdb
-        :param image_set: train or val or trainval
-        :param year: 2007, 2010, 2012
+        :param image_set: 2007_trainval, 2007_test, etc
         :param root_path: 'selective_search_data' and 'cache'
         :param devkit_path: data and results
         :return: imdb object
         """
-        super(PascalVOC, self).__init__('voc_' + year + '_' + image_set)  # set self.name
-        self.image_set = image_set
+        year, image_set = image_set.split('_')
+        super(PascalVOC, self).__init__('voc_' + year, image_set, root_path, devkit_path)  # set self.name
         self.year = year
         self.root_path = root_path
         self.devkit_path = devkit_path
@@ -42,21 +42,11 @@ class PascalVOC(IMDB):
         self.num_classes = 21
         self.image_set_index = self.load_image_set_index()
         self.num_images = len(self.image_set_index)
+        print 'num_images', self.num_images
 
         self.config = {'comp_id': 'comp4',
                        'use_diff': False,
                        'min_size': 2}
-
-    @property
-    def cache_path(self):
-        """
-        make a directory to store all caches
-        :return: cache path
-        """
-        cache_path = os.path.join(self.root_path, 'cache')
-        if not os.path.exists(cache_path):
-            os.mkdir(cache_path)
-        return cache_path
 
     def load_image_set_index(self):
         """
@@ -105,8 +95,13 @@ class PascalVOC(IMDB):
         :return: record['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
         """
         import xml.etree.ElementTree as ET
-        filename = os.path.join(self.data_path, 'Annotations', index + '.xml')
+        roi_rec = dict()
+        roi_rec['image'] = self.image_path_from_index(index)
+        size = cv2.imread(roi_rec['image']).shape
+        roi_rec['height'] = size[0]
+        roi_rec['width'] = size[1]
 
+        filename = os.path.join(self.data_path, 'Annotations', index + '.xml')
         tree = ET.parse(filename)
         objs = tree.findall('object')
         if not self.config['use_diff']:
@@ -132,15 +127,13 @@ class PascalVOC(IMDB):
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
 
-        overlaps = scipy.sparse.csr_matrix(overlaps)
-
-        return {'boxes': boxes,
-                'gt_classes': gt_classes,
-                'gt_overlaps': overlaps,
-                'flipped': False}
-
-    def roidb(self, gt_roidb):
-        return self.selective_search_roidb(gt_roidb)
+        roi_rec.update({'boxes': boxes,
+                        'gt_classes': gt_classes,
+                        'gt_overlaps': overlaps,
+                        'max_classes': overlaps.argmax(axis=1),
+                        'max_overlaps': overlaps.max(axis=1),
+                        'flipped': False})
+        return roi_rec
 
     def load_selective_search_roidb(self, gt_roidb):
         """
@@ -176,7 +169,7 @@ class PascalVOC(IMDB):
             print '{} ss roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
-        if self.image_set != 'test':
+        if 'train' in self.image_set:
             ss_roidb = self.load_selective_search_roidb(gt_roidb)
             roidb = IMDB.merge_roidbs(gt_roidb, ss_roidb)
         else:
@@ -185,33 +178,6 @@ class PascalVOC(IMDB):
             cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote ss roidb to {}'.format(cache_file)
 
-        return roidb
-
-    def load_rpn_roidb(self, gt_roidb):
-        """
-        turn rpn detection boxes into roidb
-        :param gt_roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        :return: roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        """
-        rpn_file = os.path.join(self.root_path, 'rpn_data', self.name + '_rpn.pkl')
-        print 'loading {}'.format(rpn_file)
-        assert os.path.exists(rpn_file), 'rpn data not found at {}'.format(rpn_file)
-        with open(rpn_file, 'rb') as f:
-            box_list = cPickle.load(f)
-        return self.create_roidb_from_box_list(box_list, gt_roidb)
-
-    def rpn_roidb(self, gt_roidb):
-        """
-        get rpn roidb and ground truth roidb
-        :param gt_roidb: ground truth roidb
-        :return: roidb of rpn (ground truth included)
-        """
-        if self.image_set != 'test':
-            rpn_roidb = self.load_rpn_roidb(gt_roidb)
-            roidb = IMDB.merge_roidbs(gt_roidb, rpn_roidb)
-        else:
-            print 'rpn database need not be used in test'
-            roidb = self.load_rpn_roidb(gt_roidb)
         return roidb
 
     def evaluate_detections(self, detections):

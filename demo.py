@@ -1,17 +1,15 @@
 import argparse
 import os
-import numpy as np
 import cv2
-
 import mxnet as mx
-
-from helper.processing.image_processing import resize, transform
-from helper.processing.nms import nms
+import numpy as np
 from rcnn.config import config
-from rcnn.detector import Detector
+from rcnn.core.detector import Detector
 from rcnn.symbol import get_vgg_test
-from rcnn.tester import vis_all_detection
-from utils.load_model import load_param
+from rcnn.processing.image_processing import resize, transform
+from rcnn.processing.nms import nms
+from rcnn.core.tester import vis_all_detection
+from rcnn.utils.load_model import load_param
 
 
 def get_net(prefix, epoch, ctx):

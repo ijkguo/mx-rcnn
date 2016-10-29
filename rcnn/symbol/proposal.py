@@ -7,9 +7,9 @@ import mxnet as mx
 import numpy as np
 import numpy.random as npr
 
-from helper.processing.generate_anchor import generate_anchors
-from helper.processing.bbox_transform import bbox_pred, clip_boxes
-from helper.processing.nms import nms
+from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
+from rcnn.processing.generate_anchor import generate_anchors
+from rcnn.processing.nms import nms
 
 DEBUG = False
 
