@@ -47,7 +47,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
                          ctx=ctx, work_load_list=args.work_load_list)
 
     # infer max shape
-    max_data_shape = [('data', (config.TRAIN.BATCH_IMAGES, 3, 1000, 1000))]
+    max_data_shape = [('data', (config.TRAIN.BATCH_IMAGES, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
 
     # load pretrained
     arg_params, aux_params = load_param(pretrained, epoch, convert=True)
@@ -83,9 +83,9 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     data_names = [k[0] for k in train_data.provide_data]
     label_names = [k[0] for k in train_data.provide_label]
     if finetune:
-        fixed_param_prefix = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+        fixed_param_prefix = config.FIXED_PARAMS_FINETUNE
     else:
-        fixed_param_prefix = ['conv1', 'conv2']
+        fixed_param_prefix = config.FIXED_PARAMS
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
                         logger=logger, context=ctx, work_load_list=args.work_load_list,
                         max_data_shapes=max_data_shape, fixed_param_prefix=fixed_param_prefix)

@@ -66,7 +66,7 @@ def get_vgg_conv(data):
     return relu5_3
 
 
-def get_vgg_rcnn(num_classes=21):
+def get_vgg_rcnn(num_classes=config.NUM_CLASSES):
     """
     Fast R-CNN with VGG 16 conv layers
     :param num_classes: used to determine output size
@@ -91,7 +91,7 @@ def get_vgg_rcnn(num_classes=21):
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=0.0625)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -120,7 +120,7 @@ def get_vgg_rcnn(num_classes=21):
     return group
 
 
-def get_vgg_rcnn_test(num_classes=21):
+def get_vgg_rcnn_test(num_classes=config.NUM_CLASSES):
     """
     Fast R-CNN Network with VGG
     :param num_classes: used to determine output size
@@ -137,7 +137,7 @@ def get_vgg_rcnn_test(num_classes=21):
     
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=0.0625)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -162,10 +162,9 @@ def get_vgg_rcnn_test(num_classes=21):
     return group
 
 
-def get_vgg_rpn(num_classes=21, num_anchors=9):
+def get_vgg_rpn(num_anchors=config.NUM_ANCHORS):
     """
     Region Proposal Network with VGG
-    :param num_classes: used to determine output size
     :param num_anchors: used to determine output size
     :return: Symbol
     """
@@ -204,10 +203,9 @@ def get_vgg_rpn(num_classes=21, num_anchors=9):
     return group
 
 
-def get_vgg_rpn_test(num_classes=21, num_anchors=9):
+def get_vgg_rpn_test(num_anchors=config.NUM_ANCHORS):
     """
     Region Proposal Network with VGG
-    :param num_classes: used to determine output size
     :param num_anchors: used to determine output size
     :return: Symbol
     """
@@ -235,7 +233,8 @@ def get_vgg_rpn_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     group = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2), output_score=True,
+        op_type='proposal', feat_stride=config.RPN_FEAT_STRIDE,
+        scales=tuple(config.ANCHOR_SCALES), ratios=tuple(config.ANCHOR_RATIOS), output_score=True,
         rpn_pre_nms_top_n=config.TEST.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TEST.RPN_POST_NMS_TOP_N,
         threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
     # rois = group[0]
@@ -244,7 +243,7 @@ def get_vgg_rpn_test(num_classes=21, num_anchors=9):
     return group
 
 
-def get_vgg_test(num_classes=21, num_anchors=9):
+def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
     """
     Faster R-CNN test with VGG 16 conv layers
     :param num_classes: used to determine output size
@@ -275,13 +274,14 @@ def get_vgg_test(num_classes=21, num_anchors=9):
         data=rpn_cls_prob, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_prob_reshape')
     rois = mx.symbol.Custom(
         cls_prob=rpn_cls_prob_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2),
+        op_type='proposal', feat_stride=config.RPN_FEAT_STRIDE,
+        scales=tuple(config.ANCHOR_SCALES), ratios=tuple(config.ANCHOR_RATIOS),
         rpn_pre_nms_top_n=config.TEST.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TEST.RPN_POST_NMS_TOP_N,
         threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=0.0625)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -306,7 +306,7 @@ def get_vgg_test(num_classes=21, num_anchors=9):
     return group
 
 
-def get_vgg_train(num_classes=21, num_anchors=9):
+def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
     """
     Faster R-CNN end-to-end with VGG 16 conv layers
     :param num_classes: used to determine output size
@@ -353,7 +353,8 @@ def get_vgg_train(num_classes=21, num_anchors=9):
         data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
     rois = mx.symbol.Custom(
         cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
-        op_type='proposal', feat_stride=16, scales=(8, 16, 32), ratios=(0.5, 1, 2),
+        op_type='proposal', feat_stride=config.RPN_FEAT_STRIDE,
+        scales=tuple(config.ANCHOR_SCALES), ratios=tuple(config.ANCHOR_RATIOS),
         rpn_pre_nms_top_n=config.TRAIN.RPN_PRE_NMS_TOP_N, rpn_post_nms_top_n=config.TRAIN.RPN_POST_NMS_TOP_N,
         threshold=config.TRAIN.RPN_NMS_THRESH, rpn_min_size=config.TRAIN.RPN_MIN_SIZE)
 
@@ -370,7 +371,7 @@ def get_vgg_train(num_classes=21, num_anchors=9):
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=0.0625)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")

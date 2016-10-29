@@ -43,10 +43,12 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # load training data
     train_data = AnchorLoader(feat_sym, roidb, batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
-                              ctx=ctx, work_load_list=args.work_load_list)
+                              ctx=ctx, work_load_list=args.work_load_list,
+                              feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
+                              anchor_ratios=config.ANCHOR_RATIOS)
 
     # infer max shape
-    max_data_shape = [('data', (config.TRAIN.BATCH_SIZE, 3, 1000, 1000))]
+    max_data_shape = [('data', (config.TRAIN.BATCH_IMAGES, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
     max_data_shape, max_label_shape = train_data.infer_shape(max_data_shape)
     print 'providing maximum shape', max_data_shape, max_label_shape
 
@@ -85,9 +87,9 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     data_names = [k[0] for k in train_data.provide_data]
     label_names = [k[0] for k in train_data.provide_label]
     if finetune:
-        fixed_param_prefix = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+        fixed_param_prefix = config.FIXED_PARAMS_FINETUNE
     else:
-        fixed_param_prefix = ['conv1', 'conv2']
+        fixed_param_prefix = config.FIXED_PARAMS
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
                         logger=logger, context=ctx, work_load_list=args.work_load_list,
                         max_data_shapes=max_data_shape, max_label_shapes=max_label_shape,

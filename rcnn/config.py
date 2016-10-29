@@ -9,6 +9,16 @@ config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
 config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
 config.IMAGE_STRIDE = 0
 
+# symbol
+config.NUM_CLASSES = 21
+config.RPN_FEAT_STRIDE = 16
+config.ANCHOR_SCALES = (8, 16, 32)
+config.ANCHOR_RATIOS = (0.5, 1, 2)
+config.NUM_ANCHORS = len(config.ANCHOR_SCALES) * len(config.ANCHOR_RATIOS)
+config.RCNN_FEAT_SRTIDE = 16
+config.FIXED_PARAMS = ['conv1', 'conv2']
+config.FIXED_PARAMS_FINETUNE = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+
 config.TRAIN = edict()
 
 # R-CNN and RPN
