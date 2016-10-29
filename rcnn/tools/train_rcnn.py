@@ -52,15 +52,31 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     # load pretrained
     arg_params, aux_params = load_param(pretrained, epoch, convert=True)
 
+    # infer shape
+    data_shape_dict = dict(train_data.provide_data + train_data.provide_label)
+    arg_shape, out_shape, aux_shape = sym.infer_shape(**data_shape_dict)
+    arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
+    out_shape_dict = dict(zip(sym.list_outputs(), out_shape))
+    aux_shape_dict = dict(zip(sym.list_auxiliary_states(), aux_shape))
+    print 'output shape'
+    pprint.pprint(out_shape_dict)
+
     # initialize params
     if not args.resume:
-        input_shapes = {k: v for k, v in train_data.provide_data + train_data.provide_label}
-        arg_shape, _, _ = sym.infer_shape(**input_shapes)
-        arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
         arg_params['cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['cls_score_weight'])
         arg_params['cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['cls_score_bias'])
         arg_params['bbox_pred_weight'] = mx.random.normal(0, 0.001, shape=arg_shape_dict['bbox_pred_weight'])
         arg_params['bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['bbox_pred_bias'])
+
+    # check parameter shapes
+    for k in sym.list_arguments():
+        if k in data_shape_dict:
+            continue
+        assert arg_params[k].shape == arg_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(arg_shape_dict[k]) + ' provided ' + str(arg_params[k].shape)
+    for k in sym.list_auxiliary_states():
+        assert aux_params[k].shape == aux_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(aux_shape_dict[k]) + ' provided ' + str(aux_params[k].shape)
 
     # prepare training
     # create solver
