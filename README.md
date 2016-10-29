@@ -54,9 +54,19 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
 * Download VGG16 pretrained model, use `mxnet/tools/caffe_converter` to convert it,
   rename to `vgg16-symbol.json` and `vgg16-0001.params` and place it in `model` folder.
   `model` folder will be used to place model checkpoints along the training process.
-* Start training by running `python -m tools.train_rcnn --proposal ss` to use the selective search proposal.
-* Start testing by running `python -m tools.test_rcnn --proposal ss`.
+* Start training by running `python -m rcnn.tools.train_rcnn --proposal ss` to use the selective search proposal.
+* Start testing by running `python -m rcnn.tools.test_rcnn --proposal ss`.
 * An experiment yields 66.5 mAP, close to 66.9 as reported.
+
+## Structure
+* This repository provides Faster R-CNN as a package named `rcnn`.
+    * `rcnn.core`: core routines in Faster R-CNN training and testing.
+    * `rcnn.dataset`: dataset library. Base class is `rcnn.dataset.imdb.IMDB`.
+    * `rcnn.processing`: data and label processing library.
+    * `rcnn.tools`: training and testing wrapper.
+    * `rcnn.utils`: utilities in training and testing, usually overloads mxnet functions.
+* `data` Refer to `Data Folder Structure` for dataset reference. Usually dataset contains `images` and `imglists`.
+* `model` It is recommended to make a `model` symbolic link to hard disk to place your model.
 
 ## Information
 * Download link to trained model
