@@ -5,7 +5,7 @@ import pprint
 
 import mxnet as mx
 
-from rcnn.callback import Speedometer
+from rcnn.callback import Speedometer, do_checkpoint
 from rcnn.config import config
 from rcnn.loader import ROIIter
 from rcnn.metric import RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
@@ -15,7 +15,7 @@ from utils.load_data import load_ss_roidb, load_rpn_roidb
 from utils.load_model import load_checkpoint, load_param
 from utils.save_model import save_checkpoint
 
-config.TRAIN.BG_THRESH_LO = 0.0
+# config.TRAIN.BG_THRESH_LO = 0.0 [not used for Fast R-CNN]
 
 
 def train_rcnn(image_set, year, root_path, devkit_path, pretrained, epoch,
@@ -64,7 +64,7 @@ def train_rcnn(image_set, year, root_path, devkit_path, pretrained, epoch,
     data_names = [k[0] for k in train_data.provide_data]
     label_names = [k[0] for k in train_data.provide_label]
     batch_end_callback = Speedometer(train_data.batch_size, frequent=frequent)
-    epoch_end_callback = mx.callback.do_checkpoint(prefix)
+    epoch_end_callback = do_checkpoint(prefix, means, stds)
     eval_metric = RCNNAccMetric()
     cls_metric = RCNNLogLossMetric()
     bbox_metric = RCNNL1LossMetric()
@@ -85,14 +85,6 @@ def train_rcnn(image_set, year, root_path, devkit_path, pretrained, epoch,
             batch_end_callback=batch_end_callback, kvstore=kv_store,
             optimizer='sgd', optimizer_params=optimizer_params,
             arg_params=args, aux_params=auxs, begin_epoch=begin_epoch, num_epoch=end_epoch)
-
-    # edit params and save
-    for epoch in range(begin_epoch + 1, end_epoch + 1):
-        arg_params, aux_params = load_checkpoint(prefix, epoch)
-        arg_params['bbox_pred_weight'] = (arg_params['bbox_pred_weight'].T * mx.nd.array(stds)).T
-        arg_params['bbox_pred_bias'] = arg_params['bbox_pred_bias'] * mx.nd.array(stds) + \
-                                       mx.nd.array(means)
-        save_checkpoint(prefix, epoch, arg_params, aux_params)
 
 
 def parse_args():

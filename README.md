@@ -30,12 +30,22 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
 * Download VGG16 pretrained model, use `mxnet/tools/caffe_converter` to convert it,
   rename to `vgg16-symbol.json` and `vgg16-0001.params` and place it in `model` folder.
   `model` folder will be used to place model checkpoints along the training process.
+
+### Alternate
 * Start training by running `python train_alternate.py` after VOCdevkit is ready.
   A typical command would be `python train_alternate.py --gpus 0`. This will train the network on the VOC07 trainval.
   More control of training process can be found in the argparse help accessed by `python train_alternate.py -h`.
-* Start testing by run `python test.py` after completing the training process.
+* Start testing by running `python test.py` after completing the training process.
   A typical command would be `python test.py --has_rpn --prefix model/final --epoch 8`. This will test the network on the VOC07 test.
   Adding a `--vis` will turn on visualization and `-h` will show help as in the training process.
+* An experiment yields 69.54 mAP, close to 69.9 as reported.
+
+### End-to-end
+* End-to-end training is the same as `py-faster-rcnn` and is first made possible by `tornadomeet/mx-rcnn`, which also has resnet-50 based detection.
+* Start training by running `python train_end2end.py`. A typical command would be `python train_end2end.py`. This will train the network on VOC07 trainval.
+  As usual control of training process can be found in argparse help.
+* Start testing by running `python test.py --has_rpn --prefix model/e2e --epoch 10`. This will test the network on the VOC07 test.
+* An experiment yields 69.65 mAP.
 
 ## Training and Testing Fast R-CNN
 * Download Pascal VOC data and place them to `data` folder according to `Data Folder Structure`.
@@ -46,6 +56,7 @@ and Fast R-CNN. Fast R-CNN weights are used to initiate RPN for training.
   `model` folder will be used to place model checkpoints along the training process.
 * Start training by running `python -m tools.train_rcnn --proposal ss` to use the selective search proposal.
 * Start testing by running `python -m tools.test_rcnn --proposal ss`.
+* An experiment yields 66.5 mAP, close to 66.9 as reported.
 
 ## Information
 * Download link to trained model
@@ -83,6 +94,7 @@ This repository used code from [MXNet](https://github.com/dmlc/mxnet),
 [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/),
 [ImageNet](http://image-net.org/). Model comes from
 [VGG16](http://www.robots.ox.ac.uk/~vgg/research/very_deep/).
+Thanks to tornadomeet for end-to-end experiments and MXNet contributers for helpful discussions.
 
 ## References
 1. Tianqi Chen, Mu Li, Yutian Li, Min Lin, Naiyan Wang, Minjie Wang, Tianjun Xiao, Bing Xu, Chiyuan Zhang, and Zheng Zhang. MXNet: A Flexible and Efficient Machine Learning Library for Heterogeneous Distributed Systems. In Neural Information Processing Systems, Workshop on Machine Learning Systems, 2015

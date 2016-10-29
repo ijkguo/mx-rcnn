@@ -4,8 +4,9 @@ import os
 import pprint
 
 import mxnet as mx
+import numpy as np
 
-from rcnn.callback import Speedometer
+from rcnn.callback import Speedometer, do_checkpoint
 from rcnn.config import config
 from rcnn.loader import AnchorLoader
 from rcnn.metric import *
@@ -18,13 +19,15 @@ from utils.load_model import load_param
 config.TRAIN.HAS_RPN = True
 config.TRAIN.BATCH_SIZE = 1
 config.TRAIN.BATCH_IMAGES = 1
-config.TRAIN.BATCH_ROIS = 64
+config.TRAIN.BATCH_ROIS = 128
 config.TRAIN.END2END = True
 config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
+config.TRAIN.BG_THRESH_LO = 0.0
 
 
 def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
-              prefix, ctx, begin_epoch, end_epoch, frequent, kv_store, work_load_list=None, resume=False):
+              prefix, ctx, begin_epoch, end_epoch, frequent, kv_store, work_load_list=None,
+              resume=False, lr=0.001, lr_step=50000):
     # set up logger
     logging.basicConfig()
     logger = logging.getLogger()
@@ -87,8 +90,11 @@ def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
         fixed_param_prefix = ['conv1', 'conv2']
     data_names = [k[0] for k in train_data.provide_data]
     label_names = [k[0] for k in train_data.provide_label]
+    # callback
     batch_end_callback = Speedometer(train_data.batch_size, frequent=frequent)
-    epoch_end_callback = mx.callback.do_checkpoint(prefix)
+    means = np.tile(np.array(config.TRAIN.BBOX_MEANS), voc.num_classes)
+    stds = np.tile(np.array(config.TRAIN.BBOX_STDS), voc.num_classes)
+    epoch_end_callback = do_checkpoint(prefix, means, stds)
     # metric
     rpn_eval_metric = RPNAccMetric()
     rpn_cls_metric = RPNLogLossMetric()
@@ -101,8 +107,8 @@ def train_net(image_set, year, root_path, devkit_path, pretrained, epoch,
         eval_metrics.add(child_metric)
     optimizer_params = {'momentum': 0.9,
                         'wd': 0.0005,
-                        'learning_rate': 0.001,
-                        'lr_scheduler': mx.lr_scheduler.FactorScheduler(60000, 0.1),
+                        'learning_rate': lr,
+                        'lr_scheduler': mx.lr_scheduler.FactorScheduler(lr_step, 0.1),
                         'rescale_grad': (1.0 / config.TRAIN.BATCH_SIZE)}
 
     # train
@@ -131,13 +137,13 @@ def parse_args():
     parser.add_argument('--epoch', dest='epoch', help='epoch of pretrained model',
                         default=1, type=int)
     parser.add_argument('--prefix', dest='prefix', help='new model prefix',
-                        default=os.path.join(os.getcwd(), 'model', 'rpn'), type=str)
+                        default=os.path.join(os.getcwd(), 'model', 'e2e'), type=str)
     parser.add_argument('--gpus', dest='gpu_ids', help='GPU device to train with',
                         default='0', type=str)
     parser.add_argument('--begin_epoch', dest='begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end_epoch', dest='end_epoch', help='end epoch of training',
-                        default=8, type=int)
+                        default=10, type=int)
     parser.add_argument('--frequent', dest='frequent', help='frequency of logging',
                         default=20, type=int)
     parser.add_argument('--kv_store', dest='kv_store', help='the kv-store type',
@@ -146,6 +152,8 @@ def parse_args():
                         default=None, type=list)
     parser.add_argument('--finetune', dest='finetune', help='second round finetune', action='store_true')
     parser.add_argument('--resume', dest='resume', help='continue training', action='store_true')
+    parser.add_argument('--lr', dest='lr', help='base learning rate', default=0.001, type=float)
+    parser.add_argument('--lr_step', dest='lr_step', help='learning rate step', default=50000, type=int)
     args = parser.parse_args()
     return args
 
@@ -156,4 +164,4 @@ if __name__ == '__main__':
         config.TRAIN.FINETUNE = True
     train_net(args.image_set, args.year, args.root_path, args.devkit_path, args.pretrained, args.epoch,
               args.prefix, ctx, args.begin_epoch, args.end_epoch, args.frequent,
-              args.kv_store, args.work_load_list, args.resume)
+              args.kv_store, args.work_load_list, args.resume, args.lr, args.lr_step)
