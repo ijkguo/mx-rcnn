@@ -33,6 +33,13 @@ def test_rcnn(args, ctx, prefix, epoch,
     # load model
     arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx, process=True)
 
+    # check parameters
+    param_names = [k for k in sym.list_arguments() + sym.list_auxiliary_states()
+                   if k not in dict(test_data.provide_data) and 'label' not in k]
+    missing_names = [k for k in param_names if k not in arg_params and k not in aux_params]
+    if len(missing_names):
+        print 'detected missing params', missing_names
+
     # detect
     detector = Detector(sym, ctx, arg_params, aux_params)
     pred_eval(detector, test_data, imdb, vis=vis)
