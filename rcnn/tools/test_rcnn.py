@@ -6,8 +6,7 @@ from ..config import config
 from ..symbol import *
 from ..dataset import *
 from ..core.loader import TestLoader
-from ..core.detector import Detector
-from ..core.tester import pred_eval
+from ..core.tester import Predictor, pred_eval
 from ..utils.load_model import load_param
 
 
@@ -40,9 +39,16 @@ def test_rcnn(args, ctx, prefix, epoch,
     if len(missing_names):
         print 'detected missing params', missing_names
 
-    # detect
-    detector = Detector(sym, ctx, arg_params, aux_params)
-    pred_eval(detector, test_data, imdb, vis=vis)
+    # decide maximum shape
+    data_names = [k[0] for k in test_data.provide_data]
+    label_names = ['cls_prob_label']
+    max_data_shape = [('data', (1, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
+    predictor = Predictor(sym, data_names, label_names,
+                          context=ctx, max_data_shapes=max_data_shape,
+                          test_data=test_data, arg_params=arg_params, aux_params=aux_params)
+
+    # start detection
+    pred_eval(predictor, test_data, imdb, vis=vis)
 
 
 def parse_args():

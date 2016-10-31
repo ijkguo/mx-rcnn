@@ -22,10 +22,18 @@ class TestLoader(mx.io.DataIter):
         self.size = len(self.roidb)
         self.index = np.arange(self.size)
 
+        # decide data and label names (only for training)
+        if has_rpn:
+            self.data_name = ['data', 'im_info']
+        else:
+            self.label_name = ['data', 'rois']
+        self.label_name = []
+
         # status variable for synchronization between get_data and get_label
         self.cur = 0
         self.data = None
         self.label = None
+        self.im_info = None
 
         # get first batch to fill in provide_data and provide_label
         self.reset()
@@ -33,11 +41,11 @@ class TestLoader(mx.io.DataIter):
 
     @property
     def provide_data(self):
-        return [(k, v.shape) for k, v in self.data.items()]
+        return [(k, v.shape) for k, v in zip(self.data_name, self.data)]
 
     @property
     def provide_label(self):
-        return [(k, v.shape) for k, v in self.label.items()]
+        return [(k, v.shape) for k, v in zip(self.label_name, self.label)]
 
     def reset(self):
         self.cur = 0
@@ -51,7 +59,8 @@ class TestLoader(mx.io.DataIter):
         if self.iter_next():
             self.get_batch()
             self.cur += self.batch_size
-            return mx.io.DataBatch(data=self.data, label=self.label,
+            return self.im_info, \
+                   mx.io.DataBatch(data=self.data, label=self.label,
                                    pad=self.getpad(), index=self.getindex(),
                                    provide_data=self.provide_data, provide_label=self.provide_label)
         else:
@@ -71,9 +80,12 @@ class TestLoader(mx.io.DataIter):
         cur_to = min(cur_from + self.batch_size, self.size)
         roidb = [self.roidb[self.index[i]] for i in range(cur_from, cur_to)]
         if self.has_rpn:
-            self.data, self.label = minibatch.get_rpn_testbatch(roidb)
+            data, label, im_info = minibatch.get_rpn_testbatch(roidb)
         else:
-            self.data, self.label = minibatch.get_rcnn_testbatch(roidb)
+            data, label, im_info = minibatch.get_rcnn_testbatch(roidb)
+        self.data = [mx.nd.array(data[name]) for name in self.data_name]
+        self.label = [mx.nd.array(label[name]) for name in self.label_name]
+        self.im_info = im_info
 
 
 class ROIIter(mx.io.DataIter):

@@ -107,7 +107,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     rpn_cls_metric = metric.RPNLogLossMetric()
     rpn_bbox_metric = metric.RPNL1LossMetric()
     eval_metric = metric.RCNNAccMetric()
-    cls_metric = metric.RCNNL1LossMetric()
+    cls_metric = metric.RCNNLogLossMetric()
     bbox_metric = metric.RCNNL1LossMetric()
     eval_metrics = mx.metric.CompositeEvalMetric()
     for child_metric in [rpn_eval_metric, rpn_cls_metric, rpn_bbox_metric, eval_metric, cls_metric, bbox_metric]:

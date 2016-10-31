@@ -1,5 +1,4 @@
 import mxnet as mx
-import numpy as np
 
 from rcnn.config import config
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
@@ -36,11 +35,9 @@ class Detector(object):
             arg_shapes, out_shapes, aux_shapes = \
                 self.symbol.infer_shape(data=self.arg_params['data'].shape, rois=self.arg_params['rois'].shape)
 
-        # fill in label and aux
+        # fill in label
         arg_shapes_dict = {name: shape for name, shape in zip(self.symbol.list_arguments(), arg_shapes)}
         self.arg_params['cls_prob_label'] = mx.nd.zeros(arg_shapes_dict['cls_prob_label'], self.ctx)
-        aux_names = self.symbol.list_auxiliary_states()
-        self.aux_params = {k: mx.nd.zeros(s, self.ctx) for k, s in zip(aux_names, aux_shapes)}
 
         # execute
         self.executor = self.symbol.bind(self.ctx, self.arg_params, args_grad=None,
@@ -52,8 +49,7 @@ class Detector(object):
         scores = output_dict['cls_prob_reshape_output'].asnumpy()[0]
         bbox_deltas = output_dict['bbox_pred_reshape_output'].asnumpy()[0]
         if config.TEST.HAS_RPN:
-            rois = output_dict['rois_output'].asnumpy()
-            rois = rois[:, 1:].copy()  # scale back
+            rois = output_dict['rois_output'].asnumpy()[:, 1:]
         else:
             rois = roi_array[:, 1:]
 

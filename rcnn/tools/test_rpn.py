@@ -6,7 +6,7 @@ from ..config import config
 from ..symbol import *
 from ..dataset import *
 from ..core.loader import TestLoader
-from ..core.generate import Detector, generate_detections
+from ..core.tester import Predictor, generate_proposals
 from ..utils.load_model import load_param
 
 # rpn generate proposal config
@@ -35,9 +35,18 @@ def test_rpn(args, ctx, prefix, epoch,
     if len(missing_names):
         print 'detected missing params', missing_names
 
+    # decide maximum shape
+    data_names = [k[0] for k in test_data.provide_data]
+    label_names = [k[0] for k in test_data.provide_label]
+    max_data_shape = [('data', (1, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
+
+    # create predictor
+    predictor = Predictor(sym, data_names, label_names,
+                          context=ctx, max_data_shapes=max_data_shape,
+                          test_data=test_data, arg_params=arg_params, aux_params=aux_params)
+
     # start testing
-    detector = Detector(sym, ctx, arg_params, aux_params)
-    imdb_boxes = generate_detections(detector, test_data, imdb, vis=vis, thresh=thresh)
+    imdb_boxes = generate_proposals(predictor, test_data, imdb, vis=vis, thresh=thresh)
     imdb.evaluate_recall(roidb, candidate_boxes=imdb_boxes)
 
 

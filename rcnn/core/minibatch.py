@@ -76,7 +76,7 @@ def get_rpn_testbatch(roidb):
     """
     return a dict of testbatch
     :param roidb: ['image', 'flipped']
-    :return: data, label
+    :return: data, label, im_info
     """
     assert len(roidb) == 1, 'Single batch only'
     imgs, roidb = get_image(roidb)
@@ -87,32 +87,30 @@ def get_rpn_testbatch(roidb):
             'im_info': im_info}
     label = {}
 
-    return data, label
+    return data, label, im_info
 
 
 def get_rcnn_testbatch(roidb):
     """
     return a dict of testbatch
     :param roidb: ['image', 'flipped'] + ['boxes']
-    :return: data, label
+    :return: data, label, im_info
     """
-    num_images = len(roidb)
+    assert len(roidb) == 1, 'Single batch only'
     imgs, roidb = get_image(roidb)
-    im_array = image_processing.tensor_vstack(imgs)
-    rois_array = list()
-    for im_i in range(num_images):
-        im_rois = roidb[im_i]['boxes']
-        rois = im_rois
-        batch_index = im_i * np.ones((rois.shape[0], 1))
-        rois_array_this_image = np.hstack((batch_index, rois))
-        rois_array.append(rois_array_this_image)
-    rois_array = np.vstack(rois_array)
+    im_array = imgs[0]
+    im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
+
+    im_rois = roidb[0]['boxes']
+    rois = im_rois
+    batch_index = 0 * np.ones((rois.shape[0], 1))
+    rois_array = np.hstack((batch_index, rois))[np.newaxis, :]
 
     data = {'data': im_array,
             'rois': rois_array}
     label = {}
 
-    return data, label
+    return data, label, im_info
 
 
 def get_rpn_batch(roidb):
