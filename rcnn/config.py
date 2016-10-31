@@ -49,9 +49,10 @@ config.TRAIN.RPN_POSITIVE_WEIGHT = -1.0
 
 # used for end2end training
 # RPN proposal
+config.TRAIN.CXX_PROPOSAL = True
 config.TRAIN.RPN_NMS_THRESH = 0.7
 config.TRAIN.RPN_PRE_NMS_TOP_N = 12000
-config.TRAIN.RPN_POST_NMS_TOP_N = 6000
+config.TRAIN.RPN_POST_NMS_TOP_N = 2000
 config.TRAIN.RPN_MIN_SIZE = 16
 # approximate bounding box regression
 config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = False
@@ -66,6 +67,7 @@ config.TEST.BATCH_IMAGES = 1
 config.TEST.NMS = 0.3
 
 # RPN proposal
+config.TEST.CXX_PROPOSAL = True
 config.TEST.RPN_NMS_THRESH = 0.7
 config.TEST.RPN_PRE_NMS_TOP_N = 6000
 config.TEST.RPN_POST_NMS_TOP_N = 300

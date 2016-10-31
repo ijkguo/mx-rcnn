@@ -1,6 +1,6 @@
 import cPickle
 import os
-
+import time
 import mxnet as mx
 import numpy as np
 
@@ -118,14 +118,18 @@ def pred_eval(predictor, test_data, imdb, vis=False):
                  for _ in xrange(imdb.num_classes)]
 
     i = 0
+    t = time.time()
     for im_info, data_batch in test_data:
-        if i % 10 == 0:
-            print 'testing {}/{}'.format(i, imdb.num_images)
+        t1 = time.time() - t
+        t = time.time()
 
         scores, boxes, data_dict = im_detect(predictor, data_batch, data_names)
         # we used scaled image & roi to train, so it is necessary to transform them back
         # however, visualization will be scaled
         scale = im_info[0, 2]
+
+        t2 = time.time() - t
+        t = time.time()
 
         for j in range(1, imdb.num_classes):
             indexes = np.where(scores[:, j] > thresh)[0]
@@ -152,6 +156,10 @@ def pred_eval(predictor, test_data, imdb, vis=False):
                     box[:, :4] *= scale
             vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image,
                               class_names=imdb.classes)
+
+        t3 = time.time() - t
+        t = time.time()
+        print 'testing {}/{} data {:.4f}s net {:.4f}s post {:.4f}s'.format(i, imdb.num_images, t1, t2, t3)
         i += 1
 
     cache_folder = os.path.join(imdb.cache_path, imdb.name)

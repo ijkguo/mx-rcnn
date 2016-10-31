@@ -6,9 +6,14 @@ import numpy as np
 
 from rcnn.config import config
 from bbox_transform import bbox_transform
+from ..cython.bbox import bbox_overlaps_cython
 
 
 def bbox_overlaps(boxes, query_boxes):
+    return bbox_overlaps_cython(boxes, query_boxes)
+
+
+def bbox_overlaps_py(boxes, query_boxes):
     """
     determine overlaps between boxes and query_boxes
     :param boxes: n * 4 bounding boxes
