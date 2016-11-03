@@ -76,15 +76,13 @@ def get_vgg_rcnn(num_classes=config.NUM_CLASSES):
     rois = mx.symbol.Variable(name='rois')
     label = mx.symbol.Variable(name='label')
     bbox_target = mx.symbol.Variable(name='bbox_target')
-    bbox_inside_weight = mx.symbol.Variable(name='bbox_inside_weight')
-    bbox_outside_weight = mx.symbol.Variable(name='bbox_outside_weight')
+    bbox_weight = mx.symbol.Variable(name='bbox_weight')
 
     # reshape input
     rois = mx.symbol.Reshape(data=rois, shape=(-1, 5), name='rois_reshape')
     label = mx.symbol.Reshape(data=label, shape=(-1, ), name='label_reshape')
     bbox_target = mx.symbol.Reshape(data=bbox_target, shape=(-1, 4 * num_classes), name='bbox_target_reshape')
-    bbox_inside_weight = mx.symbol.Reshape(data=bbox_inside_weight, shape=(-1, 4 * num_classes), name='bbox_inside_weight_reshape')
-    bbox_outside_weight = mx.symbol.Reshape(data=bbox_outside_weight, shape=(-1, 4 * num_classes), name='bbox_outside_weight_reshape')
+    bbox_weight = mx.symbol.Reshape(data=bbox_weight, shape=(-1, 4 * num_classes), name='bbox_weight_reshape')
 
     # shared convolutional layers
     relu5_3 = get_vgg_conv(data)
@@ -106,9 +104,7 @@ def get_vgg_rcnn(num_classes=config.NUM_CLASSES):
     cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='batch')
     # bounding box regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
-    bbox_loss_ = bbox_outside_weight * \
-                 mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0,
-                                     data=bbox_inside_weight * (bbox_pred - bbox_target))
+    bbox_loss_ = bbox_weight * mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0, data=(bbox_pred - bbox_target))
     bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / config.TRAIN.BATCH_ROIS)
 
     # reshape output
@@ -171,8 +167,7 @@ def get_vgg_rpn(num_anchors=config.NUM_ANCHORS):
     data = mx.symbol.Variable(name="data")
     label = mx.symbol.Variable(name='label')
     bbox_target = mx.symbol.Variable(name='bbox_target')
-    bbox_inside_weight = mx.symbol.Variable(name='bbox_inside_weight')
-    bbox_outside_weight = mx.symbol.Variable(name='bbox_outside_weight')
+    bbox_weight = mx.symbol.Variable(name='bbox_weight')
 
     # shared convolutional layers
     relu5_3 = get_vgg_conv(data)
@@ -188,16 +183,14 @@ def get_vgg_rpn(num_anchors=config.NUM_ANCHORS):
 
     # prepare rpn data
     rpn_cls_score_reshape = mx.symbol.Reshape(
-        data=rpn_cls_score, shape=(0, 2, -1), name="rpn_cls_score_reshape")
+        data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
 
     # classification
     cls_prob = mx.symbol.SoftmaxOutput(data=rpn_cls_score_reshape, label=label, multi_output=True,
                                        normalization='valid', use_ignore=True, ignore_label=-1, name="cls_prob")
     # bounding box regression
-    bbox_loss_ = bbox_outside_weight * \
-                 mx.symbol.smooth_l1(name='bbox_loss_', scalar=3.0,
-                                     data=bbox_inside_weight * (rpn_bbox_pred - bbox_target))
-    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_)
+    bbox_loss_ = bbox_weight * mx.symbol.smooth_l1(name='bbox_loss_', scalar=3.0, data=(rpn_bbox_pred - bbox_target))
+    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / config.TRAIN.RPN_BATCH_SIZE)
     # group output
     group = mx.symbol.Group([cls_prob, bbox_loss])
     return group
@@ -332,8 +325,7 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     gt_boxes = mx.symbol.Variable(name="gt_boxes")
     rpn_label = mx.symbol.Variable(name='label')
     rpn_bbox_target = mx.symbol.Variable(name='bbox_target')
-    rpn_bbox_inside_weight = mx.symbol.Variable(name='bbox_inside_weight')
-    rpn_bbox_outside_weight = mx.symbol.Variable(name='bbox_outside_weight')
+    rpn_bbox_weight = mx.symbol.Variable(name='bbox_weight')
 
     # shared convolutional layers
     relu5_3 = get_vgg_conv(data)
@@ -355,10 +347,8 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     rpn_cls_prob = mx.symbol.SoftmaxOutput(data=rpn_cls_score_reshape, label=rpn_label, multi_output=True,
                                            normalization='valid', use_ignore=True, ignore_label=-1, name="rpn_cls_prob")
     # bounding box regression
-    rpn_bbox_loss_ = rpn_bbox_outside_weight * \
-                     mx.symbol.smooth_l1(name='rpn_bbox_loss_', scalar=3.0,
-                                         data=rpn_bbox_inside_weight * (rpn_bbox_pred - rpn_bbox_target))
-    rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_)
+    rpn_bbox_loss_ = rpn_bbox_weight * mx.symbol.smooth_l1(name='rpn_bbox_loss_', scalar=3.0, data=(rpn_bbox_pred - rpn_bbox_target))
+    rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_, grad_scale=1.0 / config.TRAIN.RPN_BATCH_SIZE)
 
     # ROI proposal
     rpn_cls_act = mx.symbol.SoftmaxActivation(
@@ -387,8 +377,7 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     rois = group[0]
     label = group[1]
     bbox_target = group[2]
-    bbox_inside_weight = group[3]
-    bbox_outside_weight = group[4]
+    bbox_weight = group[3]
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
@@ -407,9 +396,7 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='batch')
     # bounding box regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=drop7, num_hidden=num_classes * 4)
-    bbox_loss_ = bbox_outside_weight * \
-                 mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0,
-                                     data=bbox_inside_weight * (bbox_pred - bbox_target))
+    bbox_loss_ = bbox_weight * mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0, data=(bbox_pred - bbox_target))
     bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / config.TRAIN.BATCH_ROIS)
 
     # reshape output

@@ -22,8 +22,6 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     logger.setLevel(logging.INFO)
 
     # setup config
-    config.TRAIN.HAS_RPN = True
-    config.TRAIN.BATCH_SIZE = 1
     config.TRAIN.BATCH_IMAGES = 1
     config.TRAIN.BATCH_ROIS = 128
     config.TRAIN.END2END = True
@@ -35,8 +33,8 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu
-    config.TRAIN.BATCH_IMAGES *= len(ctx)
-    config.TRAIN.BATCH_SIZE *= len(ctx)
+    batch_size = len(ctx)
+    input_batch_size = config.TRAIN.BATCH_IMAGES * batch_size
 
     # print config
     pprint.pprint(config)
@@ -48,15 +46,15 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         roidb = imdb.append_flipped_images(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
+    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=True,
                               ctx=ctx, work_load_list=args.work_load_list,
                               feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
                               anchor_ratios=config.ANCHOR_RATIOS)
 
     # infer max shape
-    max_data_shape = [('data', (config.TRAIN.BATCH_IMAGES, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
+    max_data_shape = [('data', (input_batch_size, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
     max_data_shape, max_label_shape = train_data.infer_shape(max_data_shape)
-    max_data_shape.append(('gt_boxes', (config.TRAIN.BATCH_SIZE, 100, 5)))
+    max_data_shape.append(('gt_boxes', (input_batch_size, 100, 5)))
     print 'providing maximum shape', max_data_shape, max_label_shape
 
     # load pretrained
@@ -88,9 +86,11 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     for k in sym.list_arguments():
         if k in data_shape_dict:
             continue
+        assert k in arg_params, k + ' not initialized'
         assert arg_params[k].shape == arg_shape_dict[k], \
             'shape inconsistent for ' + k + ' inferred ' + str(arg_shape_dict[k]) + ' provided ' + str(arg_params[k].shape)
     for k in sym.list_auxiliary_states():
+        assert k in aux_params, k + ' not initialized'
         assert aux_params[k].shape == aux_shape_dict[k], \
             'shape inconsistent for ' + k + ' inferred ' + str(aux_shape_dict[k]) + ' provided ' + str(aux_params[k].shape)
 
@@ -124,7 +124,8 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
                         'wd': 0.0005,
                         'learning_rate': lr,
                         'lr_scheduler': mx.lr_scheduler.FactorScheduler(lr_step, 0.1),
-                        'rescale_grad': (1.0 / config.TRAIN.BATCH_SIZE)}
+                        'rescale_grad': (1.0 / batch_size),
+                        'clip_gradient': 5}
 
     # train
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,

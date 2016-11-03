@@ -130,17 +130,17 @@ def expand_bbox_regression_targets(bbox_targets_data, num_classes):
     :param bbox_targets_data: [k * 5]
     :param num_classes: number of classes
     :return: bbox target processed [k * 4 num_classes]
-    bbox_inside_weights ! only foreground boxes have bbox regression computation!
+    bbox_weights ! only foreground boxes have bbox regression computation!
     """
     classes = bbox_targets_data[:, 0]
     bbox_targets = np.zeros((classes.size, 4 * num_classes), dtype=np.float32)
-    bbox_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
+    bbox_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
     indexes = np.where(classes > 0)[0]
     for index in indexes:
         cls = classes[index]
         start = int(4 * cls)
         end = start + 4
         bbox_targets[index, start:end] = bbox_targets_data[index, 1:]
-        bbox_inside_weights[index, start:end] = config.TRAIN.BBOX_INSIDE_WEIGHTS
-    return bbox_targets, bbox_inside_weights
+        bbox_weights[index, start:end] = config.TRAIN.BBOX_WEIGHTS
+    return bbox_targets, bbox_weights
 

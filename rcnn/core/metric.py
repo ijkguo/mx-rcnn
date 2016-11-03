@@ -101,7 +101,7 @@ class RPNL1LossMetric(mx.metric.EvalMetric):
         pred = preds[1]
 
         bbox_loss = pred.asnumpy()
-        bbox_loss = bbox_loss.reshape((bbox_loss.shape[0], -1))
+        bbox_loss = bbox_loss.reshape((bbox_loss.shape[0], -1)) / config.TRAIN.RPN_BATCH_SIZE
 
         self.sum_metric += np.sum(bbox_loss)
         self.num_inst += bbox_loss.shape[0]
@@ -110,7 +110,6 @@ class RPNL1LossMetric(mx.metric.EvalMetric):
 class RCNNL1LossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RCNNL1LossMetric, self).__init__('RCNNL1Loss')
-        self.has_rpn = config.TRAIN.HAS_RPN
 
     def update(self, labels, preds):
         if config.TRAIN.END2END:

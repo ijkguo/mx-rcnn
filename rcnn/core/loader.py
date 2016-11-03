@@ -116,7 +116,7 @@ class ROIIter(mx.io.DataIter):
 
         # decide data and label names (only for training)
         self.data_name = ['data', 'rois']
-        self.label_name = ['label', 'bbox_target', 'bbox_inside_weight', 'bbox_outside_weight']
+        self.label_name = ['label', 'bbox_target', 'bbox_weight']
 
         # status variable for synchronization between get_data and get_label
         self.cur = 0
@@ -237,7 +237,7 @@ class AnchorLoader(mx.io.DataIter):
             self.data_name = ['data', 'im_info', 'gt_boxes']
         else:
             self.data_name = ['data']
-        self.label_name = ['label', 'bbox_target', 'bbox_inside_weight', 'bbox_outside_weight']
+        self.label_name = ['label', 'bbox_target', 'bbox_weight']
 
         # status variable for synchronization between get_data and get_label
         self.cur = 0
@@ -291,12 +291,13 @@ class AnchorLoader(mx.io.DataIter):
         if max_label_shape is None:
             max_label_shape = []
         max_shapes = dict(max_data_shape + max_label_shape)
+        input_batch_size = max_shapes['data'][0]
         im_info = [[max_shapes['data'][2], max_shapes['data'][3], 1.0]]
         _, feat_shape, _ = self.feat_sym.infer_shape(**max_shapes)
         label = minibatch.assign_anchor(feat_shape[0], np.zeros((0, 5)), im_info,
                                         self.feat_stride, self.anchor_scales, self.anchor_ratios, self.allowed_border)
         label = [label[k] for k in self.label_name]
-        label_shape = [(k, v.shape) for k, v in zip(self.label_name, label)]
+        label_shape = [(k, tuple([input_batch_size] + list(v.shape[1:]))) for k, v in zip(self.label_name, label)]
         return max_data_shape, label_shape
 
     def get_batch(self):

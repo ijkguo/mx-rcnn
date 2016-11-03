@@ -22,8 +22,6 @@ def alternate_train(args, ctx, pretrained, epoch, rpn_epoch, rcnn_epoch):
     config.TRAIN.BG_THRESH_LO = 0.0
 
     logging.info('########## TRAIN RPN WITH IMAGENET INIT')
-    config.TRAIN.HAS_RPN = True
-    config.TRAIN.BATCH_SIZE = 1
     train_rpn(args, ctx, pretrained, epoch, 'model/rpn1', begin_epoch, rpn_epoch)
 
     logging.info('########## GENERATE RPN DETECTION')
@@ -33,13 +31,9 @@ def alternate_train(args, ctx, pretrained, epoch, rpn_epoch, rcnn_epoch):
     test_rpn(args, ctx[0], 'model/rpn1', rpn_epoch)
 
     logging.info('########## TRAIN RCNN WITH IMAGENET INIT AND RPN DETECTION')
-    config.TRAIN.HAS_RPN = False
-    config.TRAIN.BATCH_SIZE = 128
     train_rcnn(args, ctx, pretrained, epoch, 'model/rcnn1', begin_epoch, rcnn_epoch)
 
     logging.info('########## TRAIN RPN WITH RCNN INIT')
-    config.TRAIN.HAS_RPN = True
-    config.TRAIN.BATCH_SIZE = 1
     train_rpn(args, ctx, 'model/rcnn1', rcnn_epoch, 'model/rpn2', begin_epoch, rpn_epoch,
               finetune=True)
 
@@ -53,8 +47,6 @@ def alternate_train(args, ctx, pretrained, epoch, rpn_epoch, rcnn_epoch):
     combine_model('model/rpn2', rpn_epoch, 'model/rcnn1', rcnn_epoch, 'model/rcnn2', 0)
 
     logger.info('########## TRAIN RCNN WITH RPN INIT AND DETECTION')
-    config.TRAIN.HAS_RPN = False
-    config.TRAIN.BATCH_SIZE = 128
     train_rcnn(args, ctx, 'model/rcnn2', 0, 'model/rcnn2', begin_epoch, rcnn_epoch,
                finetune=True)
 
