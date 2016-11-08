@@ -44,7 +44,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=True,
                               ctx=ctx, work_load_list=args.work_load_list,
                               feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
-                              anchor_ratios=config.ANCHOR_RATIOS)
+                              anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
 
     # infer max shape
     max_data_shape = [('data', (input_batch_size, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]

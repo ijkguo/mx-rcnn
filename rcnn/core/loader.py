@@ -89,7 +89,7 @@ class TestLoader(mx.io.DataIter):
 
 
 class ROIIter(mx.io.DataIter):
-    def __init__(self, roidb, batch_size=2, shuffle=False, ctx=None, work_load_list=None):
+    def __init__(self, roidb, batch_size=2, shuffle=False, ctx=None, work_load_list=None, aspect_grouping=False):
         """
         This Iter will provide roi data to Fast R-CNN network
         :param roidb: must be preprocessed
@@ -97,6 +97,7 @@ class ROIIter(mx.io.DataIter):
         :param shuffle: bool
         :param ctx: list of contexts
         :param work_load_list: list of work load
+        :param aspect_grouping: group images with similar aspects
         :return: ROIIter
         """
         super(ROIIter, self).__init__()
@@ -109,6 +110,7 @@ class ROIIter(mx.io.DataIter):
         if self.ctx is None:
             self.ctx = [mx.cpu()]
         self.work_load_list = work_load_list
+        self.aspect_grouping = aspect_grouping
 
         # infer properties from roidb
         self.size = len(roidb)
@@ -139,7 +141,21 @@ class ROIIter(mx.io.DataIter):
     def reset(self):
         self.cur = 0
         if self.shuffle:
-            np.random.shuffle(self.index)
+            if self.aspect_grouping:
+                widths = np.array([r['width'] for r in self.roidb])
+                heights = np.array([r['height'] for r in self.roidb])
+                horz = (widths >= heights)
+                vert = np.logical_not(horz)
+                horz_inds = np.where(horz)[0]
+                vert_inds = np.where(vert)[0]
+                inds = np.hstack((np.random.permutation(horz_inds), np.random.permutation(vert_inds)))
+                extra = inds.shape[0] % self.batch_size
+                inds_ = np.reshape(inds[:-extra], (-1, self.batch_size))
+                row_perm = np.random.permutation(np.arange(inds_.shape[0]))
+                inds[:-extra] = np.reshape(inds_[row_perm, :], (-1,))
+                self.index = inds
+            else:
+                np.random.shuffle(self.index)
 
     def iter_next(self):
         return self.cur + self.batch_size <= self.size
@@ -201,7 +217,8 @@ class ROIIter(mx.io.DataIter):
 
 class AnchorLoader(mx.io.DataIter):
     def __init__(self, feat_sym, roidb, batch_size=1, shuffle=False, ctx=None, work_load_list=None,
-                 feat_stride=16, anchor_scales=(8, 16, 32), anchor_ratios=(0.5, 1, 2), allowed_border=0):
+                 feat_stride=16, anchor_scales=(8, 16, 32), anchor_ratios=(0.5, 1, 2), allowed_border=0,
+                 aspect_grouping=False):
         """
         This Iter will provide roi data to Fast R-CNN network
         :param feat_sym: to infer shape of assign_output
@@ -210,6 +227,7 @@ class AnchorLoader(mx.io.DataIter):
         :param shuffle: bool
         :param ctx: list of contexts
         :param work_load_list: list of work load
+        :param aspect_grouping: group images with similar aspects
         :return: AnchorLoader
         """
         super(AnchorLoader, self).__init__()
@@ -227,6 +245,7 @@ class AnchorLoader(mx.io.DataIter):
         self.anchor_scales = anchor_scales
         self.anchor_ratios = anchor_ratios
         self.allowed_border = allowed_border
+        self.aspect_grouping = aspect_grouping
 
         # infer properties from roidb
         self.size = len(roidb)
@@ -260,7 +279,21 @@ class AnchorLoader(mx.io.DataIter):
     def reset(self):
         self.cur = 0
         if self.shuffle:
-            np.random.shuffle(self.index)
+            if self.aspect_grouping:
+                widths = np.array([r['width'] for r in self.roidb])
+                heights = np.array([r['height'] for r in self.roidb])
+                horz = (widths >= heights)
+                vert = np.logical_not(horz)
+                horz_inds = np.where(horz)[0]
+                vert_inds = np.where(vert)[0]
+                inds = np.hstack((np.random.permutation(horz_inds), np.random.permutation(vert_inds)))
+                extra = inds.shape[0] % self.batch_size
+                inds_ = np.reshape(inds[:-extra], (-1, self.batch_size))
+                row_perm = np.random.permutation(np.arange(inds_.shape[0]))
+                inds[:-extra] = np.reshape(inds_[row_perm, :], (-1,))
+                self.index = inds
+            else:
+                np.random.shuffle(self.index)
 
     def iter_next(self):
         return self.cur + self.batch_size <= self.size

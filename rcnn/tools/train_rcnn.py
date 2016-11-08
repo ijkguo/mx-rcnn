@@ -48,7 +48,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # load training data
     train_data = ROIIter(roidb, batch_size=input_batch_size, shuffle=True,
-                         ctx=ctx, work_load_list=args.work_load_list)
+                         ctx=ctx, work_load_list=args.work_load_list, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
 
     # infer max shape
     max_data_shape = [('data', (input_batch_size, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
