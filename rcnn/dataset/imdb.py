@@ -12,7 +12,7 @@ basic format [image_index]
 import os
 import cPickle
 import numpy as np
-from ..processing.bbox_regression import bbox_overlaps
+from ..processing.bbox_transform import bbox_overlaps
 
 
 class IMDB(object):

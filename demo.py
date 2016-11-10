@@ -6,14 +6,14 @@ import numpy as np
 from rcnn.config import config
 from rcnn.core.detector import Detector
 from rcnn.symbol import get_vgg_test
-from rcnn.processing.image_processing import resize, transform
+from rcnn.io.image import resize, transform
 from rcnn.processing.nms import nms
 from rcnn.core.tester import vis_all_detection
 from rcnn.utils.load_model import load_param
 
 
 def get_net(prefix, epoch, ctx):
-    args, auxs = load_param(prefix, epoch, convert=True, ctx=ctx)
+    args, auxs = load_param(prefix, epoch, convert=True, ctx=ctx, process=True)
     sym = get_vgg_test()
     detector = Detector(sym, ctx, args, auxs)
     return detector
@@ -37,7 +37,7 @@ def demo_net(detector, image_name):
     config.TEST.HAS_RPN = True
     assert os.path.exists(image_name), image_name + ' not found'
     im = cv2.imread(image_name)
-    im_array, im_scale = resize(im, config.SCALES[0], config.MAX_SIZE)
+    im_array, im_scale = resize(im, config.SCALES[0][0], config.SCALES[0][1])
     im_array = transform(im_array, config.PIXEL_MEANS)
     im_info = np.array([[im_array.shape[2], im_array.shape[3], im_scale]], dtype=np.float32)
 

@@ -4,11 +4,11 @@ import time
 import mxnet as mx
 import numpy as np
 
+from module import MutableModule
 from rcnn.config import config
-from rcnn.processing import image_processing
+from rcnn.io import image
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 from rcnn.processing.nms import nms
-from module import MutableModule
 
 
 class Predictor(object):
@@ -183,7 +183,7 @@ def vis_all_detection(im_array, detections, class_names=None, thresh=0.7):
     """
     import matplotlib.pyplot as plt
     import random
-    im = image_processing.transform_inverse(im_array, config.PIXEL_MEANS)
+    im = image.transform_inverse(im_array, config.PIXEL_MEANS)
     plt.imshow(im)
     for j, name in enumerate(class_names):
         if name == '__background__':

@@ -2,9 +2,10 @@ import mxnet as mx
 import numpy as np
 from mxnet.executor_manager import _split_input_slice
 
-import minibatch
 from rcnn.config import config
-from rcnn.processing.image_processing import tensor_vstack
+from rcnn.io.image import tensor_vstack
+from rcnn.io.rpn import get_rpn_testbatch, get_rpn_batch, assign_anchor
+from rcnn.io.rcnn import get_rcnn_testbatch, get_rcnn_batch
 
 
 class TestLoader(mx.io.DataIter):
@@ -80,9 +81,9 @@ class TestLoader(mx.io.DataIter):
         cur_to = min(cur_from + self.batch_size, self.size)
         roidb = [self.roidb[self.index[i]] for i in range(cur_from, cur_to)]
         if self.has_rpn:
-            data, label, im_info = minibatch.get_rpn_testbatch(roidb)
+            data, label, im_info = get_rpn_testbatch(roidb)
         else:
-            data, label, im_info = minibatch.get_rcnn_testbatch(roidb)
+            data, label, im_info = get_rcnn_testbatch(roidb)
         self.data = [mx.nd.array(data[name]) for name in self.data_name]
         self.label = [mx.nd.array(label[name]) for name in self.label_name]
         self.im_info = im_info
@@ -199,7 +200,7 @@ class ROIIter(mx.io.DataIter):
         label_list = []
         for islice in slices:
             iroidb = [roidb[i] for i in range(islice.start, islice.stop)]
-            data, label = minibatch.get_rcnn_batch(iroidb)
+            data, label = get_rcnn_batch(iroidb)
             data_list.append(data)
             label_list.append(label)
 
@@ -327,8 +328,8 @@ class AnchorLoader(mx.io.DataIter):
         input_batch_size = max_shapes['data'][0]
         im_info = [[max_shapes['data'][2], max_shapes['data'][3], 1.0]]
         _, feat_shape, _ = self.feat_sym.infer_shape(**max_shapes)
-        label = minibatch.assign_anchor(feat_shape[0], np.zeros((0, 5)), im_info,
-                                        self.feat_stride, self.anchor_scales, self.anchor_ratios, self.allowed_border)
+        label = assign_anchor(feat_shape[0], np.zeros((0, 5)), im_info,
+                              self.feat_stride, self.anchor_scales, self.anchor_ratios, self.allowed_border)
         label = [label[k] for k in self.label_name]
         label_shape = [(k, tuple([input_batch_size] + list(v.shape[1:]))) for k, v in zip(self.label_name, label)]
         return max_data_shape, label_shape
@@ -353,7 +354,7 @@ class AnchorLoader(mx.io.DataIter):
         label_list = []
         for islice in slices:
             iroidb = [roidb[i] for i in range(islice.start, islice.stop)]
-            data, label = minibatch.get_rpn_batch(iroidb)
+            data, label = get_rpn_batch(iroidb)
             data_list.append(data)
             label_list.append(label)
 
@@ -374,9 +375,9 @@ class AnchorLoader(mx.io.DataIter):
             data['gt_boxes'] = label['gt_boxes'][np.newaxis, :, :]
 
             # assign anchor for label
-            label = minibatch.assign_anchor(feat_shape, label['gt_boxes'], data['im_info'],
-                                            self.feat_stride, self.anchor_scales,
-                                            self.anchor_ratios, self.allowed_border)
+            label = assign_anchor(feat_shape, label['gt_boxes'], data['im_info'],
+                                  self.feat_stride, self.anchor_scales,
+                                  self.anchor_ratios, self.allowed_border)
             new_label_list.append(label)
 
         all_data = dict()

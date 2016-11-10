@@ -13,7 +13,6 @@ import numpy as np
 import scipy.io
 
 from imdb import IMDB
-from ..processing.bbox_process import unique_boxes, filter_small_boxes
 from ..utils.voc_eval import voc_eval
 
 
@@ -255,3 +254,18 @@ class PascalVOC(IMDB):
             aps += [ap]
             print('AP for {} = {:.4f}'.format(cls, ap))
         print('Mean AP = {:.4f}'.format(np.mean(aps)))
+
+
+def unique_boxes(boxes, scale=1.0):
+    """ return indices of unique boxes """
+    v = np.array([1, 1e3, 1e6, 1e9])
+    hashes = np.round(boxes * scale).dot(v)
+    _, index = np.unique(hashes, return_index=True)
+    return np.sort(index)
+
+
+def filter_small_boxes(boxes, min_size):
+    w = boxes[:, 2] - boxes[:, 0]
+    h = boxes[:, 3] - boxes[:, 1]
+    keep = np.where((w >= min_size) & (h > min_size))[0]
+    return keep
