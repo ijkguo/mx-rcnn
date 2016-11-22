@@ -27,7 +27,7 @@ class TestLoader(mx.io.DataIter):
         if has_rpn:
             self.data_name = ['data', 'im_info']
         else:
-            self.label_name = ['data', 'rois']
+            self.data_name = ['data', 'rois']
         self.label_name = []
 
         # status variable for synchronization between get_data and get_label

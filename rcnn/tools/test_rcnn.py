@@ -11,12 +11,10 @@ from ..utils.load_model import load_param
 
 
 def test_rcnn(args, ctx, prefix, epoch,
-              vis=False, shuffle=False, has_rpn=True, proposal='rpn'):
+              vis=False, shuffle=False, has_rpn=True, proposal='rpn', thresh=1e-3):
     # load symbol and testing data
     if has_rpn:
         config.TEST.HAS_RPN = True
-        config.TEST.RPN_PRE_NMS_TOP_N = 6000
-        config.TEST.RPN_POST_NMS_TOP_N = 300
         sym = eval('get_' + args.network + '_test')()
         imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
         roidb = imdb.gt_roidb()
@@ -48,7 +46,7 @@ def test_rcnn(args, ctx, prefix, epoch,
                           test_data=test_data, arg_params=arg_params, aux_params=aux_params)
 
     # start detection
-    pred_eval(predictor, test_data, imdb, vis=vis)
+    pred_eval(predictor, test_data, imdb, vis=vis, thresh=thresh)
 
 
 def parse_args():
@@ -70,6 +68,7 @@ def parse_args():
     parser.add_argument('--gpu', help='GPU device to test with', type=int)
     # rcnn
     parser.add_argument('--vis', dest='vis', help='turn on visualization', action='store_true')
+    parser.add_argument('--thresh', help='valid detection threshold', default=1e-3, type=float)
     parser.add_argument('--shuffle', help='shuffle data on visualization', action='store_true')
     parser.add_argument('--has_rpn', help='generate proposals on the fly',
                         action='store_true')
@@ -78,8 +77,13 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-if __name__ == '__main__':
+
+def main():
     args = parse_args()
     ctx = mx.gpu(args.gpu)
+    print args
     test_rcnn(args, ctx, args.prefix, args.epoch,
-              vis=args.vis, shuffle=args.shuffle, has_rpn=args.has_rpn, proposal=args.proposal)
+              vis=args.vis, shuffle=args.shuffle, has_rpn=args.has_rpn, proposal=args.proposal, thresh=args.thresh)
+
+if __name__ == '__main__':
+    main()

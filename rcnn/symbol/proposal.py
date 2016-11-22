@@ -6,6 +6,7 @@ classification probability and bounding box prediction results, and image size a
 import mxnet as mx
 import numpy as np
 import numpy.random as npr
+from distutils.util import strtobool
 
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 from rcnn.processing.generate_anchor import generate_anchors
@@ -182,13 +183,13 @@ class ProposalOperator(mx.operator.CustomOp):
 
 @mx.operator.register("proposal")
 class ProposalProp(mx.operator.CustomOpProp):
-    def __init__(self, feat_stride='16', scales='(8, 16, 32)', ratios='(0.5, 1, 2)', output_score=False,
+    def __init__(self, feat_stride='16', scales='(8, 16, 32)', ratios='(0.5, 1, 2)', output_score='False',
                  rpn_pre_nms_top_n='6000', rpn_post_nms_top_n='300', threshold='0.3', rpn_min_size='16'):
         super(ProposalProp, self).__init__(need_top_grad=False)
         self._feat_stride = int(feat_stride)
         self._scales = scales
         self._ratios = ratios
-        self._output_score = output_score
+        self._output_score = strtobool(output_score)
         self._rpn_pre_nms_top_n = int(rpn_pre_nms_top_n)
         self._rpn_post_nms_top_n = int(rpn_post_nms_top_n)
         self._threshold = float(threshold)

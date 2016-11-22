@@ -4,6 +4,7 @@ Proposal Target Operator selects foreground and background roi and assigns label
 
 import mxnet as mx
 import numpy as np
+from distutils.util import strtobool
 
 from rcnn.io.rcnn import sample_rois
 
@@ -63,7 +64,7 @@ class ProposalTargetOperator(mx.operator.CustomOp):
 
 @mx.operator.register('proposal_target')
 class ProposalTargetProp(mx.operator.CustomOpProp):
-    def __init__(self, num_classes, batch_images, batch_rois, fg_fraction):
+    def __init__(self, num_classes, batch_images, batch_rois, fg_fraction='0.25'):
         super(ProposalTargetProp, self).__init__(need_top_grad=False)
         self._num_classes = int(num_classes)
         self._batch_images = int(batch_images)

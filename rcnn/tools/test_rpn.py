@@ -74,8 +74,13 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-if __name__ == '__main__':
+
+def main():
     args = parse_args()
+    print 'Called with argument:', args
     ctx = mx.gpu(args.gpu)
     test_rpn(args, ctx, args.prefix, args.epoch,
              vis=args.vis, shuffle=args.shuffle, thresh=args.thresh)
+
+if __name__ == '__main__':
+    main()

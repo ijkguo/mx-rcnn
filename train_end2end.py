@@ -174,8 +174,13 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-if __name__ == '__main__':
+
+def main():
     args = parse_args()
+    print 'Called with argument:', args
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     train_net(args, ctx, args.pretrained, args.epoch, args.prefix, args.begin_epoch, args.end_epoch,
               lr=args.lr, lr_step=args.lr_step)
+
+if __name__ == '__main__':
+    main()
