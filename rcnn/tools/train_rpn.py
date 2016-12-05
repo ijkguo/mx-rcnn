@@ -14,7 +14,7 @@ from ..utils.load_model import load_param
 
 
 def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
-              finetune=False, lr=0.001, lr_step=60000):
+              finetune=False, lr=0.001, lr_step='6'):
     # set up logger
     logging.basicConfig()
     logger = logging.getLogger()
@@ -107,11 +107,20 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     # callback
     batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=args.frequent)
     epoch_end_callback = mx.callback.do_checkpoint(prefix)
+    # decide learning rate
+    base_lr = lr
+    lr_factor = 0.1
+    lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
+    lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
+    lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
+    lr_iters = [int(epoch * len(roidb) / config.TRAIN.BATCH_IMAGES) for epoch in lr_epoch_diff]
+    print 'lr', lr, 'lr_epoch', lr_epoch, 'lr_epoch_diff', lr_epoch_diff
+    lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer
     optimizer_params = {'momentum': 0.9,
                         'wd': 0.0005,
                         'learning_rate': lr,
-                        'lr_scheduler': mx.lr_scheduler.FactorScheduler(lr_step, 0.1),
+                        'lr_scheduler': lr_scheduler,
                         'rescale_grad': (1.0 / batch_size),
                         'clip_gradient': 5}
 
@@ -159,7 +168,7 @@ def parse_args():
                         default=8, type=int)
     parser.add_argument('--finetune', help='second round finetune', action='store_true')
     parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate step', default=60000, type=int)
+    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='6', type=str)
     args = parser.parse_args()
     return args
 

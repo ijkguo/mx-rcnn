@@ -25,9 +25,6 @@ def alternate_train(args, ctx, pretrained, epoch, rpn_epoch, rcnn_epoch):
     train_rpn(args, ctx, pretrained, epoch, 'model/rpn1', begin_epoch, rpn_epoch)
 
     logging.info('########## GENERATE RPN DETECTION')
-    config.TEST.HAS_RPN = True
-    config.TEST.RPN_PRE_NMS_TOP_N = -1
-    config.TEST.RPN_POST_NMS_TOP_N = 2000
     test_rpn(args, ctx[0], 'model/rpn1', rpn_epoch)
 
     logging.info('########## TRAIN RCNN WITH IMAGENET INIT AND RPN DETECTION')
@@ -38,9 +35,6 @@ def alternate_train(args, ctx, pretrained, epoch, rpn_epoch, rcnn_epoch):
               finetune=True)
 
     logging.info('########## GENERATE RPN DETECTION')
-    config.TEST.HAS_RPN = True
-    config.TEST.RPN_PRE_NMS_TOP_N = -1
-    config.TEST.RPN_POST_NMS_TOP_N = 2000
     test_rpn(args, ctx[0], 'model/rpn2', rpn_epoch)
 
     logger.info('########## COMBINE RPN2 WITH RCNN1')

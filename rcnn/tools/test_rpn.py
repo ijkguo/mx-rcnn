@@ -9,14 +9,12 @@ from ..core.loader import TestLoader
 from ..core.tester import Predictor, generate_proposals
 from ..utils.load_model import load_param
 
-# rpn generate proposal config
-config.TEST.HAS_RPN = True
-config.TEST.RPN_PRE_NMS_TOP_N = -1
-config.TEST.RPN_POST_NMS_TOP_N = 2000
-
 
 def test_rpn(args, ctx, prefix, epoch,
              vis=False, shuffle=False, thresh=0):
+    # rpn generate proposal config
+    config.TEST.HAS_RPN = True
+
     # load symbol
     sym = eval('get_' + args.network + '_rpn_test')()
 

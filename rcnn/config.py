@@ -36,7 +36,7 @@ config.TRAIN.BATCH_ROIS = 128
 config.TRAIN.FG_FRACTION = 0.25
 config.TRAIN.FG_THRESH = 0.5
 config.TRAIN.BG_THRESH_HI = 0.5
-config.TRAIN.BG_THRESH_LO = 0.1
+config.TRAIN.BG_THRESH_LO = 0.0
 # rcnn bounding box regression params
 config.TRAIN.BBOX_REGRESSION_THRESH = 0.5
 config.TRAIN.BBOX_WEIGHTS = np.array([1.0, 1.0, 1.0, 1.0])
@@ -59,7 +59,7 @@ config.TRAIN.CXX_PROPOSAL = True
 config.TRAIN.RPN_NMS_THRESH = 0.7
 config.TRAIN.RPN_PRE_NMS_TOP_N = 12000
 config.TRAIN.RPN_POST_NMS_TOP_N = 2000
-config.TRAIN.RPN_MIN_SIZE = 16
+config.TRAIN.RPN_MIN_SIZE = config.RPN_FEAT_STRIDE
 # approximate bounding box regression
 config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = False
 config.TRAIN.BBOX_MEANS = (0.0, 0.0, 0.0, 0.0)
@@ -78,7 +78,13 @@ config.TEST.CXX_PROPOSAL = True
 config.TEST.RPN_NMS_THRESH = 0.7
 config.TEST.RPN_PRE_NMS_TOP_N = 6000
 config.TEST.RPN_POST_NMS_TOP_N = 300
-config.TEST.RPN_MIN_SIZE = 16
+config.TEST.RPN_MIN_SIZE = config.RPN_FEAT_STRIDE
+
+# RPN generate proposal
+config.TEST.PROPOSAL_NMS_THRESH = 0.7
+config.TEST.PROPOSAL_PRE_NMS_TOP_N = 20000
+config.TEST.PROPOSAL_POST_NMS_TOP_N = 2000
+config.TEST.PROPOSAL_MIN_SIZE = config.RPN_FEAT_STRIDE
 
 # RCNN nms
 config.TEST.NMS = 0.3

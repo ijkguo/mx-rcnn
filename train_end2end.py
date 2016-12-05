@@ -15,7 +15,7 @@ from rcnn.utils.load_model import load_param
 
 
 def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
-              lr=0.001, lr_step=50000):
+              lr=0.001, lr_step='5'):
     # set up logger
     logging.basicConfig()
     logger = logging.getLogger()
@@ -26,7 +26,6 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     config.TRAIN.BATCH_ROIS = 128
     config.TRAIN.END2END = True
     config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
-    config.TRAIN.BG_THRESH_LO = 0.0
 
     # load symbol
     sym = eval('get_' + args.network + '_train')()
@@ -119,11 +118,20 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     means = np.tile(np.array(config.TRAIN.BBOX_MEANS), imdb.num_classes)
     stds = np.tile(np.array(config.TRAIN.BBOX_STDS), imdb.num_classes)
     epoch_end_callback = callback.do_checkpoint(prefix, means, stds)
+    # decide learning rate
+    base_lr = lr
+    lr_factor = 0.1
+    lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
+    lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
+    lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
+    lr_iters = [int(epoch * len(roidb) / config.TRAIN.BATCH_IMAGES) for epoch in lr_epoch_diff]
+    print 'lr', lr, 'lr_epoch', lr_epoch, 'lr_epoch_diff', lr_epoch_diff
+    lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer
     optimizer_params = {'momentum': 0.9,
                         'wd': 0.0005,
                         'learning_rate': lr,
-                        'lr_scheduler': mx.lr_scheduler.FactorScheduler(lr_step, 0.1),
+                        'lr_scheduler': lr_scheduler,
                         'rescale_grad': (1.0 / batch_size),
                         'clip_gradient': 5}
 
@@ -170,7 +178,7 @@ def parse_args():
     parser.add_argument('--end_epoch', help='end epoch of training',
                         default=10, type=int)
     parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate step', default=50000, type=int)
+    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='5', type=str)
     args = parser.parse_args()
     return args
 
