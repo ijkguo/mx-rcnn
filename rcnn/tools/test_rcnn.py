@@ -43,7 +43,8 @@ def test_rcnn(args, ctx, prefix, epoch,
     max_data_shape = [('data', (1, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
     predictor = Predictor(sym, data_names, label_names,
                           context=ctx, max_data_shapes=max_data_shape,
-                          test_data=test_data, arg_params=arg_params, aux_params=aux_params)
+                          provide_data=test_data.provide_data, provide_label=test_data.provide_label,
+                          arg_params=arg_params, aux_params=aux_params)
 
     # start detection
     pred_eval(predictor, test_data, imdb, vis=vis, thresh=thresh)

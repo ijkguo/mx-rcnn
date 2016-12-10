@@ -41,7 +41,8 @@ def test_rpn(args, ctx, prefix, epoch,
     # create predictor
     predictor = Predictor(sym, data_names, label_names,
                           context=ctx, max_data_shapes=max_data_shape,
-                          test_data=test_data, arg_params=arg_params, aux_params=aux_params)
+                          provide_data=test_data.provide_data, provide_label=test_data.provide_label,
+                          arg_params=arg_params, aux_params=aux_params)
 
     # start testing
     imdb_boxes = generate_proposals(predictor, test_data, imdb, vis=vis, thresh=thresh)
