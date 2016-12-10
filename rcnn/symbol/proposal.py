@@ -10,7 +10,7 @@ from distutils.util import strtobool
 
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 from rcnn.processing.generate_anchor import generate_anchors
-from rcnn.processing.nms import nms
+from ..cython.gpu_nms import gpu_nms
 
 DEBUG = False
 
@@ -36,6 +36,9 @@ class ProposalOperator(mx.operator.CustomOp):
             print self._anchors
 
     def forward(self, is_train, req, in_data, out_data, aux):
+        def nms(dets):
+            return gpu_nms(dets, self._threshold, in_data[0].context.device_id)
+
         batch_size = in_data[0].shape[0]
         if batch_size > 1:
             raise ValueError("Sorry, multiple images each device is not implemented")
@@ -53,7 +56,6 @@ class ProposalOperator(mx.operator.CustomOp):
 
         pre_nms_topN = self._rpn_pre_nms_top_n
         post_nms_topN = self._rpn_post_nms_top_n
-        nms_thresh = self._threshold
         min_size = self._rpn_min_size
 
         # the first set of anchors are background probabilities
@@ -132,7 +134,8 @@ class ProposalOperator(mx.operator.CustomOp):
         # 6. apply nms (e.g. threshold = 0.7)
         # 7. take after_nms_topN (e.g. 300)
         # 8. return the top proposals (-> RoIs top)
-        keep = nms(np.hstack((proposals, scores)), nms_thresh)
+        det = np.hstack((proposals, scores)).astype(np.float32)
+        keep = nms(det)
         if post_nms_topN > 0:
             keep = keep[:post_nms_topN]
         # pad to ensure output size remains unchanged

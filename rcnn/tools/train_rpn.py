@@ -113,7 +113,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
     lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
-    lr_iters = [int(epoch * len(roidb) / config.TRAIN.BATCH_IMAGES) for epoch in lr_epoch_diff]
+    lr_iters = [int(epoch * len(roidb) / batch_size) for epoch in lr_epoch_diff]
     print 'lr', lr, 'lr_epoch', lr_epoch, 'lr_epoch_diff', lr_epoch_diff
     lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer

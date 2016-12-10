@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument('--dataset', help='dataset name',
                         default='PascalVOC', type=str)
     parser.add_argument('--image_set', help='image_set name',
-                        default='2007_test', type=str)
+                        default='2007_trainval', type=str)
     parser.add_argument('--root_path', help='output data folder',
                         default='data', type=str)
     parser.add_argument('--dataset_path', help='dataset path',
@@ -88,7 +88,7 @@ def parse_args():
 def main():
     args = parse_args()
     print 'Called with argument:', args
-    ctx = [mx.gpu(int(i)) for i in args.gpu_ids.split(',')]
+    ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     alternate_train(args, ctx, args.pretrained, args.epoch, args.rpn_epoch, args.rcnn_epoch)
 
 if __name__ == '__main__':
