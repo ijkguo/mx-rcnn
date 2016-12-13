@@ -10,7 +10,7 @@ from distutils.util import strtobool
 
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 from rcnn.processing.generate_anchor import generate_anchors
-from ..cython.gpu_nms import gpu_nms
+from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 DEBUG = False
 
@@ -36,8 +36,7 @@ class ProposalOperator(mx.operator.CustomOp):
             print self._anchors
 
     def forward(self, is_train, req, in_data, out_data, aux):
-        def nms(dets):
-            return gpu_nms(dets, self._threshold, in_data[0].context.device_id)
+        nms = gpu_nms_wrapper(self._threshold, in_data[0].context.device_id)
 
         batch_size = in_data[0].shape[0]
         if batch_size > 1:
@@ -158,6 +157,7 @@ class ProposalOperator(mx.operator.CustomOp):
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
         self.assign(in_grad[0], req[0], 0)
         self.assign(in_grad[1], req[1], 0)
+        self.assign(in_grad[2], req[2], 0)
 
     @staticmethod
     def _filter_boxes(boxes, min_size):

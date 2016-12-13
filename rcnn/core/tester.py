@@ -8,7 +8,7 @@ from module import MutableModule
 from rcnn.config import config
 from rcnn.io import image
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
-from rcnn.processing.nms import nms
+from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 
 class Predictor(object):
@@ -140,6 +140,8 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
     assert not test_data.shuffle
     data_names = [k[0] for k in test_data.provide_data]
 
+    nms = py_nms_wrapper(config.TEST.NMS)
+
     # limit detections to max_per_image over all classes
     max_per_image = -1
 
@@ -167,7 +169,7 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
             cls_scores = scores[indexes, j, np.newaxis]
             cls_boxes = boxes[indexes, j * 4:(j + 1) * 4]
             cls_dets = np.hstack((cls_boxes, cls_scores))
-            keep = nms(cls_dets, config.TEST.NMS)
+            keep = nms(cls_dets)
             all_boxes[j][i] = cls_dets[keep, :]
 
         if max_per_image > 0:

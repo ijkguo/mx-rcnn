@@ -4,9 +4,9 @@ import cv2
 import mxnet as mx
 import numpy as np
 from rcnn.config import config
-from rcnn.symbol import get_vgg_test
+from rcnn.symbol import get_vgg_test, get_vgg_rpn_test
 from rcnn.io.image import resize, transform
-from rcnn.core.tester import Predictor, im_detect, nms, vis_all_detection
+from rcnn.core.tester import Predictor, im_detect, im_proposal, nms, vis_all_detection
 from rcnn.utils.load_model import load_param
 
 
@@ -29,9 +29,8 @@ CONF_THRESH = 0.7
 NMS_THRESH = 0.3
 
 
-def get_net(prefix, epoch, ctx):
+def get_net(symbol, prefix, epoch, ctx):
     arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx, process=True)
-    symbol = get_vgg_test()
     predictor = Predictor(symbol, DATA_NAMES, LABEL_NAMES, context=ctx,
                           provide_data=DATA_SHAPES, provide_label=LABEL_SHAPES,
                           arg_params=arg_params, aux_params=aux_params)
@@ -82,6 +81,24 @@ def demo_net(predictor, image_name):
     vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image, CLASSES, im_scale)
 
 
+def demo_rpn(predictor, image_name):
+    """
+    generate data_batch -> im_proposal -> output
+    :param predictor: Predictor
+    :param image_name: image name
+    :return: None
+    """
+    assert os.path.exists(image_name), image_name + ' not found'
+    im = cv2.imread(image_name)
+    data_batch, data_names, im_scale = generate_batch(im)
+    scores, boxes, data_dict = im_proposal(predictor, data_batch, data_names, 1.0)
+
+    keep = np.where((scores > CONF_THRESH))[0]
+    dets = np.hstack((boxes, scores))[keep, :]
+    # print np.array_str(dets, precision=6, suppress_small=True)
+    vis_all_detection(data_dict['data'].asnumpy(), [dets], ['obj'], im_scale)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network')
     parser.add_argument('--image', help='custom image', type=str)
@@ -95,8 +112,28 @@ def parse_args():
 def main():
     args = parse_args()
     ctx = mx.gpu(args.gpu)
-    predictor = get_net(args.prefix, args.epoch, ctx)
+    symbol = get_vgg_test()
+    predictor = get_net(symbol, args.prefix, args.epoch, ctx)
     demo_net(predictor, args.image)
+
+
+def cpu_rpn():
+    args = parse_args()
+    ctx = mx.cpu()
+    symbol = get_vgg_rpn_test()
+    predictor = get_net(symbol, args.prefix, args.epoch, ctx)
+    demo_rpn(predictor, args.image)
+
+
+def gpu_rpn():
+    args = parse_args()
+    ctx = mx.gpu(args.gpu)
+    symbol = get_vgg_rpn_test()
+    predictor = get_net(symbol, args.prefix, args.epoch, ctx)
+    demo_rpn(predictor, args.image)
+
 
 if __name__ == '__main__':
     main()
+    # cpu_rpn()
+    # gpu_rpn()
