@@ -1,8 +1,7 @@
 import argparse
-import os
 import mxnet as mx
 
-from ..config import config
+from ..config import config, default, generate_config
 from ..symbol import *
 from ..dataset import *
 from ..core.loader import TestLoader
@@ -11,7 +10,7 @@ from ..utils.load_model import load_param
 
 
 def test_rpn(args, ctx, prefix, epoch,
-             vis=False, shuffle=False, thresh=0):
+             vis, shuffle, thresh):
     # rpn generate proposal config
     config.TEST.HAS_RPN = True
 
@@ -52,24 +51,21 @@ def test_rpn(args, ctx, prefix, epoch,
 def parse_args():
     parser = argparse.ArgumentParser(description='Test a Region Proposal Network')
     # general
-    parser.add_argument('--network', help='network name',
-                        default='vgg', type=str)
-    parser.add_argument('--dataset', help='dataset name',
-                        default='PascalVOC', type=str)
-    parser.add_argument('--image_set', help='image_set name',
-                        default='2007_test', type=str)
-    parser.add_argument('--root_path', help='output data folder',
-                        default='data', type=str)
-    parser.add_argument('--dataset_path', help='dataset path',
-                        default=os.path.join('data', 'VOCdevkit'), type=str)
+    parser.add_argument('--network', help='network name', default=default.network, type=str)
+    parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
+    args, rest = parser.parse_known_args()
+    generate_config(args.network, args.dataset)
+    parser.add_argument('--image_set', help='image_set name', default=default.test_image_set, type=str)
+    parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
+    parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)
     # testing
-    parser.add_argument('--prefix', help='model to test with', type=str)
-    parser.add_argument('--epoch', help='model to test with', type=int)
+    parser.add_argument('--prefix', help='model to test with', default=default.rpn_prefix, type=str)
+    parser.add_argument('--epoch', help='model to test with', default=default.rpn_epoch, type=int)
     # rpn
-    parser.add_argument('--gpu', help='GPU device to test with', type=int)
+    parser.add_argument('--gpu', help='GPU device to test with', default=0, type=int)
     parser.add_argument('--vis', help='turn on visualization', action='store_true')
-    parser.add_argument('--shuffle', help='shuffle data on visualization', action='store_true')
     parser.add_argument('--thresh', help='rpn proposal threshold', default=0, type=float)
+    parser.add_argument('--shuffle', help='shuffle data on visualization', action='store_true')
     args = parser.parse_args()
     return args
 
@@ -79,7 +75,7 @@ def main():
     print 'Called with argument:', args
     ctx = mx.gpu(args.gpu)
     test_rpn(args, ctx, args.prefix, args.epoch,
-             vis=args.vis, shuffle=args.shuffle, thresh=args.thresh)
+             args.vis, args.shuffle, args.thresh)
 
 if __name__ == '__main__':
     main()

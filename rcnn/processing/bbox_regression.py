@@ -69,7 +69,7 @@ def add_bbox_regression_targets(roidb):
         stds = np.tile(np.array(config.TRAIN.BBOX_STDS), (num_classes, 1))
     else:
         # compute mean, std values
-        class_counts = np.zeros((num_classes, 1)) + config.EPS
+        class_counts = np.zeros((num_classes, 1))
         sums = np.zeros((num_classes, 4))
         squared_sums = np.zeros((num_classes, 4))
         for im_i in range(num_images):
@@ -81,7 +81,7 @@ def add_bbox_regression_targets(roidb):
                     sums[cls, :] += targets[cls_indexes, 1:].sum(axis=0)
                     squared_sums[cls, :] += (targets[cls_indexes, 1:] ** 2).sum(axis=0)
 
-        means = sums / class_counts
+        means = sums / (class_counts + 1e-14)
         # var(x) = E(x^2) - E(x)^2
         stds = np.sqrt(squared_sums / class_counts - means ** 2)
 

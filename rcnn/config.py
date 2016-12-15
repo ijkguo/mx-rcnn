@@ -3,21 +3,20 @@ from easydict import EasyDict as edict
 
 config = edict()
 
-# image processing config
-config.EPS = 1e-14
+# network related params
 config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
-config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
 config.IMAGE_STRIDE = 0
-
-# symbol
-config.NUM_CLASSES = 21
 config.RPN_FEAT_STRIDE = 16
+config.RCNN_FEAT_SRTIDE = 16
+config.FIXED_PARAMS = ['conv1', 'conv2']
+config.FIXED_PARAMS_SHARED = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+
+# dataset related params
+config.NUM_CLASSES = 21
+config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
 config.ANCHOR_SCALES = (8, 16, 32)
 config.ANCHOR_RATIOS = (0.5, 1, 2)
 config.NUM_ANCHORS = len(config.ANCHOR_SCALES) * len(config.ANCHOR_RATIOS)
-config.RCNN_FEAT_SRTIDE = 16
-config.FIXED_PARAMS = ['conv1', 'conv2']
-config.FIXED_PARAMS_FINETUNE = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
 
 config.TRAIN = edict()
 
@@ -88,3 +87,60 @@ config.TEST.PROPOSAL_MIN_SIZE = config.RPN_FEAT_STRIDE
 
 # RCNN nms
 config.TEST.NMS = 0.3
+
+# default settings
+default = edict()
+
+# default network
+default.network = 'vgg'
+default.pretrained = 'model/vgg16'
+default.pretrained_epoch = 1
+default.base_lr = 0.001
+# default dataset
+default.dataset = 'PascalVOC'
+default.image_set = '2007_trainval'
+default.test_image_set = '2007_test'
+default.root_path = 'data'
+default.dataset_path = 'data/VOCdevkit'
+# default training
+default.frequent = 20
+default.kvstore = 'device'
+# default e2e
+default.e2e_prefix = 'model/e2e'
+default.e2e_epoch = 10
+default.e2e_lr = default.base_lr
+default.e2e_lr_step = '7'
+# default rpn
+default.rpn_prefix = 'model/rpn'
+default.rpn_epoch = 8
+default.rpn_lr = default.base_lr
+default.rpn_lr_step = '6'
+# default rcnn
+default.rcnn_prefix = 'model/rcnn'
+default.rcnn_epoch = 8
+default.rcnn_lr = default.base_lr
+default.rcnn_lr_step = '6'
+
+# network settings
+network = edict()
+
+network.vgg = edict()
+
+# dataset settings
+dataset = edict()
+
+dataset.PascalVOC = edict()
+
+
+def generate_config(_network, _dataset):
+    for k, v in network[_network].items():
+        if k in config:
+            config[k] = v
+        elif k in default:
+            default[k] = v
+    for k, v in dataset[_dataset].items():
+        if k in config:
+            config[k] = v
+        elif k in default:
+            default[k] = v
+

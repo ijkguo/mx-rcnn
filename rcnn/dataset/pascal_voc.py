@@ -10,7 +10,6 @@ import cPickle
 import cv2
 import os
 import numpy as np
-import scipy.io
 
 from imdb import IMDB
 from ..utils.voc_eval import voc_eval
@@ -140,6 +139,7 @@ class PascalVOC(IMDB):
         :param gt_roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
         :return: roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
         """
+        import scipy.io
         matfile = os.path.join(self.root_path, 'selective_search_data', self.name + '.mat')
         assert os.path.exists(matfile), 'selective search data does not exist: {}'.format(matfile)
         raw_data = scipy.io.loadmat(matfile)['boxes'].ravel()  # original was dict ['images', 'boxes']

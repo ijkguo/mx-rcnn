@@ -198,8 +198,8 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16,
     if DEBUG:
         _sums = bbox_targets[labels == 1, :].sum(axis=0)
         _squared_sums = (bbox_targets[labels == 1, :] ** 2).sum(axis=0)
-        _counts = config.EPS + np.sum(labels == 1)
-        means = _sums / _counts
+        _counts = np.sum(labels == 1)
+        means = _sums / (_counts + 1e-14)
         stds = np.sqrt(_squared_sums / _counts - means ** 2)
         print 'means', means
         print 'stdevs', stds

@@ -1,11 +1,10 @@
 import argparse
 import logging
-import os
 import pprint
 import mxnet as mx
 import numpy as np
 
-from rcnn.config import config
+from rcnn.config import config, default, generate_config
 from rcnn.symbol import *
 from rcnn.dataset import *
 from rcnn.core import callback, metric
@@ -41,11 +40,11 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     # load dataset and prepare imdb for training
     imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
     roidb = imdb.gt_roidb()
-    if args.flip:
+    if not args.no_flip:
         roidb = imdb.append_flipped_images(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=True,
+    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=not args.no_shuffle,
                               ctx=ctx, work_load_list=args.work_load_list,
                               feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
                               anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
@@ -56,9 +55,6 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     max_data_shape.append(('gt_boxes', (input_batch_size, 100, 5)))
     print 'providing maximum shape', max_data_shape, max_label_shape
 
-    # load pretrained
-    arg_params, aux_params = load_param(pretrained, epoch, convert=True)
-
     # infer shape
     data_shape_dict = dict(train_data.provide_data + train_data.provide_label)
     arg_shape, out_shape, aux_shape = sym.infer_shape(**data_shape_dict)
@@ -68,8 +64,11 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     print 'output shape'
     pprint.pprint(out_shape_dict)
 
-    # initialize params
-    if not args.resume:
+    # load and initialize params
+    if args.resume:
+        arg_params, aux_params = load_param(prefix, begin_epoch, convert=True)
+    else:
+        arg_params, aux_params = load_param(pretrained, epoch, convert=True)
         arg_params['rpn_conv_3x3_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_conv_3x3_weight'])
         arg_params['rpn_conv_3x3_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_conv_3x3_bias'])
         arg_params['rpn_cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_cls_score_weight'])
@@ -125,7 +124,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
     lr_iters = [int(epoch * len(roidb) / batch_size) for epoch in lr_epoch_diff]
-    print 'lr', lr, 'lr_epoch', lr_epoch, 'lr_epoch_diff', lr_epoch_diff
+    print 'lr', lr, 'lr_epoch_diff', lr_epoch_diff, 'lr_iters', lr_iters
     lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer
     optimizer_params = {'momentum': 0.9,
@@ -143,42 +142,31 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train a Region Proposal Network')
+    parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
     # general
-    parser.add_argument('--network', help='network name',
-                        default='vgg', type=str)
-    parser.add_argument('--dataset', help='dataset name',
-                        default='PascalVOC', type=str)
-    parser.add_argument('--image_set', help='image_set name',
-                        default='2007_trainval', type=str)
-    parser.add_argument('--root_path', help='output data folder',
-                        default='data', type=str)
-    parser.add_argument('--dataset_path', help='dataset path',
-                        default=os.path.join('data', 'VOCdevkit'), type=str)
+    parser.add_argument('--network', help='network name', default=default.network, type=str)
+    parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
+    args, rest = parser.parse_known_args()
+    generate_config(args.network, args.dataset)
+    parser.add_argument('--image_set', help='image_set name', default=default.image_set, type=str)
+    parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
+    parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)
     # training
-    parser.add_argument('--frequent', help='frequency of logging',
-                        default=20, type=int)
-    parser.add_argument('--kvstore', help='the kv-store type',
-                        default='device', type=str)
-    parser.add_argument('--work_load_list', help='work load for different devices',
-                        default=None, type=list)
-    parser.add_argument('--flip', help='flip images', action='store_true', default=True)
+    parser.add_argument('--frequent', help='frequency of logging', default=default.frequent, type=int)
+    parser.add_argument('--kvstore', help='the kv-store type', default=default.kvstore, type=str)
+    parser.add_argument('--work_load_list', help='work load for different devices', default=None, type=list)
+    parser.add_argument('--no_flip', help='disable flip images', action='store_true')
+    parser.add_argument('--no_shuffle', help='disable random shuffle', action='store_true')
     parser.add_argument('--resume', help='continue training', action='store_true')
     # e2e
-    parser.add_argument('--gpus', help='GPU device to train with',
-                        default='0', type=str)
-    parser.add_argument('--pretrained', help='pretrained model prefix',
-                        default=os.path.join('model', 'vgg16'), type=str)
-    parser.add_argument('--epoch', help='epoch of pretrained model',
-                        default=1, type=int)
-    parser.add_argument('--prefix', help='new model prefix',
-                        default=os.path.join('model', 'e2e'), type=str)
-    parser.add_argument('--begin_epoch', help='begin epoch of training',
-                        default=0, type=int)
-    parser.add_argument('--end_epoch', help='end epoch of training',
-                        default=10, type=int)
-    parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='5', type=str)
+    parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
+    parser.add_argument('--pretrained', help='pretrained model prefix', default=default.pretrained, type=str)
+    parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=default.pretrained_epoch, type=int)
+    parser.add_argument('--prefix', help='new model prefix', default=default.e2e_prefix, type=str)
+    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
+    parser.add_argument('--end_epoch', help='end epoch of training', default=default.e2e_epoch, type=int)
+    parser.add_argument('--lr', help='base learning rate', default=default.e2e_lr, type=float)
+    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default=default.e2e_lr_step, type=str)
     args = parser.parse_args()
     return args
 
@@ -187,7 +175,7 @@ def main():
     args = parse_args()
     print 'Called with argument:', args
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    train_net(args, ctx, args.pretrained, args.epoch, args.prefix, args.begin_epoch, args.end_epoch,
+    train_net(args, ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
               lr=args.lr, lr_step=args.lr_step)
 
 if __name__ == '__main__':

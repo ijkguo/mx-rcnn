@@ -1,6 +1,4 @@
 import numpy as np
-import importlib
-from ..config import config
 from ..cython.bbox import bbox_overlaps_cython
 
 

@@ -1,8 +1,7 @@
 import argparse
-import os
 import mxnet as mx
 
-from ..config import config
+from ..config import config, default, generate_config
 from ..symbol import *
 from ..dataset import *
 from ..core.loader import TestLoader
@@ -11,7 +10,7 @@ from ..utils.load_model import load_param
 
 
 def test_rcnn(args, ctx, prefix, epoch,
-              vis=False, shuffle=False, has_rpn=True, proposal='rpn', thresh=1e-3):
+              vis, shuffle, has_rpn, proposal, thresh):
     # load symbol and testing data
     if has_rpn:
         config.TEST.HAS_RPN = True
@@ -41,6 +40,8 @@ def test_rcnn(args, ctx, prefix, epoch,
     data_names = [k[0] for k in test_data.provide_data]
     label_names = ['cls_prob_label']
     max_data_shape = [('data', (1, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
+    if not has_rpn:
+        max_data_shape.append(('rois', (1, config.TEST.PROPOSAL_POST_NMS_TOP_N + 30, 5)))
     predictor = Predictor(sym, data_names, label_names,
                           context=ctx, max_data_shapes=max_data_shape,
                           provide_data=test_data.provide_data, provide_label=test_data.provide_label,
@@ -53,28 +54,23 @@ def test_rcnn(args, ctx, prefix, epoch,
 def parse_args():
     parser = argparse.ArgumentParser(description='Test a Fast R-CNN network')
     # general
-    parser.add_argument('--network', help='network name',
-                        default='vgg', type=str)
-    parser.add_argument('--dataset', help='dataset name',
-                        default='PascalVOC', type=str)
-    parser.add_argument('--image_set', help='image_set name',
-                        default='2007_test', type=str)
-    parser.add_argument('--root_path', help='output data folder',
-                        default='data', type=str)
-    parser.add_argument('--dataset_path', help='dataset path',
-                        default=os.path.join('data', 'VOCdevkit'), type=str)
+    parser.add_argument('--network', help='network name', default=default.network, type=str)
+    parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
+    args, rest = parser.parse_known_args()
+    generate_config(args.network, args.dataset)
+    parser.add_argument('--image_set', help='image_set name', default=default.test_image_set, type=str)
+    parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
+    parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)
     # testing
-    parser.add_argument('--prefix', help='model to test with', type=str)
-    parser.add_argument('--epoch', help='model to test with', type=int)
-    parser.add_argument('--gpu', help='GPU device to test with', type=int)
+    parser.add_argument('--prefix', help='model to test with', default=default.rcnn_prefix, type=str)
+    parser.add_argument('--epoch', help='model to test with', default=default.rcnn_epoch, type=int)
+    parser.add_argument('--gpu', help='GPU device to test with', default=0, type=int)
     # rcnn
-    parser.add_argument('--vis', dest='vis', help='turn on visualization', action='store_true')
+    parser.add_argument('--vis', help='turn on visualization', action='store_true')
     parser.add_argument('--thresh', help='valid detection threshold', default=1e-3, type=float)
     parser.add_argument('--shuffle', help='shuffle data on visualization', action='store_true')
-    parser.add_argument('--has_rpn', help='generate proposals on the fly',
-                        action='store_true')
-    parser.add_argument('--proposal', dest='proposal', help='can be ss for selective search or rpn',
-                        default='rpn', type=str)
+    parser.add_argument('--has_rpn', help='generate proposals on the fly', action='store_true')
+    parser.add_argument('--proposal', help='can be ss for selective search or rpn', default='rpn', type=str)
     args = parser.parse_args()
     return args
 
@@ -84,7 +80,7 @@ def main():
     ctx = mx.gpu(args.gpu)
     print args
     test_rcnn(args, ctx, args.prefix, args.epoch,
-              vis=args.vis, shuffle=args.shuffle, has_rpn=args.has_rpn, proposal=args.proposal, thresh=args.thresh)
+              args.vis, args.shuffle, args.has_rpn, args.proposal, args.thresh)
 
 if __name__ == '__main__':
     main()
