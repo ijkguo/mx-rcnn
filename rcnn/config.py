@@ -126,6 +126,16 @@ network = edict()
 
 network.vgg = edict()
 
+network.resnet = edict()
+network.resnet.pretrained = 'model/resnet-101'
+network.resnet.pretrained_epoch = 0
+network.resnet.PIXEL_MEANS = np.array([[[0, 0, 0]]])
+network.resnet.IMAGE_STRIDE = 0
+network.resnet.RPN_FEAT_STRIDE = 16
+network.resnet.RCNN_FEAT_SRTIDE = 16
+network.resnet.FIXED_PARAMS = ['conv0', 'stage1', 'gamma', 'beta']
+network.resnet.FIXED_PARAMS_SHARED = ['conv0', 'stage1', 'stage2', 'stage3', 'gamma', 'beta']
+
 # dataset settings
 dataset = edict()
 
