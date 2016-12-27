@@ -27,7 +27,8 @@ def alternate_train(args, ctx, pretrained, epoch,
               train_shared=False, lr=rpn_lr, lr_step=rpn_lr_step)
 
     logging.info('########## GENERATE RPN DETECTION')
-    test_rpn(args, ctx[0], 'model/rpn1', rpn_epoch)
+    test_rpn(args, ctx[0], 'model/rpn1', rpn_epoch,
+             vis=False, shuffle=False, thresh=0)
 
     logging.info('########## TRAIN RCNN WITH IMAGENET INIT AND RPN DETECTION')
     train_rcnn(args, ctx, pretrained, epoch, 'model/rcnn1', begin_epoch, rcnn_epoch,
@@ -38,7 +39,8 @@ def alternate_train(args, ctx, pretrained, epoch,
               train_shared=True, lr=rpn_lr, lr_step=rpn_lr_step)
 
     logging.info('########## GENERATE RPN DETECTION')
-    test_rpn(args, ctx[0], 'model/rpn2', rpn_epoch)
+    test_rpn(args, ctx[0], 'model/rpn2', rpn_epoch,
+             vis=False, shuffle=False, thresh=0)
 
     logger.info('########## COMBINE RPN2 WITH RCNN1')
     combine_model('model/rpn2', rpn_epoch, 'model/rcnn1', rcnn_epoch, 'model/rcnn2', 0)

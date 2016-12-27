@@ -27,7 +27,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         config.TRAIN.BG_THRESH_LO = 0.1  # reproduce Fast R-CNN
 
     # load symbol
-    sym = eval('get_' + args.network + '_rcnn')()
+    sym = eval('get_' + args.network + '_rcnn')(num_classes=config.NUM_CLASSES)
 
     # setup multi-gpu
     batch_size = len(ctx)

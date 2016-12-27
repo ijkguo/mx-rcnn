@@ -15,7 +15,7 @@ def test_rpn(args, ctx, prefix, epoch,
     config.TEST.HAS_RPN = True
 
     # load symbol
-    sym = eval('get_' + args.network + '_rpn_test')()
+    sym = eval('get_' + args.network + '_rpn_test')(num_anchors=config.NUM_ANCHORS)
 
     # load dataset and prepare imdb for training
     imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)

@@ -14,11 +14,11 @@ def test_rcnn(args, ctx, prefix, epoch,
     # load symbol and testing data
     if has_rpn:
         config.TEST.HAS_RPN = True
-        sym = eval('get_' + args.network + '_test')()
+        sym = eval('get_' + args.network + '_test')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
         imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
         roidb = imdb.gt_roidb()
     else:
-        sym = eval('get_' + args.network + '_rcnn_test')()
+        sym = eval('get_' + args.network + '_rcnn_test')(num_classes=config.NUM_CLASSES)
         imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
         gt_roidb = imdb.gt_roidb()
         roidb = eval('imdb.' + proposal + '_roidb')(gt_roidb)

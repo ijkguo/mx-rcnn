@@ -7,7 +7,7 @@ config = edict()
 config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
 config.IMAGE_STRIDE = 0
 config.RPN_FEAT_STRIDE = 16
-config.RCNN_FEAT_SRTIDE = 16
+config.RCNN_FEAT_STRIDE = 16
 config.FIXED_PARAMS = ['conv1', 'conv2']
 config.FIXED_PARAMS_SHARED = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
 

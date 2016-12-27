@@ -96,7 +96,7 @@ def assign_anchor(feat_shape, gt_boxes, im_info, feat_stride=16,
     DEBUG = False
     im_info = im_info[0]
     scales = np.array(scales, dtype=np.float32)
-    base_anchors = generate_anchors(base_size=16, ratios=list(ratios), scales=scales)
+    base_anchors = generate_anchors(base_size=feat_stride, ratios=list(ratios), scales=scales)
     num_anchors = base_anchors.shape[0]
     feat_height, feat_width = feat_shape[-2:]
 

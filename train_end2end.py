@@ -27,7 +27,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
 
     # load symbol
-    sym = eval('get_' + args.network + '_train')()
+    sym = eval('get_' + args.network + '_train')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
     feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu

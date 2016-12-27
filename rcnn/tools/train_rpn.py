@@ -23,8 +23,8 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     config.TRAIN.BATCH_IMAGES = 1
 
     # load symbol
-    sym = eval('get_' + args.network + '_rpn')()
-    feat_sym = get_vgg_rpn().get_internals()['rpn_cls_score_output']
+    sym = eval('get_' + args.network + '_rpn')(num_anchors=config.NUM_ANCHORS)
+    feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu
     batch_size = len(ctx)

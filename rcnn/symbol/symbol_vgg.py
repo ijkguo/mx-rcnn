@@ -89,7 +89,7 @@ def get_vgg_rcnn(num_classes=config.NUM_CLASSES):
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -133,7 +133,7 @@ def get_vgg_rcnn_test(num_classes=config.NUM_CLASSES):
     
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -288,7 +288,7 @@ def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
@@ -381,7 +381,7 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
 
     # Fast R-CNN
     pool5 = mx.symbol.ROIPooling(
-        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_SRTIDE)
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
     # group 6
     flatten = mx.symbol.Flatten(data=pool5, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
