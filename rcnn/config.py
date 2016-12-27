@@ -4,7 +4,7 @@ from easydict import EasyDict as edict
 config = edict()
 
 # network related params
-config.PIXEL_MEANS = np.array([[[123.68, 116.779, 103.939]]])
+config.PIXEL_MEANS = np.array([103.939, 116.779, 123.68])
 config.IMAGE_STRIDE = 0
 config.RPN_FEAT_STRIDE = 16
 config.RCNN_FEAT_STRIDE = 16
@@ -129,7 +129,7 @@ network.vgg = edict()
 network.resnet = edict()
 network.resnet.pretrained = 'model/resnet-101'
 network.resnet.pretrained_epoch = 0
-network.resnet.PIXEL_MEANS = np.array([[[0, 0, 0]]])
+network.resnet.PIXEL_MEANS = np.array([0, 0, 0])
 network.resnet.IMAGE_STRIDE = 0
 network.resnet.RPN_FEAT_STRIDE = 16
 network.resnet.RCNN_FEAT_SRTIDE = 16

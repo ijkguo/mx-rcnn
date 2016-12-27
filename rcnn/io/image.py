@@ -73,17 +73,12 @@ def transform(im, pixel_means):
     transform into mxnet tensor
     substract pixel size and transform to correct format
     :param im: [height, width, channel] in BGR
-    :param pixel_means: [[[R, G, B pixel means]]]
+    :param pixel_means: [B, G, R pixel means]
     :return: [batch, channel, height, width]
     """
-    im = im.copy()
-    im[:, :, (0, 1, 2)] = im[:, :, (2, 1, 0)]
-    im = im.astype(float)
-    im -= pixel_means
-    im_tensor = im[np.newaxis, :]
-    # put channel first
-    channel_swap = (0, 3, 1, 2)
-    im_tensor = im_tensor.transpose(channel_swap)
+    im_tensor = np.zeros((1, 3, im.shape[0], im.shape[1]))
+    for i in range(3):
+        im_tensor[0, i, :, :] = im[:, :, 2 - i] - pixel_means[2 - i]
     return im_tensor
 
 
@@ -92,7 +87,7 @@ def transform_inverse(im_tensor, pixel_means):
     transform from mxnet im_tensor to ordinary RGB image
     im_tensor is limited to one image
     :param im_tensor: [batch, channel, height, width]
-    :param pixel_means: [[[R, G, B pixel means]]]
+    :param pixel_means: [B, G, R pixel means]
     :return: im [height, width, channel(RGB)]
     """
     assert im_tensor.shape[0] == 1
@@ -102,7 +97,7 @@ def transform_inverse(im_tensor, pixel_means):
     im_tensor = im_tensor.transpose(channel_swap)
     im = im_tensor[0]
     assert im.shape[2] == 3
-    im += pixel_means
+    im += pixel_means[[2, 1, 0]]
     im = im.astype(np.uint8)
     return im
 
@@ -115,15 +110,31 @@ def tensor_vstack(tensor_list, pad=0):
     :return: tensor with max shape
     """
     ndim = len(tensor_list[0].shape)
-    if ndim == 1:
-        return np.hstack(tensor_list)
-    dimensions = [0]
+    dtype = tensor_list[0].dtype
+    islice = tensor_list[0].shape[0]
+    dimensions = []
+    first_dim = sum([tensor.shape[0] for tensor in tensor_list])
+    dimensions.append(first_dim)
     for dim in range(1, ndim):
         dimensions.append(max([tensor.shape[dim] for tensor in tensor_list]))
-    for ind, tensor in enumerate(tensor_list):
-        pad_shape = [(0, 0)]
-        for dim in range(1, ndim):
-            pad_shape.append((0, dimensions[dim] - tensor.shape[dim]))
-        tensor_list[ind] = np.lib.pad(tensor, pad_shape, 'constant', constant_values=pad)
-    all_tensor = np.vstack(tensor_list)
+    if pad == 0:
+        all_tensor = np.zeros(tuple(dimensions), dtype=dtype)
+    elif pad == 1:
+        all_tensor = np.ones(tuple(dimensions), dtype=dtype)
+    else:
+        all_tensor = np.full(tuple(dimensions), pad, dtype=dtype)
+    if ndim == 1:
+        for ind, tensor in enumerate(tensor_list):
+            all_tensor[ind*islice:(ind+1)*islice] = tensor
+    elif ndim == 2:
+        for ind, tensor in enumerate(tensor_list):
+            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1]] = tensor
+    elif ndim == 3:
+        for ind, tensor in enumerate(tensor_list):
+            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1], :tensor.shape[2]] = tensor
+    elif ndim == 4:
+        for ind, tensor in enumerate(tensor_list):
+            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1], :tensor.shape[2], :tensor.shape[3]] = tensor
+    else:
+        raise Exception('Sorry, unimplemented.')
     return all_tensor
