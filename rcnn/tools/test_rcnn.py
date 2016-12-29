@@ -10,7 +10,8 @@ from ..core.tester import Predictor, pred_eval
 from ..utils.load_model import load_param
 
 
-def test_rcnn(args, ctx, prefix, epoch,
+def test_rcnn(network, dataset, image_set, root_path, dataset_path,
+              ctx, prefix, epoch,
               vis, shuffle, has_rpn, proposal, thresh):
     # set config
     if has_rpn:
@@ -21,12 +22,12 @@ def test_rcnn(args, ctx, prefix, epoch,
 
     # load symbol and testing data
     if has_rpn:
-        sym = eval('get_' + args.network + '_test')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
-        imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
+        sym = eval('get_' + network + '_test')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
+        imdb = eval(dataset)(image_set, root_path, dataset_path)
         roidb = imdb.gt_roidb()
     else:
-        sym = eval('get_' + args.network + '_rcnn_test')(num_classes=config.NUM_CLASSES)
-        imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
+        sym = eval('get_' + network + '_rcnn_test')(num_classes=config.NUM_CLASSES)
+        imdb = eval(dataset)(image_set, root_path, dataset_path)
         gt_roidb = imdb.gt_roidb()
         roidb = eval('imdb.' + proposal + '_roidb')(gt_roidb)
 
@@ -86,7 +87,8 @@ def main():
     args = parse_args()
     ctx = mx.gpu(args.gpu)
     print args
-    test_rcnn(args, ctx, args.prefix, args.epoch,
+    test_rcnn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+              ctx, args.prefix, args.epoch,
               args.vis, args.shuffle, args.has_rpn, args.proposal, args.thresh)
 
 if __name__ == '__main__':

@@ -6,10 +6,10 @@ import numpy as np
 
 from rcnn.config import config, default, generate_config
 from rcnn.symbol import *
-from rcnn.dataset import *
 from rcnn.core import callback, metric
 from rcnn.core.loader import AnchorLoader
 from rcnn.core.module import MutableModule
+from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
 from rcnn.utils.load_model import load_param
 
 
@@ -38,10 +38,12 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     pprint.pprint(config)
 
     # load dataset and prepare imdb for training
-    imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
-    roidb = imdb.gt_roidb()
-    if not args.no_flip:
-        roidb = imdb.append_flipped_images(roidb)
+    image_sets = [iset for iset in args.image_set.split('+')]
+    roidbs = [load_gt_roidb(args.dataset, image_set, args.root_path, args.dataset_path,
+                            flip=not args.no_flip)
+              for image_set in image_sets]
+    roidb = merge_roidb(roidbs)
+    roidb = filter_roidb(roidb)
 
     # load training data
     train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=not args.no_shuffle,
@@ -114,8 +116,8 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         eval_metrics.add(child_metric)
     # callback
     batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=args.frequent)
-    means = np.tile(np.array(config.TRAIN.BBOX_MEANS), imdb.num_classes)
-    stds = np.tile(np.array(config.TRAIN.BBOX_STDS), imdb.num_classes)
+    means = np.tile(np.array(config.TRAIN.BBOX_MEANS), config.NUM_CLASSES)
+    stds = np.tile(np.array(config.TRAIN.BBOX_STDS), config.NUM_CLASSES)
     epoch_end_callback = callback.do_checkpoint(prefix, means, stds)
     # decide learning rate
     base_lr = lr

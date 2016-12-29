@@ -84,17 +84,18 @@ class IMDB(object):
         box_list = self.load_rpn_data()
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
-    def rpn_roidb(self, gt_roidb):
+    def rpn_roidb(self, gt_roidb, append_gt=False):
         """
         get rpn roidb and ground truth roidb
         :param gt_roidb: ground truth roidb
-        :return: roidb of rpn (ground truth included)
+        :param append_gt: append ground truth
+        :return: roidb of rpn
         """
-        if 'train' in self.image_set:
+        if append_gt:
+            print 'appending ground truth annotations'
             rpn_roidb = self.load_rpn_roidb(gt_roidb)
             roidb = IMDB.merge_roidbs(gt_roidb, rpn_roidb)
         else:
-            print 'rpn database need not be used in test'
             roidb = self.load_rpn_roidb(gt_roidb)
         return roidb
 

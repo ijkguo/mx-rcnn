@@ -23,30 +23,44 @@ def alternate_train(args, ctx, pretrained, epoch,
     config.TRAIN.BG_THRESH_LO = 0.0
 
     logging.info('########## TRAIN RPN WITH IMAGENET INIT')
-    train_rpn(args, ctx, pretrained, epoch, 'model/rpn1', begin_epoch, rpn_epoch,
+    train_rpn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+              args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+              ctx, pretrained, epoch, 'model/rpn1', begin_epoch, rpn_epoch,
               train_shared=False, lr=rpn_lr, lr_step=rpn_lr_step)
 
     logging.info('########## GENERATE RPN DETECTION')
-    test_rpn(args, ctx[0], 'model/rpn1', rpn_epoch,
-             vis=False, shuffle=False, thresh=0)
+    image_sets = [iset for iset in args.image_set.split('+')]
+    for image_set in image_sets:
+        test_rpn(args.network, args.dataset, image_set, args.root_path, args.dataset_path,
+                 ctx[0], 'model/rpn1', rpn_epoch,
+                 vis=False, shuffle=False, thresh=0)
 
     logging.info('########## TRAIN RCNN WITH IMAGENET INIT AND RPN DETECTION')
-    train_rcnn(args, ctx, pretrained, epoch, 'model/rcnn1', begin_epoch, rcnn_epoch,
+    train_rcnn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+               args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+               ctx, pretrained, epoch, 'model/rcnn1', begin_epoch, rcnn_epoch,
                train_shared=False, lr=rcnn_lr, lr_step=rcnn_lr_step, proposal='rpn')
 
     logging.info('########## TRAIN RPN WITH RCNN INIT')
-    train_rpn(args, ctx, 'model/rcnn1', rcnn_epoch, 'model/rpn2', begin_epoch, rpn_epoch,
+    train_rpn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+              args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+              ctx, 'model/rcnn1', rcnn_epoch, 'model/rpn2', begin_epoch, rpn_epoch,
               train_shared=True, lr=rpn_lr, lr_step=rpn_lr_step)
 
     logging.info('########## GENERATE RPN DETECTION')
-    test_rpn(args, ctx[0], 'model/rpn2', rpn_epoch,
-             vis=False, shuffle=False, thresh=0)
+    image_sets = [iset for iset in args.image_set.split('+')]
+    for image_set in image_sets:
+        test_rpn(args.network, args.dataset, image_set, args.root_path, args.dataset_path,
+                 ctx[0], 'model/rpn2', rpn_epoch,
+                 vis=False, shuffle=False, thresh=0)
 
     logger.info('########## COMBINE RPN2 WITH RCNN1')
     combine_model('model/rpn2', rpn_epoch, 'model/rcnn1', rcnn_epoch, 'model/rcnn2', 0)
 
     logger.info('########## TRAIN RCNN WITH RPN INIT AND DETECTION')
-    train_rcnn(args, ctx, 'model/rcnn2', 0, 'model/rcnn2', begin_epoch, rcnn_epoch,
+    train_rcnn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+               args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+               ctx, 'model/rcnn2', 0, 'model/rcnn2', begin_epoch, rcnn_epoch,
                train_shared=True, lr=rcnn_lr, lr_step=rcnn_lr_step, proposal='rpn')
 
     logger.info('########## COMBINE RPN2 WITH RCNN2')

@@ -5,15 +5,17 @@ import mxnet as mx
 
 from ..config import config, default, generate_config
 from ..symbol import *
-from ..dataset import *
 from ..core import callback, metric
 from ..core.loader import ROIIter
 from ..core.module import MutableModule
 from ..processing.bbox_regression import add_bbox_regression_targets
+from ..utils.load_data import load_proposal_roidb, merge_roidb, filter_roidb
 from ..utils.load_model import load_param
 
 
-def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
+def train_rcnn(network, dataset, image_set, root_path, dataset_path,
+               frequent, kvstore, work_load_list, no_flip, no_shuffle, resume,
+               ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
                train_shared, lr, lr_step, proposal):
     # set up logger
     logging.basicConfig()
@@ -27,7 +29,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         config.TRAIN.BG_THRESH_LO = 0.1  # reproduce Fast R-CNN
 
     # load symbol
-    sym = eval('get_' + args.network + '_rcnn')(num_classes=config.NUM_CLASSES)
+    sym = eval('get_' + network + '_rcnn')(num_classes=config.NUM_CLASSES)
 
     # setup multi-gpu
     batch_size = len(ctx)
@@ -37,16 +39,17 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     pprint.pprint(config)
 
     # load dataset and prepare imdb for training
-    imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
-    gt_roidb = imdb.gt_roidb()
-    roidb = eval('imdb.' + proposal + '_roidb')(gt_roidb)
-    if not args.no_flip:
-        roidb = imdb.append_flipped_images(roidb)
+    image_sets = [iset for iset in image_set.split('+')]
+    roidbs = [load_proposal_roidb(dataset, image_set, root_path, dataset_path,
+                                  proposal=proposal, append_gt=True, flip=not no_flip)
+              for image_set in image_sets]
+    roidb = merge_roidb(roidbs)
+    roidb = filter_roidb(roidb)
     means, stds = add_bbox_regression_targets(roidb)
 
     # load training data
-    train_data = ROIIter(roidb, batch_size=input_batch_size, shuffle=not args.no_shuffle,
-                         ctx=ctx, work_load_list=args.work_load_list, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
+    train_data = ROIIter(roidb, batch_size=input_batch_size, shuffle=not no_shuffle,
+                         ctx=ctx, work_load_list=work_load_list, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
 
     # infer max shape
     max_data_shape = [('data', (input_batch_size, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
@@ -61,7 +64,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     pprint.pprint(out_shape_dict)
 
     # load and initialize params
-    if args.resume:
+    if resume:
         arg_params, aux_params = load_param(prefix, begin_epoch, convert=True)
     else:
         arg_params, aux_params = load_param(pretrained, epoch, convert=True)
@@ -91,7 +94,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     else:
         fixed_param_prefix = config.FIXED_PARAMS
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=args.work_load_list,
+                        logger=logger, context=ctx, work_load_list=work_load_list,
                         max_data_shapes=max_data_shape, fixed_param_prefix=fixed_param_prefix)
 
     # decide training params
@@ -103,7 +106,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     for child_metric in [eval_metric, cls_metric, bbox_metric]:
         eval_metrics.add(child_metric)
     # callback
-    batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=args.frequent)
+    batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=frequent)
     epoch_end_callback = callback.do_checkpoint(prefix, means, stds)
     # decide learning rate
     base_lr = lr
@@ -124,7 +127,7 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # train
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
-            batch_end_callback=batch_end_callback, kvstore=args.kvstore,
+            batch_end_callback=batch_end_callback, kvstore=kvstore,
             optimizer='sgd', optimizer_params=optimizer_params,
             arg_params=arg_params, aux_params=aux_params, begin_epoch=begin_epoch, num_epoch=end_epoch)
 
@@ -165,7 +168,9 @@ def main():
     args = parse_args()
     print 'Called with argument:', args
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    train_rcnn(args, ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
+    train_rcnn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+               args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+               ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
                train_shared=args.train_shared, lr=args.lr, lr_step=args.lr_step, proposal=args.proposal)
 
 if __name__ == '__main__':

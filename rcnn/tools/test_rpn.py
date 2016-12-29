@@ -10,7 +10,8 @@ from ..core.tester import Predictor, generate_proposals
 from ..utils.load_model import load_param
 
 
-def test_rpn(args, ctx, prefix, epoch,
+def test_rpn(network, dataset, image_set, root_path, dataset_path,
+             ctx, prefix, epoch,
              vis, shuffle, thresh):
     # rpn generate proposal config
     config.TEST.HAS_RPN = True
@@ -19,10 +20,10 @@ def test_rpn(args, ctx, prefix, epoch,
     pprint.pprint(config)
 
     # load symbol
-    sym = eval('get_' + args.network + '_rpn_test')(num_anchors=config.NUM_ANCHORS)
+    sym = eval('get_' + network + '_rpn_test')(num_anchors=config.NUM_ANCHORS)
 
     # load dataset and prepare imdb for training
-    imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
+    imdb = eval(dataset)(image_set, root_path, dataset_path)
     roidb = imdb.gt_roidb()
     test_data = TestLoader(roidb, batch_size=1, shuffle=shuffle, has_rpn=True)
 
@@ -78,7 +79,8 @@ def main():
     args = parse_args()
     print 'Called with argument:', args
     ctx = mx.gpu(args.gpu)
-    test_rpn(args, ctx, args.prefix, args.epoch,
+    test_rpn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+             ctx, args.prefix, args.epoch,
              args.vis, args.shuffle, args.thresh)
 
 if __name__ == '__main__':

@@ -5,14 +5,16 @@ import mxnet as mx
 
 from ..config import config, default, generate_config
 from ..symbol import *
-from ..dataset import *
 from ..core import callback, metric
 from ..core.loader import AnchorLoader
 from ..core.module import MutableModule
+from ..utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
 from ..utils.load_model import load_param
 
 
-def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
+def train_rpn(network, dataset, image_set, root_path, dataset_path,
+              frequent, kvstore, work_load_list, no_flip, no_shuffle, resume,
+              ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
               train_shared, lr, lr_step):
     # set up logger
     logging.basicConfig()
@@ -23,7 +25,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     config.TRAIN.BATCH_IMAGES = 1
 
     # load symbol
-    sym = eval('get_' + args.network + '_rpn')(num_anchors=config.NUM_ANCHORS)
+    sym = eval('get_' + network + '_rpn')(num_anchors=config.NUM_ANCHORS)
     feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu
@@ -34,14 +36,16 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     pprint.pprint(config)
 
     # load dataset and prepare imdb for training
-    imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
-    roidb = imdb.gt_roidb()
-    if not args.no_flip:
-        roidb = imdb.append_flipped_images(roidb)
+    image_sets = [iset for iset in image_set.split('+')]
+    roidbs = [load_gt_roidb(dataset, image_set, root_path, dataset_path,
+                            flip=not no_flip)
+              for image_set in image_sets]
+    roidb = merge_roidb(roidbs)
+    roidb = filter_roidb(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=not args.no_shuffle,
-                              ctx=ctx, work_load_list=args.work_load_list,
+    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=not no_shuffle,
+                              ctx=ctx, work_load_list=work_load_list,
                               feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
                               anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECR_GROUPING)
 
@@ -60,7 +64,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     pprint.pprint(out_shape_dict)
 
     # load and initialize params
-    if args.resume:
+    if resume:
         arg_params, aux_params = load_param(prefix, begin_epoch, convert=True)
     else:
         arg_params, aux_params = load_param(pretrained, epoch, convert=True)
@@ -91,7 +95,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     else:
         fixed_param_prefix = config.FIXED_PARAMS
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=args.work_load_list,
+                        logger=logger, context=ctx, work_load_list=work_load_list,
                         max_data_shapes=max_data_shape, max_label_shapes=max_label_shape,
                         fixed_param_prefix=fixed_param_prefix)
 
@@ -104,7 +108,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     for child_metric in [eval_metric, cls_metric, bbox_metric]:
         eval_metrics.add(child_metric)
     # callback
-    batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=args.frequent)
+    batch_end_callback = callback.Speedometer(train_data.batch_size, frequent=frequent)
     epoch_end_callback = mx.callback.do_checkpoint(prefix)
     # decide learning rate
     base_lr = lr
@@ -125,7 +129,7 @@ def train_rpn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # train
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
-            batch_end_callback=batch_end_callback, kvstore=args.kvstore,
+            batch_end_callback=batch_end_callback, kvstore=kvstore,
             optimizer='sgd', optimizer_params=optimizer_params,
             arg_params=arg_params, aux_params=aux_params, begin_epoch=begin_epoch, num_epoch=end_epoch)
 
@@ -165,7 +169,9 @@ def main():
     args = parse_args()
     print 'Called with argument:', args
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    train_rpn(args, ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
+    train_rpn(args.network, args.dataset, args.image_set, args.root_path, args.dataset_path,
+              args.frequent, args.kvstore, args.work_load_list, args.no_flip, args.no_shuffle, args.resume,
+              ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
               train_shared=args.train_shared, lr=args.lr, lr_step=args.lr_step)
 
 if __name__ == '__main__':

@@ -155,11 +155,12 @@ class PascalVOC(IMDB):
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
-    def selective_search_roidb(self, gt_roidb):
+    def selective_search_roidb(self, gt_roidb, append_gt=False):
         """
         get selective search roidb and ground truth roidb
         :param gt_roidb: ground truth roidb
-        :return: roidb of selective search (ground truth included)
+        :param append_gt: append ground truth
+        :return: roidb of selective search
         """
         cache_file = os.path.join(self.cache_path, self.name + '_ss_roidb.pkl')
         if os.path.exists(cache_file):
@@ -168,7 +169,8 @@ class PascalVOC(IMDB):
             print '{} ss roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
-        if 'train' in self.image_set:
+        if append_gt:
+            print 'appending ground truth annotations'
             ss_roidb = self.load_selective_search_roidb(gt_roidb)
             roidb = IMDB.merge_roidbs(gt_roidb, ss_roidb)
         else:
