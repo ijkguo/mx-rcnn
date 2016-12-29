@@ -34,7 +34,6 @@ def train_rcnn(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     input_batch_size = config.TRAIN.BATCH_IMAGES * batch_size
 
     # print config
-    pprint.pprint(args)
     pprint.pprint(config)
 
     # load dataset and prepare imdb for training

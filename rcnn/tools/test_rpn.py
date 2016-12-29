@@ -1,4 +1,5 @@
 import argparse
+import pprint
 import mxnet as mx
 
 from ..config import config, default, generate_config
@@ -13,6 +14,9 @@ def test_rpn(args, ctx, prefix, epoch,
              vis, shuffle, thresh):
     # rpn generate proposal config
     config.TEST.HAS_RPN = True
+
+    # print config
+    pprint.pprint(config)
 
     # load symbol
     sym = eval('get_' + args.network + '_rpn_test')(num_anchors=config.NUM_ANCHORS)

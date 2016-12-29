@@ -1,4 +1,5 @@
 import argparse
+import pprint
 import mxnet as mx
 
 from ..config import config, default, generate_config
@@ -11,9 +12,15 @@ from ..utils.load_model import load_param
 
 def test_rcnn(args, ctx, prefix, epoch,
               vis, shuffle, has_rpn, proposal, thresh):
-    # load symbol and testing data
+    # set config
     if has_rpn:
         config.TEST.HAS_RPN = True
+
+    # print config
+    pprint.pprint(config)
+
+    # load symbol and testing data
+    if has_rpn:
         sym = eval('get_' + args.network + '_test')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
         imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
         roidb = imdb.gt_roidb()
