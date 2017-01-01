@@ -6,8 +6,9 @@ import numpy as np
 from rcnn.config import config
 from rcnn.symbol import get_vgg_test, get_vgg_rpn_test
 from rcnn.io.image import resize, transform
-from rcnn.core.tester import Predictor, im_detect, im_proposal, nms, vis_all_detection
+from rcnn.core.tester import Predictor, im_detect, im_proposal, vis_all_detection
 from rcnn.utils.load_model import load_param
+from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 
 CLASSES = ('__background__',
@@ -27,6 +28,7 @@ LABEL_SHAPES = []
 # visualization
 CONF_THRESH = 0.7
 NMS_THRESH = 0.3
+nms = py_nms_wrapper(NMS_THRESH)
 
 
 def get_net(symbol, prefix, epoch, ctx):
@@ -74,7 +76,7 @@ def demo_net(predictor, image_name):
         cls_scores = scores[:, cls_ind, np.newaxis]
         keep = np.where(cls_scores >= CONF_THRESH)[0]
         dets = np.hstack((cls_boxes, cls_scores)).astype(np.float32)[keep, :]
-        keep = nms(dets, NMS_THRESH)
+        keep = nms(dets)
         all_boxes[cls_ind] = dets[keep, :]
 
     boxes_this_image = [[]] + [all_boxes[j] for j in range(1, len(CLASSES))]
