@@ -1,6 +1,7 @@
 import cPickle
 import cv2
 import os
+import json
 import numpy as np
 
 from imdb import IMDB
@@ -131,3 +132,96 @@ class coco(IMDB):
                    'max_overlaps': overlaps.max(axis=1),
                    'flipped': False}
         return roi_rec
+
+    def evaluate_detections(self, detections):
+        """ detections_val2014_results.json """
+        res_folder = os.path.join(self.cache_path, 'results')
+        if not os.path.exists(res_folder):
+            os.makedirs(res_folder)
+        res_file = os.path.join(res_folder, 'detections_%s_results.json' % self.image_set)
+        self._write_coco_results(detections, res_file)
+        if 'test' not in self.image_set:
+            self._do_python_eval(res_file, res_folder)
+
+    def _write_coco_results(self, detections, res_file):
+        """ example results
+        [{"image_id": 42,
+          "category_id": 18,
+          "bbox": [258.15,41.29,348.26,243.78],
+          "score": 0.236}, ...]
+        """
+        results = []
+        for cls_ind, cls in enumerate(self.classes):
+            if cls == '__background__':
+                continue
+            print 'Collecting %s results (%d/%d)' % (cls, cls_ind, self.num_classes - 1)
+            coco_cat_id = self._class_to_coco_ind[cls]
+            results.extend(self._coco_results_one_category(detections[cls_ind], coco_cat_id))
+        print 'Writing results json to %s' % res_file
+        with open(res_file, 'w') as f:
+            json.dump(results, f, sort_keys=True, indent=4)
+
+    def _coco_results_one_category(self, boxes, cat_id):
+        results = []
+        for im_ind, index in enumerate(self.image_set_index):
+            dets = boxes[im_ind].astype(np.float)
+            if len(dets) == 0:
+                continue
+            scores = dets[:, -1]
+            xs = dets[:, 0]
+            ys = dets[:, 1]
+            ws = dets[:, 2] - xs + 1
+            hs = dets[:, 3] - ys + 1
+            result = [{'image_id': index,
+                       'category_id': cat_id,
+                       'bbox': [xs[k], ys[k], ws[k], hs[k]],
+                       'score': scores[k]} for k in xrange(dets.shape[0])]
+            results.extend(result)
+        return results
+
+    def _do_python_eval(self, res_file, res_folder):
+        ann_type = 'bbox'
+        coco_dt = self.coco.loadRes(res_file)
+        coco_eval = COCOeval(self.coco, coco_dt)
+        coco_eval.params.useSegm = (ann_type == 'segm')
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        self._print_detection_metrics(coco_eval)
+
+        eval_file = os.path.join(res_folder, 'detections_%s_results.pkl' % self.image_set)
+        with open(eval_file, 'w') as f:
+            cPickle.dump(coco_eval, f, cPickle.HIGHEST_PROTOCOL)
+        print 'coco eval results saved to %s' % eval_file
+
+    def _print_detection_metrics(self, coco_eval):
+        IoU_lo_thresh = 0.5
+        IoU_hi_thresh = 0.95
+
+        def _get_thr_ind(coco_eval, thr):
+            ind = np.where((coco_eval.params.iouThrs > thr - 1e-5) &
+                           (coco_eval.params.iouThrs < thr + 1e-5))[0][0]
+            iou_thr = coco_eval.params.iouThrs[ind]
+            assert np.isclose(iou_thr, thr)
+            return ind
+
+        ind_lo = _get_thr_ind(coco_eval, IoU_lo_thresh)
+        ind_hi = _get_thr_ind(coco_eval, IoU_hi_thresh)
+
+        # precision has dims (iou, recall, cls, area range, max dets)
+        # area range index 0: all area ranges
+        # max dets index 2: 100 per image
+        precision = \
+            coco_eval.eval['precision'][ind_lo:(ind_hi + 1), :, :, 0, 2]
+        ap_default = np.mean(precision[precision > -1])
+        print '~~~~ Mean and per-category AP @ IoU=%.2f,%.2f] ~~~~' % (IoU_lo_thresh, IoU_hi_thresh)
+        print '%-15s %5.1f' % ('all', 100 * ap_default)
+        for cls_ind, cls in enumerate(self.classes):
+            if cls == '__background__':
+                continue
+            # minus 1 because of __background__
+            precision = coco_eval.eval['precision'][ind_lo:(ind_hi + 1), :, cls_ind - 1, 0, 2]
+            ap = np.mean(precision[precision > -1])
+            print '%-15s %5.1f' % (cls, 100 * ap)
+
+        print '~~~~ Summary metrics ~~~~'
+        coco_eval.summarize()
