@@ -141,6 +141,20 @@ dataset = edict()
 
 dataset.PascalVOC = edict()
 
+dataset.coco = edict()
+dataset.coco.dataset = 'coco'
+dataset.coco.image_set = 'train2014'
+dataset.coco.test_image_set = 'val2014'
+dataset.coco.root_path = 'data'
+dataset.coco.dataset_path = 'data/coco'
+dataset.coco.NUM_CLASSES = 81
+dataset.coco.e2e_epoch = 5
+dataset.coco.e2e_lr_step = '4'
+dataset.coco.rpn_epoch = 4
+dataset.coco.rpn_lr_step = '3'
+dataset.coco.rcnn_epoch = 4
+dataset.coco.rcnn_lr_step = '3'
+
 
 def generate_config(_network, _dataset):
     for k, v in network[_network].items():
