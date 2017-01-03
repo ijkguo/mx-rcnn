@@ -12,7 +12,8 @@ import os
 import numpy as np
 
 from imdb import IMDB
-from ..utils.voc_eval import voc_eval
+from pascal_voc_eval import voc_eval
+from ds_utils import unique_boxes, filter_small_boxes
 
 
 class PascalVOC(IMDB):
@@ -37,7 +38,7 @@ class PascalVOC(IMDB):
                         'cow', 'diningtable', 'dog', 'horse',
                         'motorbike', 'person', 'pottedplant',
                         'sheep', 'sofa', 'train', 'tvmonitor']
-        self.num_classes = 21
+        self.num_classes = len(self.classes)
         self.image_set_index = self.load_image_set_index()
         self.num_images = len(self.image_set_index)
         print 'num_images', self.num_images
@@ -256,18 +257,3 @@ class PascalVOC(IMDB):
             aps += [ap]
             print('AP for {} = {:.4f}'.format(cls, ap))
         print('Mean AP = {:.4f}'.format(np.mean(aps)))
-
-
-def unique_boxes(boxes, scale=1.0):
-    """ return indices of unique boxes """
-    v = np.array([1, 1e3, 1e6, 1e9])
-    hashes = np.round(boxes * scale).dot(v)
-    _, index = np.unique(hashes, return_index=True)
-    return np.sort(index)
-
-
-def filter_small_boxes(boxes, min_size):
-    w = boxes[:, 2] - boxes[:, 0]
-    h = boxes[:, 3] - boxes[:, 1]
-    keep = np.where((w >= min_size) & (h > min_size))[0]
-    return keep
