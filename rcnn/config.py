@@ -148,12 +148,12 @@ dataset.coco.test_image_set = 'val2014'
 dataset.coco.root_path = 'data'
 dataset.coco.dataset_path = 'data/coco'
 dataset.coco.NUM_CLASSES = 81
-dataset.coco.e2e_epoch = 5
-dataset.coco.e2e_lr_step = '4'
-dataset.coco.rpn_epoch = 4
-dataset.coco.rpn_lr_step = '3'
-dataset.coco.rcnn_epoch = 4
-dataset.coco.rcnn_lr_step = '3'
+dataset.coco.e2e_epoch = 8
+dataset.coco.e2e_lr_step = '6'
+dataset.coco.rpn_epoch = 7
+dataset.coco.rpn_lr_step = '5'
+dataset.coco.rcnn_epoch = 7
+dataset.coco.rcnn_lr_step = '5'
 
 
 def generate_config(_network, _dataset):
