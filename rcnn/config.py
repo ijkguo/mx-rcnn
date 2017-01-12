@@ -94,7 +94,7 @@ default = edict()
 # default network
 default.network = 'vgg'
 default.pretrained = 'model/vgg16'
-default.pretrained_epoch = 1
+default.pretrained_epoch = 0
 default.base_lr = 0.001
 # default dataset
 default.dataset = 'PascalVOC'

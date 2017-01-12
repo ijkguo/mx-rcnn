@@ -60,10 +60,11 @@ MXNet engines and parallelization for object detection.
 *All reference results are from original publications, not verified.*
 
 ## Getting started
-* Install python package `cython`, `cv2`, `easydict`, `matplotlib`, `numpy`.
 * Install [MXNet](https://github.com/precedenceguo/mxnet/tree/simple) and [Python interface](http://mxnet.io/get_started/ubuntu_setup.html).
+* Install additional python package `cython easydict matplotlib scikit-image`.
+  Use `pip` to install them all or refer to `script/additional_deps.sh`.
 * Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
-* Run `make` in `HOME`
+* Run `make` in `HOME`.
 * Make a folder `model` in `HOME`. `model` folder will be used to place model checkpoints along the training process. 
   It is recommended to make `model` as a symbolic link to some place in hard disk.
 * `prefix` refers to the first part of a saved model file name and `epoch` refers to a number in this file name.
@@ -89,14 +90,15 @@ All dataset have three attributes, `image_set`, `root_path` and `dataset_path`.
 
 Currently PascalVOC and COCO are supported.
 * Download and extract [Pascal VOC data](http://host.robots.ox.ac.uk/pascal/VOC/), place the `VOCdevkit` folder in `HOME/data`.
-* For coco dataset, refer to rbg's [COCO dataset guide](https://github.com/rbgirshick/py-faster-rcnn/blob/master/data/README.md).
-  No need for the computed proposals.
+* Download and extract [coco dataset](http://mscoco.org/dataset/), place all images to `coco/images` and annotation jsons to `data/annotations`.
+* `script/get_voc.sh` produces `VOCdevkit` folder for you.
+  `script/get_coco.sh` produces `coco` folder for you.
 
 ### Prepare Pretrained Models
-* Download VGG16 pretrained model from [MXNet model gallery](https://github.com/dmlc/mxnet-model-gallery/blob/master/imagenet-1k-vgg.md),
-  rename `vgg16-0000.params` to `vgg16-0001.params` and place it in `model` folder.
-* Download ResNet pretrained model from [ResNet](https://github.com/tornadomeet/ResNet).
-  Download `resnet-101-0000.params` to `model` folder. Other networks like resnet-152 require change in `rcnn.symbol.resnet`.
+* Download VGG16 pretrained model `vgg16-0000.params` from [MXNet model gallery](https://github.com/dmlc/mxnet-model-gallery/blob/master/imagenet-1k-vgg.md) to `model` folder.
+* Download ResNet pretrained model `resnet-101-0000.params` from [ResNet](https://github.com/tornadomeet/ResNet) to `model` folder.
+  Other networks like resnet-152 require change in `rcnn.symbol.resnet`.
+* `script/get_pretrained_model.sh` downloads these two files for you.
 
 ### Alternate Training
 * Start training by running `python train_alternate.py`. This will train the VGG network on the VOC07 trainval.
