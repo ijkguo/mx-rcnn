@@ -243,7 +243,7 @@ class PascalVOC(IMDB):
         """
         annopath = os.path.join(self.data_path, 'Annotations', '{:s}.xml')
         imageset_file = os.path.join(self.data_path, 'ImageSets', 'Main', self.image_set + '.txt')
-        cache_dir = os.path.join(self.cache_path, self.name)
+        annocache = os.path.join(self.cache_path, self.name + '_annotations.pkl')
         aps = []
         # The PASCAL VOC metric changed in 2010
         use_07_metric = True if int(self.year) < 2010 else False
@@ -252,7 +252,7 @@ class PascalVOC(IMDB):
             if cls == '__background__':
                 continue
             filename = self.get_result_file_template().format(cls)
-            rec, prec, ap = voc_eval(filename, annopath, imageset_file, cls, cache_dir,
+            rec, prec, ap = voc_eval(filename, annopath, imageset_file, cls, annocache,
                                      ovthresh=0.5, use_07_metric=use_07_metric)
             aps += [ap]
             print('AP for {} = {:.4f}'.format(cls, ap))

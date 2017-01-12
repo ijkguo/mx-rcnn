@@ -50,7 +50,7 @@ def generate_proposals(predictor, test_data, imdb, vis=False, thresh=0.):
     :param thresh: thresh for valid detections
     :return: list of detected boxes
     """
-    assert not test_data.shuffle
+    assert vis or not test_data.shuffle
     data_names = [k[0] for k in test_data.provide_data]
 
     i = 0
@@ -137,7 +137,7 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
     :param thresh: valid detection threshold
     :return:
     """
-    assert not test_data.shuffle
+    assert vis or not test_data.shuffle
     data_names = [k[0] for k in test_data.provide_data]
 
     nms = py_nms_wrapper(config.TEST.NMS)
@@ -190,12 +190,9 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
         print 'testing {}/{} data {:.4f}s net {:.4f}s post {:.4f}s'.format(i, imdb.num_images, t1, t2, t3)
         i += 1
 
-    cache_folder = os.path.join(imdb.cache_path, imdb.name)
-    if not os.path.exists(cache_folder):
-        os.mkdir(cache_folder)
-    det_file = os.path.join(cache_folder, 'detections.pkl')
+    det_file = os.path.join(imdb.cache_path, imdb.name + '_detections.pkl')
     with open(det_file, 'wb') as f:
-        cPickle.dump(all_boxes, f)
+        cPickle.dump(all_boxes, f, protocol=cPickle.HIGHEST_PROTOCOL)
 
     imdb.evaluate_detections(all_boxes)
 

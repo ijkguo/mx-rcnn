@@ -63,37 +63,34 @@ def voc_ap(rec, prec, use_07_metric=False):
     return ap
 
 
-def voc_eval(detpath, annopath, imageset_file, classname, cache_dir, ovthresh=0.5, use_07_metric=False):
+def voc_eval(detpath, annopath, imageset_file, classname, annocache, ovthresh=0.5, use_07_metric=False):
     """
     pascal voc evaluation
     :param detpath: detection results detpath.format(classname)
     :param annopath: annotations annopath.format(classname)
     :param imageset_file: text file containing list of images
     :param classname: category name
-    :param cache_dir: caching annotations
+    :param annocache: caching annotations
     :param ovthresh: overlap threshold
     :param use_07_metric: whether to use voc07's 11 point ap computation
     :return: rec, prec, ap
     """
-    if not os.path.isdir(cache_dir):
-        os.mkdir(cache_dir)
-    cache_file = os.path.join(cache_dir, 'annotations.pkl')
     with open(imageset_file, 'r') as f:
         lines = f.readlines()
     image_filenames = [x.strip() for x in lines]
 
     # load annotations from cache
-    if not os.path.isfile(cache_file):
+    if not os.path.isfile(annocache):
         recs = {}
         for ind, image_filename in enumerate(image_filenames):
             recs[image_filename] = parse_voc_rec(annopath.format(image_filename))
             if ind % 100 == 0:
                 print 'reading annotations for {:d}/{:d}'.format(ind + 1, len(image_filenames))
-        print 'saving annotations cache to {:s}'.format(cache_file)
-        with open(cache_file, 'w') as f:
-            cPickle.dump(recs, f)
+        print 'saving annotations cache to {:s}'.format(annocache)
+        with open(annocache, 'w') as f:
+            cPickle.dump(recs, f, protocol=cPickle.HIGHEST_PROTOCOL)
     else:
-        with open(cache_file, 'r') as f:
+        with open(annocache, 'r') as f:
             recs = cPickle.load(f)
 
     # extract objects in :param classname:
