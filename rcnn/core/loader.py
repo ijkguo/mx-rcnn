@@ -28,7 +28,7 @@ class TestLoader(mx.io.DataIter):
             self.data_name = ['data', 'im_info']
         else:
             self.data_name = ['data', 'rois']
-        self.label_name = []
+        self.label_name = None
 
         # status variable for synchronization between get_data and get_label
         self.cur = 0
@@ -46,7 +46,7 @@ class TestLoader(mx.io.DataIter):
 
     @property
     def provide_label(self):
-        return [(k, v.shape) for k, v in zip(self.label_name, self.label)]
+        return None
 
     def reset(self):
         self.cur = 0
@@ -85,7 +85,6 @@ class TestLoader(mx.io.DataIter):
         else:
             data, label, im_info = get_rcnn_testbatch(roidb)
         self.data = [mx.nd.array(data[name]) for name in self.data_name]
-        self.label = [mx.nd.array(label[name]) for name in self.label_name]
         self.im_info = im_info
 
 

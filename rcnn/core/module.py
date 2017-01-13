@@ -40,18 +40,12 @@ class MutableModule(BaseModule):
         self._max_label_shapes = max_label_shapes
         self._fixed_param_prefix = fixed_param_prefix
 
-        if self._max_data_shapes is None:
-            self._max_data_shapes = []
-        if self._max_label_shapes is None:
-            self._max_label_shapes = []
-        if self._fixed_param_prefix is None:
-            self._fixed_param_prefix = []
-
         fixed_param_names = list()
-        for name in self._symbol.list_arguments():
-            for prefix in self._fixed_param_prefix:
-                if prefix in name:
-                    fixed_param_names.append(name)
+        if fixed_param_prefix is not None:
+            for name in self._symbol.list_arguments():
+                for prefix in self._fixed_param_prefix:
+                    if name.startswith(prefix):
+                        fixed_param_names.append(name)
         self._fixed_param_names = fixed_param_names
 
     def _reset_bind(self):
@@ -116,19 +110,29 @@ class MutableModule(BaseModule):
         self.inputs_need_grad = inputs_need_grad
         self.binded = True
 
-        max_shapes_dict = dict(self._max_data_shapes + self._max_label_shapes)
+        max_shapes_dict = dict()
+        if self._max_data_shapes is not None:
+            max_shapes_dict.update(dict(self._max_data_shapes))
+        if self._max_label_shapes is not None:
+            max_shapes_dict.update(dict(self._max_label_shapes))
+
         max_data_shapes = list()
         for name, shape in data_shapes:
             if name in max_shapes_dict:
                 max_data_shapes.append((name, max_shapes_dict[name]))
             else:
                 max_data_shapes.append((name, shape))
+
         max_label_shapes = list()
-        for name, shape in label_shapes:
-            if name in max_shapes_dict:
-                max_label_shapes.append((name, max_shapes_dict[name]))
-            else:
-                max_label_shapes.append((name, shape))
+        if label_shapes is not None:
+            for name, shape in label_shapes:
+                if name in max_shapes_dict:
+                    max_label_shapes.append((name, max_shapes_dict[name]))
+                else:
+                    max_label_shapes.append((name, shape))
+
+        if len(max_label_shapes) == 0:
+            max_label_shapes = None
 
         module = Module(self._symbol, self._data_names, self._label_names, logger=self.logger,
                         context=self._context, work_load_list=self._work_load_list,
@@ -155,9 +159,20 @@ class MutableModule(BaseModule):
     def forward(self, data_batch, is_train=None):
         assert self.binded and self.params_initialized
 
+        # get current_shapes
+        if self._curr_module.label_shapes is not None:
+            current_shapes = dict(self._curr_module.data_shapes + self._curr_module.label_shapes)
+        else:
+            current_shapes = dict(self._curr_module.data_shapes)
+
+        # get input_shapes
+        if data_batch.provide_label is not None:
+            input_shapes = dict(data_batch.provide_data + data_batch.provide_label)
+        else:
+            input_shapes = dict(data_batch.provide_data)
+
+        # decide if shape changed
         shape_changed = False
-        current_shapes = dict(self._curr_module.data_shapes + self._curr_module.label_shapes)
-        input_shapes = dict(data_batch.provide_data + data_batch.provide_label)
         for k, v in current_shapes.items():
             if v != input_shapes[k]:
                 shape_changed = True
