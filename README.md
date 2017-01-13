@@ -60,7 +60,8 @@ MXNet engines and parallelization for object detection.
 *All reference results are from original publications, not verified.*
 
 ## Getting started
-* Install [MXNet](https://github.com/precedenceguo/mxnet/tree/simple) and [Python interface](http://mxnet.io/get_started/ubuntu_setup.html).
+* Install [a forked MXNet](https://github.com/precedenceguo/mxnet/tree/legacy) and [Python interface](http://mxnet.io/get_started/ubuntu_setup.html).
+  Currently in the process to remove this fork. The above results are obtained with this legacy version.
 * Install additional python package `cython easydict matplotlib scikit-image`.
   Use `pip` to install them all or refer to `script/additional_deps.sh`.
 * Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
@@ -81,6 +82,7 @@ MXNet engines and parallelization for object detection.
 ## Training Faster R-CNN
 The following tutorial is based on VOC data, VGG network. Supply `--network resnet` and 
 `--dataset coco` to use other networks and datasets.
+Refer to `script/vgg_voc07.sh` and other experiments for examples.
 
 ### Prepare Training Data
 All dataset have three attributes, `image_set`, `root_path` and `dataset_path`.  
