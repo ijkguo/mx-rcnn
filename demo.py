@@ -24,7 +24,7 @@ PIXEL_MEANS = config.PIXEL_MEANS
 DATA_NAMES = ['data', 'im_info']
 LABEL_NAMES = ['cls_prob_label']
 DATA_SHAPES = [('data', (1, 3, LONG_SIDE, SHORT_SIDE)), ('im_info', (1, 3))]
-LABEL_SHAPES = []
+LABEL_SHAPES = None
 # visualization
 CONF_THRESH = 0.7
 NMS_THRESH = 0.3
@@ -33,6 +33,26 @@ nms = py_nms_wrapper(NMS_THRESH)
 
 def get_net(symbol, prefix, epoch, ctx):
     arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx, process=True)
+
+    # infer shape
+    data_shape_dict = dict(DATA_SHAPES)
+    arg_names, aux_names = symbol.list_arguments(), symbol.list_auxiliary_states()
+    arg_shape, _, aux_shape = symbol.infer_shape(**data_shape_dict)
+    arg_shape_dict = dict(zip(arg_names, arg_shape))
+    aux_shape_dict = dict(zip(aux_names, aux_shape))
+
+    # check shapes
+    for k in symbol.list_arguments():
+        if k in data_shape_dict or 'label' in k:
+            continue
+        assert k in arg_params, k + ' not initialized'
+        assert arg_params[k].shape == arg_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(arg_shape_dict[k]) + ' provided ' + str(arg_params[k].shape)
+    for k in symbol.list_auxiliary_states():
+        assert k in aux_params, k + ' not initialized'
+        assert aux_params[k].shape == aux_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(aux_shape_dict[k]) + ' provided ' + str(aux_params[k].shape)
+
     predictor = Predictor(symbol, DATA_NAMES, LABEL_NAMES, context=ctx,
                           provide_data=DATA_SHAPES, provide_label=LABEL_SHAPES,
                           arg_params=arg_params, aux_params=aux_params)
@@ -53,7 +73,7 @@ def generate_batch(im):
     im_info = np.array([[im_array.shape[2], im_array.shape[3], im_scale]], dtype=np.float32)
     data = [mx.nd.array(im_array), mx.nd.array(im_info)]
     data_shapes = [('data', im_array.shape), ('im_info', im_info.shape)]
-    data_batch = mx.io.DataBatch(data=data, label=None, provide_data=data_shapes, provide_label=[])
+    data_batch = mx.io.DataBatch(data=data, label=None, provide_data=data_shapes, provide_label=None)
     return data_batch, DATA_NAMES, im_scale
 
 
@@ -80,6 +100,14 @@ def demo_net(predictor, image_name):
         all_boxes[cls_ind] = dets[keep, :]
 
     boxes_this_image = [[]] + [all_boxes[j] for j in range(1, len(CLASSES))]
+
+    # print results
+    print 'class ---- [[x1, x2, y1, y2, confidence]]'
+    for ind, boxes in enumerate(boxes_this_image):
+        if len(boxes) > 0:
+            print '---------', CLASSES[ind], '---------'
+            print boxes
+
     vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image, CLASSES, im_scale)
 
 

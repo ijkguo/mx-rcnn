@@ -30,16 +30,27 @@ def test_rpn(network, dataset, image_set, root_path, dataset_path,
     # load model
     arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx)
 
+    # infer shape
+    data_shape_dict = dict(test_data.provide_data)
+    arg_shape, _, aux_shape = sym.infer_shape(**data_shape_dict)
+    arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
+    aux_shape_dict = dict(zip(sym.list_auxiliary_states(), aux_shape))
+
     # check parameters
-    param_names = [k for k in sym.list_arguments() + sym.list_auxiliary_states()
-                   if k not in dict(test_data.provide_data) and 'label' not in k]
-    missing_names = [k for k in param_names if k not in arg_params and k not in aux_params]
-    if len(missing_names):
-        print 'detected missing params', missing_names
+    for k in sym.list_arguments():
+        if k in data_shape_dict or 'label' in k:
+            continue
+        assert k in arg_params, k + ' not initialized'
+        assert arg_params[k].shape == arg_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(arg_shape_dict[k]) + ' provided ' + str(arg_params[k].shape)
+    for k in sym.list_auxiliary_states():
+        assert k in aux_params, k + ' not initialized'
+        assert aux_params[k].shape == aux_shape_dict[k], \
+            'shape inconsistent for ' + k + ' inferred ' + str(aux_shape_dict[k]) + ' provided ' + str(aux_params[k].shape)
 
     # decide maximum shape
     data_names = [k[0] for k in test_data.provide_data]
-    label_names = [k[0] for k in test_data.provide_label]
+    label_names = None if test_data.provide_label is None else [k[0] for k in test_data.provide_label]
     max_data_shape = [('data', (1, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
 
     # create predictor
