@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# copy this file to data folder and execute
+# the result is VOCdevkit/VOC2007 VOCdevkit/VOC2012
+
 declare -a arr=("VOCtrainval_06-Nov-2007.tar" "VOCtest_06-Nov-2007.tar")
 for i in "${arr[@]}"
 do

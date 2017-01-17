@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# copy this file to data folder and execute
+# the result is coco/images/ coco/annotations/
+
 mkdir images
 
 declare -a filenames=("train2014" "val2014")
