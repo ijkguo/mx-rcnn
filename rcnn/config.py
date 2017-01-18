@@ -26,7 +26,7 @@ config.TRAIN.BATCH_IMAGES = 2
 # e2e changes behavior of anchor loader and metric
 config.TRAIN.END2END = False
 # group images with similar aspect ratio
-config.TRAIN.ASPECR_GROUPING = True
+config.TRAIN.ASPECT_GROUPING = True
 
 # R-CNN
 # rcnn rois batch size
