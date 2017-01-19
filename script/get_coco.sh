@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
-# copy this file to data folder and execute
-# the result is coco/images/ coco/annotations/
+pushd data
 
+# download images
 mkdir images
-
 declare -a filenames=("train2014" "val2014")
 for i in "${filenames[@]}"
 do
@@ -18,6 +17,7 @@ do
     rm -r $i
 done
 
+# download annotations
 anno="instances_train-val2014.zip"
 if ! [ -e $anno ]
 then
@@ -26,6 +26,9 @@ then
 fi
 unzip $anno
 
+# the result is coco/images/ coco/annotations/
 mkdir coco
 mv images coco
 mv annotations coco
+
+popd

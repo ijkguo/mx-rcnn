@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# copy this file to data folder and execute
-# the result is VOCdevkit/VOC2007 VOCdevkit/VOC2012
+pushd data
 
+# the result is VOCdevkit/VOC2007
 declare -a arr=("VOCtrainval_06-Nov-2007.tar" "VOCtest_06-Nov-2007.tar")
 for i in "${arr[@]}"
 do
@@ -14,6 +14,7 @@ do
     tar -xf $i
 done
 
+# the result is VOCdevkit/VOC2012
 voc2012="VOCtrainval_11-May-2012.tar"
 if ! [ -e $voc2012 ]
 then
@@ -21,3 +22,5 @@ then
     wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/$voc2012
 fi
 tar -xf $voc2012
+
+popd

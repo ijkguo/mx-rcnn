@@ -9,4 +9,4 @@ export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 export PYTHONUNBUFFERED=1
 
 python train_end2end.py --network resnet --image_set 2007_trainval+2012_trainval --gpu $1
-python test.py --gpu $gpu
+python test.py --network resnet --gpu $gpu
