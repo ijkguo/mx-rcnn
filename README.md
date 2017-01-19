@@ -27,7 +27,7 @@ MXNet engines and parallelization for object detection.
 * If you value stability and reproducibility over performance and efficiency, please refer to official implementations.
   There is no promise in all cases nor all experiments.
 * If you value simplicity. Technical details are *very complicated* in MXNet.
-  This is by design to attain maximum possible performance instead of writing tricky hand-written policies each time.
+  This is by design to attain maximum possible performance instead of patching fixes after fixes.
   Performance and parallelization are more than a change of parameter.
 * If you want to do CPU training, be advised that it has not been verified yet.
   You will not encounter NOT_IMPLEMENTED_ERROR so it is still possible.
@@ -59,7 +59,12 @@ All COCO experiments are conducted in MXNet-v0.8.
 See if `bash script/additional_deps.sh` will do the following for you.
 * Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
 * Install python package `cython easydict matplotlib scikit-image`.
-* Install [a forked MXNet](https://github.com/precedenceguo/mxnet/tree/simple) and [Python interface](http://mxnet.io/get_started/ubuntu_setup.html).
+* Install MXNet with additional operators.
+If you know Makefile, change `EXTRA_OPERATORS` in `config.mk` to include the `mx-rcnn/operator` folder.  
+If not, copy all files in `operator` to `mxnet/src/operator`.  
+Or if you would like to use the exact version I used, you can use [v0.8](https://github.com/precedenceguo/mxnet/tree/legacy) or [v0.9.1](https://github.com/precedenceguo/mxnet/tree/simple).  
+Choose either version at your will.
+* Install MXNet Python Interface. Open `python` type `import mxnet` to confirm.
 * Run `make` in `HOME`.
 
 Command line arguments have the same meaning as in mxnet/example/image-classification.
