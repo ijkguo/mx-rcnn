@@ -71,6 +71,7 @@ Command line arguments have the same meaning as in mxnet/example/image-classific
 * `prefix` refers to the first part of a saved model file name and `epoch` refers to a number in this file name.
   In `model/vgg-0000.params`, `prefix` is `"model/vgg"` and `epoch` is `0`.
 * `begin_epoch` means the start of your training process, which will apply to all saved checkpoints.
+* Remember to turn off cudnn auto tune with MXNet v0.9. `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0`.
 
 ## Demo (Pascal VOC)
 * An example of trained model (trained on VOC07 trainval) can be accessed from  
@@ -179,7 +180,7 @@ History of this implementation is:
 * Faster R-CNN with end-to-end training and module testing (v4)
 * Faster R-CNN with accelerated training and resnet (v5)  
 
-mxnet/example/rcnn was v1, v2 and now v3.5.
+mxnet/example/rcnn was v1, v2, v3.5 and now v5.
 
 ## References
 1. Tianqi Chen, Mu Li, Yutian Li, Min Lin, Naiyan Wang, Minjie Wang, Tianjun Xiao, Bing Xu, Chiyuan Zhang, and Zheng Zhang. MXNet: A Flexible and Efficient Machine Learning Library for Heterogeneous Distributed Systems. In Neural Information Processing Systems, Workshop on Machine Learning Systems, 2015
