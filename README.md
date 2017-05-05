@@ -45,10 +45,6 @@ MXNet engines and parallelization for object detection.
 | Faster R-CNN end-to-end | VGG16 | COCO train | COCO val | 21.2 | 22.8 |
 | Faster R-CNN end-to-end | ResNet-101 | COCO train | COCO val | 27.2 | 26.1 |
 
-All reference results are from original publications.
-All VOC experiments are conducted in MXNet-v0.9.1-nnvm. MXNet-v0.8 have similar results.
-All COCO experiments are conducted in MXNet-v0.8.
-
 ## I'm Feeling Lucky
 * Prepare: `bash script/additional_deps.sh`
 * Download training data: `bash script/get_voc.sh`
@@ -59,11 +55,11 @@ All COCO experiments are conducted in MXNet-v0.8.
 See if `bash script/additional_deps.sh` will do the following for you.
 * Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
 * Install python package `cython easydict matplotlib scikit-image`.
-* Install MXNet with additional operators.
-If you know Makefile, change `EXTRA_OPERATORS` in `config.mk` to include the `mx-rcnn/operator` folder.  
-If not, copy all files in `operator` to `mxnet/src/operator`.  
-Or if you would like to use the exact version I used, you can use [v0.8](https://github.com/precedenceguo/mxnet/tree/legacy) or [v0.9.1](https://github.com/precedenceguo/mxnet/tree/simple).  
-Choose either version at your will.
+* Install MXNet with additional operators. There are many ways.
+  - If you are familiar with Makefile, change `EXTRA_OPERATORS` in `config.mk` to include the `mx-rcnn/operator` folder.  
+  - If not, copy all files in `operator` to `mxnet/src/operator`.  
+  - Or, you could try a fork version of MXNet at the branch [sync](https://github.com/precedenceguo/mxnet/tree/sync), currently based on version 0.9.3.
+  - Or, find the latest mxnet and enter `example/rcnn` folder
 * Install MXNet Python Interface. Open `python` type `import mxnet` to confirm.
 * Run `make` in `HOME`.
 
