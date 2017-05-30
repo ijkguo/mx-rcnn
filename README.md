@@ -45,6 +45,9 @@ MXNet engines and parallelization for object detection.
 | Faster R-CNN end-to-end | VGG16 | COCO train | COCO val | 21.2 | 22.8 |
 | Faster R-CNN end-to-end | ResNet-101 | COCO train | COCO val | 27.2 | 26.1 |
 
+The above experiments were conducted at [mx-rcnn](https://github.com/precedenceguo/mx-rcnn/tree/6a1ab0eec5035a10a1efb5fc8c9d6c54e101b4d0)
+using [a MXNet fork, based on MXNet 0.9.1 nnvm pre-release](https://github.com/precedenceguo/mxnet/tree/simple).
+
 ## I'm Feeling Lucky
 * Prepare: `bash script/additional_deps.sh`
 * Download training data: `bash script/get_voc.sh`
@@ -55,14 +58,14 @@ MXNet engines and parallelization for object detection.
 See if `bash script/additional_deps.sh` will do the following for you.
 * Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
 * Install python package `cython easydict matplotlib scikit-image`.
-* Install MXNet and MXNet Python Interface. Open `python` type `import mxnet` to confirm.
+* Install MXNet version v0.9.5 or higher and MXNet Python Interface. Open `python` type `import mxnet` to confirm.
 * Run `make` in `HOME`.
 
 Command line arguments have the same meaning as in mxnet/example/image-classification.
 * `prefix` refers to the first part of a saved model file name and `epoch` refers to a number in this file name.
   In `model/vgg-0000.params`, `prefix` is `"model/vgg"` and `epoch` is `0`.
 * `begin_epoch` means the start of your training process, which will apply to all saved checkpoints.
-* Remember to turn off cudnn auto tune with MXNet v0.9. `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0`.
+* Remember to turn off cudnn auto tune. `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0`.
 
 ## Demo (Pascal VOC)
 * An example of trained model (trained on VOC07 trainval) can be accessed from  
@@ -79,6 +82,7 @@ Refer to `script/vgg_voc07.sh` and other experiments for examples.
 
 ### Prepare Training Data
 See `bash script/get_voc.sh` and `bash script/get_coco.sh` will do the following for you.
+* Make a folder `data` in `HOME`. `data` folder will be used to place the training data folder `VOCdevkit` and `coco`.
 * Download and extract [Pascal VOC data](http://host.robots.ox.ac.uk/pascal/VOC/), place the `VOCdevkit` folder in `HOME/data`.
 * Download and extract [coco dataset](http://mscoco.org/dataset/), place all images to `coco/images` and annotation jsons to `data/annotations`.
 
@@ -90,7 +94,7 @@ See `bash script/get_voc.sh` and `bash script/get_coco.sh` will do the following
 ### Prepare Pretrained Models
 See if `bash script/get_pretrained_model.sh` will do this for you. If not,
 * Make a folder `model` in `HOME`. `model` folder will be used to place model checkpoints along the training process. 
-  It is recommended to make `model` as a symbolic link to some place in hard disk.
+  It is recommended to set `model` as a symbolic link to somewhere else in hard disk.
 * Download VGG16 pretrained model `vgg16-0000.params` from [MXNet model gallery](https://github.com/dmlc/mxnet-model-gallery/blob/master/imagenet-1k-vgg.md) to `model` folder.
 * Download ResNet pretrained model `resnet-101-0000.params` from [ResNet](https://github.com/tornadomeet/ResNet) to `model` folder.
 
