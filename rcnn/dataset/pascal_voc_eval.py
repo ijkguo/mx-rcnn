@@ -2,6 +2,7 @@
 given a pascal voc imdb, compute mAP
 """
 
+from __future__ import print_function
 import numpy as np
 import os
 import cPickle
@@ -21,10 +22,10 @@ def parse_voc_rec(filename):
         obj_dict['name'] = obj.find('name').text
         obj_dict['difficult'] = int(obj.find('difficult').text)
         bbox = obj.find('bndbox')
-        obj_dict['bbox'] = [int(bbox.find('xmin').text),
-                            int(bbox.find('ymin').text),
-                            int(bbox.find('xmax').text),
-                            int(bbox.find('ymax').text)]
+        obj_dict['bbox'] = [int(float(bbox.find('xmin').text)),
+                            int(float(bbox.find('ymin').text)),
+                            int(float(bbox.find('xmax').text)),
+                            int(float(bbox.find('ymax').text))]
         objects.append(obj_dict)
     return objects
 
@@ -48,8 +49,8 @@ def voc_ap(rec, prec, use_07_metric=False):
             ap += p / 11.
     else:
         # append sentinel values at both ends
-        mrec = np.concatenate([0.], rec, [1.])
-        mpre = np.concatenate([0.], prec, [0.])
+        mrec = np.concatenate(([0.], rec, [1.]))
+        mpre = np.concatenate(([0.], prec, [0.]))
 
         # compute precision integration ladder
         for i in range(mpre.size - 1, 0, -1):
@@ -85,12 +86,12 @@ def voc_eval(detpath, annopath, imageset_file, classname, annocache, ovthresh=0.
         for ind, image_filename in enumerate(image_filenames):
             recs[image_filename] = parse_voc_rec(annopath.format(image_filename))
             if ind % 100 == 0:
-                print 'reading annotations for {:d}/{:d}'.format(ind + 1, len(image_filenames))
-        print 'saving annotations cache to {:s}'.format(annocache)
-        with open(annocache, 'w') as f:
+                print('reading annotations for {:d}/{:d}'.format(ind + 1, len(image_filenames)))
+        print('saving annotations cache to {:s}'.format(annocache))
+        with open(annocache, 'wb') as f:
             cPickle.dump(recs, f, protocol=cPickle.HIGHEST_PROTOCOL)
     else:
-        with open(annocache, 'r') as f:
+        with open(annocache, 'rb') as f:
             recs = cPickle.load(f)
 
     # extract objects in :param classname:
@@ -117,10 +118,11 @@ def voc_eval(detpath, annopath, imageset_file, classname, annocache, ovthresh=0.
     bbox = np.array([[float(z) for z in x[2:]] for x in splitlines])
 
     # sort by confidence
-    sorted_inds = np.argsort(-confidence)
-    sorted_scores = np.sort(-confidence)
-    bbox = bbox[sorted_inds, :]
-    image_ids = [image_ids[x] for x in sorted_inds]
+    if bbox.shape[0] > 0:
+        sorted_inds = np.argsort(-confidence)
+        sorted_scores = np.sort(-confidence)
+        bbox = bbox[sorted_inds, :]
+        image_ids = [image_ids[x] for x in sorted_inds]
 
     # go down detections and mark true positives and false positives
     nd = len(image_ids)

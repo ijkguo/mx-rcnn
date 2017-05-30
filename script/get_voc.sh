@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# make a data folder
+if ! [ -e data ]
+then
+    mkdir data
+fi
+
 pushd data
 
 # the result is VOCdevkit/VOC2007

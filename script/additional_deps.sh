@@ -5,7 +5,7 @@ sudo apt install python-pip python-dev unzip python-matplotlib
 sudo pip install cython scikit-image easydict
 
 # install a forked MXNet
-git clone https://github.com/precedenceguo/mxnet.git --recursive -b simple
+git clone https://github.com/precedenceguo/mxnet.git
 pushd mxnet
 cp make/config.mk ./
 echo "USE_CUDA=1" >>config.mk
