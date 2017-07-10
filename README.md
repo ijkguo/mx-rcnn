@@ -35,17 +35,17 @@ MXNet engines and parallelization for object detection.
   But they have disappeared.
 
 ## Experiments
-| Method | Network | Training Data | Testing Data | Reference | Result |
-| :----- | :------ | :------------ | :----------- | :-------: | :----: |
-| Fast R-CNN | VGG16 | VOC07 | VOC07test | 66.9 | 66.50 |
-| Faster R-CNN alternate | VGG16 | VOC07 | VOC07test | 69.9 | 69.62 |
-| Faster R-CNN end-to-end | VGG16 | VOC07 | VOC07test | 69.9 | 70.23 |
-| Faster R-CNN end-to-end | VGG16 | VOC07+12 | VOC07test | 73.2 | 75.97 |
-| Faster R-CNN end-to-end | ResNet-101 | VOC07+12 | VOC07test | 76.4 | 79.35 |
-| Faster R-CNN end-to-end | VGG16 | COCO train | COCO val | 21.2 | 22.8 |
-| Faster R-CNN end-to-end | ResNet-101 | COCO train | COCO val | 27.2 | 26.1 |
+| Method | Network | Training Data | Testing Data | Reference | Result | Link  |
+| :----- | :------ | :------------ | :----------- | :-------: | :----: | :---: |
+| Fast R-CNN | VGG16 | VOC07 | VOC07test | 66.9 | 66.50 | [Dropbox](https://www.dropbox.com/s/xmxjitv0kl96h7v/vgg_fast_rcnn-0008.params?dl=0) |
+| Faster R-CNN alternate | VGG16 | VOC07 | VOC07test | 69.9 | 69.62 | [Dropbox](https://www.dropbox.com/s/fgj71uzxz8h6ajj/vgg_voc_alter-0008.params?dl=0) |
+| Faster R-CNN end-to-end | VGG16 | VOC07 | VOC07test | 69.9 | 70.23 | [Dropbox](https://www.dropbox.com/s/gfxnf1qzzc0lzw2/vgg_voc07-0010.params?dl=0) |
+| Faster R-CNN end-to-end | VGG16 | VOC07+12 | VOC07test | 73.2 | 75.97 | [Dropbox](https://www.dropbox.com/s/rvktx65s48cuyb9/vgg_voc0712-0010.params?dl=0) |
+| Faster R-CNN end-to-end | ResNet-101 | VOC07+12 | VOC07test | 76.4 | 79.35 | [Dropbox](https://www.dropbox.com/s/ge2wl0tn47xezdf/resnet_voc0712-0010.params?dl=0) |
+| Faster R-CNN end-to-end | VGG16 | COCO train | COCO val | 21.2 | 22.8 | [Dropbox](https://www.dropbox.com/s/e0ivvrc4pku3vj7/vgg_coco-0010.params?dl=0) |
+| Faster R-CNN end-to-end | ResNet-101 | COCO train | COCO val | 27.2 | 26.1 | [Dropbox](https://www.dropbox.com/s/bfuy2uo1q1nwqjr/resnet_coco-0010.params?dl=0) |
 
-The above experiments were conducted at [mx-rcnn](https://github.com/precedenceguo/mx-rcnn/tree/6a1ab0eec5035a10a1efb5fc8c9d6c54e101b4d0)
+The above experiments were conducted at [a mx-rcnn version](https://github.com/precedenceguo/mx-rcnn/tree/6a1ab0eec5035a10a1efb5fc8c9d6c54e101b4d0)
 using [a MXNet fork, based on MXNet 0.9.1 nnvm pre-release](https://github.com/precedenceguo/mxnet/tree/simple).
 
 ## I'm Feeling Lucky
@@ -68,7 +68,7 @@ Command line arguments have the same meaning as in mxnet/example/image-classific
 * Remember to turn off cudnn auto tune. `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0`.
 
 ## Demo (Pascal VOC)
-* An example of trained model (trained on VOC07 trainval) can be accessed from  
+* An example of trained model (trained on VOC07 trainval) can be accessed from 
   [Baidu Yun](http://pan.baidu.com/s/1boRhGvH) (ixiw) or 
   [Dropbox](https://www.dropbox.com/s/jrr83q0ai2ckltq/final-0000.params.tar.gz?dl=0).
   If you put the extracted model `final-0000.params` in `HOME` then use `--prefix final --epoch 0` to access it. 
