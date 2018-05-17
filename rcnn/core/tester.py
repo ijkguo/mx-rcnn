@@ -1,7 +1,4 @@
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
+import pickle
 import os
 import time
 import mxnet as mx
@@ -203,13 +200,15 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
     imdb.evaluate_detections(all_boxes)
 
 
-def vis_all_detection(im_array, detections, class_names, scale):
+def vis_all_detection(im_array, detections, class_names, scale, save=False, filename=""):
     """
     visualize all detections in one image
     :param im_array: [b=1 c h w] in rgb
     :param detections: [ numpy.ndarray([[x1 y1 x2 y2 score]]) for j in classes ]
     :param class_names: list of names in imdb
     :param scale: visualize the scaled image
+    :param save: save the plot to file
+    :param filename: if save, image will be written to filename
     :return:
     """
     import matplotlib.pyplot as plt
@@ -232,34 +231,7 @@ def vis_all_detection(im_array, detections, class_names, scale):
             plt.gca().text(bbox[0], bbox[1] - 2,
                            '{:s} {:.3f}'.format(name, score),
                            bbox=dict(facecolor=color, alpha=0.5), fontsize=12, color='white')
-    plt.show()
-
-
-def draw_all_detection(im_array, detections, class_names, scale):
-    """
-    visualize all detections in one image
-    :param im_array: [b=1 c h w] in rgb
-    :param detections: [ numpy.ndarray([[x1 y1 x2 y2 score]]) for j in classes ]
-    :param class_names: list of names in imdb
-    :param scale: visualize the scaled image
-    :return:
-    """
-    import cv2
-    import random
-    color_white = (255, 255, 255)
-    im = image.transform_inverse(im_array, config.PIXEL_MEANS)
-    # change to bgr
-    im = cv2.cvtColor(im, cv2.cv.CV_RGB2BGR)
-    for j, name in enumerate(class_names):
-        if name == '__background__':
-            continue
-        color = (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))  # generate a random color
-        dets = detections[j]
-        for det in dets:
-            bbox = det[:4] * scale
-            score = det[-1]
-            bbox = map(int, bbox)
-            cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color=color, thickness=2)
-            cv2.putText(im, '%s %.3f' % (class_names[j], score), (bbox[0], bbox[1] + 10),
-                        color=color_white, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5)
-    return im
+    if save:
+        plt.savefig(filename)
+    else:
+        plt.show()
