@@ -52,12 +52,8 @@ The above experiments were conducted on [this version of repository](https://git
 with [a modified MXNet based on 0.9.1 nnvm pre-release](https://github.com/precedenceguo/mxnet/tree/simple).
 
 ## Set up environment
-Suppose `HOME` represents where this file is located. All commands, unless stated otherwise, should be started from `HOME`.
-
-`bash script/additional_deps.sh` sets up environment. It does the following
-* Install python package `cython easydict matplotlib scikit-image`.
-* Install MXNet version v0.9.5 or higher and MXNet Python Interface. Open `python` type `import mxnet` to confirm.
-* Run `make` in `HOME`.
+* Install Python package `pip install numpy matplotlib cython easydict`.
+* Install MXNet `pip install mxnet-cu90`. Type `import mxnet` in Python console to confirm.
 
 ## Run prediction with existing model
 * Download a example model trained on VOC07 trainval from

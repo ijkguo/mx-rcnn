@@ -1,10 +1,10 @@
-import cPickle
+import pickle
 import os
 import time
 import mxnet as mx
 import numpy as np
 
-from module import MutableModule
+from .module import MutableModule
 from rcnn.logger import logger
 from rcnn.config import config
 from rcnn.io import image
