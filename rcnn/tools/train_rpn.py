@@ -1,15 +1,14 @@
 import argparse
 import pprint
-import mxnet as mx
 
 from ..logger import logger
-from ..config import config, default, generate_config
+from ..config import default, generate_config
 from ..symbol import *
 from ..core import callback, metric
 from ..core.loader import AnchorLoader
-from ..core.module import MutableModule
+from net.module import MutableModule
 from ..utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
-from ..utils.load_model import load_param
+from net.load import load_param
 
 
 def train_rpn(network, dataset, image_set, root_path, dataset_path,

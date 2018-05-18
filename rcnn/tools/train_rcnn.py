@@ -1,16 +1,15 @@
 import argparse
 import pprint
-import mxnet as mx
 
 from ..logger import logger
-from ..config import config, default, generate_config
+from ..config import default, generate_config
 from ..symbol import *
 from ..core import callback, metric
 from ..core.loader import ROIIter
-from ..core.module import MutableModule
+from net.module import MutableModule
 from ..processing.bbox_regression import add_bbox_regression_targets
 from ..utils.load_data import load_proposal_roidb, merge_roidb, filter_roidb
-from ..utils.load_model import load_param
+from net.load import load_param
 
 
 def train_rcnn(network, dataset, image_set, root_path, dataset_path,

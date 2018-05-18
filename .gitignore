@@ -80,8 +80,3 @@ target/
 *.params
 *.json
 .vscode/
-
-model
-model/
-data
-data/

@@ -1,31 +1,14 @@
 import pickle
 import os
 import time
-import mxnet as mx
 import numpy as np
 from builtins import range
 
-from .module import MutableModule
 from rcnn.logger import logger
 from rcnn.config import config
 from rcnn.io import image
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
-from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
-
-
-class Predictor(object):
-    def __init__(self, symbol, data_names, label_names,
-                 context=mx.cpu(), max_data_shapes=None,
-                 provide_data=None, provide_label=None,
-                 arg_params=None, aux_params=None):
-        self._mod = MutableModule(symbol, data_names, label_names,
-                                  context=context, max_data_shapes=max_data_shapes)
-        self._mod.bind(provide_data, provide_label, for_training=False)
-        self._mod.init_params(arg_params=arg_params, aux_params=aux_params)
-
-    def predict(self, data_batch):
-        self._mod.forward(data_batch)
-        return dict(zip(self._mod.output_names, self._mod.get_outputs()))
+from rcnn.processing.nms import py_nms_wrapper
 
 
 def im_proposal(predictor, data_batch, data_names, scale):

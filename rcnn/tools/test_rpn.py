@@ -1,14 +1,13 @@
 import argparse
 import pprint
-import mxnet as mx
 
 from ..logger import logger
-from ..config import config, default, generate_config
+from ..config import default, generate_config
 from ..symbol import *
-from ..dataset import *
 from ..core.loader import TestLoader
-from ..core.tester import Predictor, generate_proposals
-from ..utils.load_model import load_param
+from ..core.tester import generate_proposals
+from net.model import Predictor
+from net.load import load_param
 
 
 def test_rpn(network, dataset, image_set, root_path, dataset_path,

@@ -2,13 +2,12 @@ import argparse
 import pprint
 import mxnet as mx
 
-from ..logger import logger
-from ..config import config, default, generate_config
-from ..symbol import *
-from ..dataset import *
-from ..core.loader import TestLoader
-from ..core.tester import Predictor, pred_eval
-from ..utils.load_model import load_param
+from rcnn.logger import logger
+from rcnn.config import config, default, generate_config
+from rcnn.core.tester import pred_eval
+from rcnn.core.loader import TestLoader
+from net.model import Predictor
+from net.load import load_param
 
 
 def test_rcnn(network, dataset, image_set, root_path, dataset_path,

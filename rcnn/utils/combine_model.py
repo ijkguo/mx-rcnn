@@ -1,4 +1,4 @@
-from .load_model import load_checkpoint
+from net.load import load_checkpoint
 from .save_model import save_checkpoint
 
 

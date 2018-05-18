@@ -1,0 +1,15 @@
+SHORT_SIDE = 600
+LONG_SIDE = 1000
+
+PIXEL_MEANS = (123.68, 116.779, 103.939)
+PIXEL_STDS = (1.0, 1.0, 1.0)
+
+DATA_NAMES = ['data', 'im_info']
+LABEL_NAMES = None
+DATA_SHAPES = [('data', (1, 3, LONG_SIDE, SHORT_SIDE)), ('im_info', (1, 3))]
+LABEL_SHAPES = None
+
+NMS_THRESH = 0.3
+
+NUM_CLASSES = 21
+NUM_ANCHORS = 9
