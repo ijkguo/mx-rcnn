@@ -1,9 +1,9 @@
 import numpy as np
-from ..cython.bbox import bbox_overlaps_cython
+# from ..cython.bbox import bbox_overlaps_cython
 
 
 def bbox_overlaps(boxes, query_boxes):
-    return bbox_overlaps_cython(boxes, query_boxes)
+    return bbox_overlaps_py(boxes, query_boxes)
 
 
 def bbox_overlaps_py(boxes, query_boxes):
