@@ -11,7 +11,7 @@ basic format [image_index]
 
 from ..logger import logger
 import os
-import cPickle
+import pickle
 import numpy as np
 from ..processing.bbox_transform import bbox_overlaps
 
@@ -73,7 +73,7 @@ class IMDB(object):
         assert os.path.exists(rpn_file), '%s rpn data not found at %s' % (self.name, rpn_file)
         logger.info('%s loading rpn data from %s' % (self.name, rpn_file))
         with open(rpn_file, 'rb') as f:
-            box_list = cPickle.load(f)
+            box_list = pickle.load(f)
         return box_list
 
     def load_rpn_roidb(self, gt_roidb):

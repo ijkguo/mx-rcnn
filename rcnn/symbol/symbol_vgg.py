@@ -1,6 +1,6 @@
 import mxnet as mx
-import proposal
-import proposal_target
+from rcnn.symbol import proposal
+from rcnn.symbol import proposal_target
 from rcnn.config import config
 
 
