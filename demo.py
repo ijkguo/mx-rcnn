@@ -6,8 +6,6 @@ from rcnn.config import config
 from rcnn.symbol.symbol_resnet import get_resnet_test
 from rcnn.utils.load_model import load_param
 from rcnn.core.tester import Predictor
-from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
-from rcnn.processing.nms import py_nms_wrapper
 
 
 CLASSES = ('__background__',
@@ -109,55 +107,73 @@ def generate_batch(im_tensor, im_info):
     return data_batch
 
 
-def im_detect(predictor, data_batch):
-    """use predictor"""
-    # read input
-    data_dict = {dshape[0]: datum for dshape, datum in zip(data_batch.provide_data, data_batch.data)}
-    height, width, scale = data_dict['im_info'].asnumpy()[0]
-
-    # save output
-    output = predictor.predict(data_batch)
-    rois = output['rois_output'].asnumpy()[:, 1:]
-    scores = output['cls_prob_reshape_output'].asnumpy()[0]
-    bbox_deltas = output['bbox_pred_reshape_output'].asnumpy()[0]
-
-    # post processing
-    pred_boxes = bbox_pred(rois, bbox_deltas)
-    pred_boxes = clip_boxes(pred_boxes, (height, width))
-
-    # we used scaled image to infer, so it is necessary to transform them back
-    pred_boxes = pred_boxes / scale
-
-    return scores, pred_boxes
+def pick_deltas(cls, deltas):
+    delta0 = deltas.pick(4 * cls, axis=1, keepdims=True)
+    delta1 = deltas.pick(4 * cls + 1, axis=1, keepdims=True)
+    delta2 = deltas.pick(4 * cls + 2, axis=1, keepdims=True)
+    delta3 = deltas.pick(4 * cls + 3, axis=1, keepdims=True)
+    return mx.nd.concat(delta0, delta1, delta2, delta3, dim=-1)
 
 
-def vis_all_detection(im_array, detections, class_names):
-    """
-    visualize all detections in one image
-    :param im_array: [b=1 c h w] in rgb
-    :param detections: [ numpy.ndarray([[x1 y1 x2 y2 score]]) for j in classes ]
-    :param class_names: list of names in imdb
-    :return:
-    """
+def bbox_corner2center(x, split=False):
+    xmin, ymin, xmax, ymax = x.split(axis=-1, num_outputs=4)
+    width = xmax - xmin + 1
+    height = ymax - ymin + 1
+    x = xmin + (width - 1) / 2
+    y = ymin + (height - 1) / 2
+    if not split:
+        return mx.nd.concat(x, y, width, height, dim=-1)
+    else:
+        return x, y, width, height
+
+
+def bbox_center2corner(x, split=False):
+    x, y, w, h = x.split(axis=-1, num_outputs=4)
+    hw = (w - 1) / 2
+    hh = (h - 1) / 2
+    xmin = x - hw
+    ymin = y - hh
+    xmax = x + hw
+    ymax = y + hh
+    if not split:
+        return mx.nd.concat(xmin, ymin, xmax, ymax, dim=-1)
+    else:
+        return xmin, ymin, xmax, ymax
+
+
+def bbox_decode(x, anchors, stds=(1.0, 1.0, 1.0, 1.0)):
+    ax, ay, aw, ah = anchors.split(axis=-1, num_outputs=4)
+    dx, dy, dw, dh = x.split(axis=-1, num_outputs=4)
+    ox = dx * stds[0] * aw + ax
+    oy = dy * stds[1] * ah + ay
+    ow = mx.nd.exp(dw * stds[2]) * aw
+    oh = mx.nd.exp(dh * stds[3]) * ah
+    return mx.nd.concat(ox, oy, ow, oh, dim=-1)
+
+
+def bbox_clip(x, height, width):
+    xmin, ymin, xmax, ymax = x.split(axis=-1, num_outputs=4)
+    xmin = xmin.clip(0, width)
+    ymin = ymin.clip(0, height)
+    xmax = xmax.clip(0, width)
+    ymax = ymax.clip(0, height)
+    return mx.nd.concat(xmin, ymin, xmax, ymax, dim=-1)
+
+
+def vis_detection(im_array, detections, class_names):
+    """visualize [cls, conf, x1, y1, x2, y2]"""
     import matplotlib.pyplot as plt
     import random
     plt.imshow(im_array)
-    for j, name in enumerate(class_names):
-        if name == '__background__':
-            continue
-        color = (random.random(), random.random(), random.random())  # generate a random color
-        dets = detections[j]
-        for det in dets:
-            bbox = det[:4]
-            score = det[-1]
-            rect = plt.Rectangle((bbox[0], bbox[1]),
-                                 bbox[2] - bbox[0],
-                                 bbox[3] - bbox[1], fill=False,
-                                 edgecolor=color, linewidth=3.5)
+    colors = [(random.random(), random.random(), random.random()) for _ in class_names]
+    for [cls, conf, x1, y1, x2, y2] in detections:
+        if cls > 0:
+            cls = int(cls)
+            rect = plt.Rectangle((x1, y1), x2 - x1, y2 - y1,
+                                 fill=False, edgecolor=colors[cls], linewidth=3.5)
             plt.gca().add_patch(rect)
-            plt.gca().text(bbox[0], bbox[1] - 2,
-                           '{:s} {:.3f}'.format(name, score),
-                           bbox=dict(facecolor=color, alpha=0.5), fontsize=12, color='white')
+            plt.gca().text(x1, y1 - 2, '{:s} {:.3f}'.format(class_names[cls], conf),
+                           bbox=dict(facecolor=colors[cls], alpha=0.5), fontsize=12, color='white')
     plt.show()
 
 
@@ -194,29 +210,33 @@ symbol = get_resnet_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_
 predictor = get_net(symbol, args.prefix, args.epoch, ctx)
 
 # forward
-scores, pred_boxes = im_detect(predictor, data_batch)
+output = predictor.predict(data_batch)
+rois = output['rois_output'][:, 1:]
+scores = output['cls_prob_reshape_output'][0]
+bbox_deltas = output['bbox_pred_reshape_output'][0]
 
 # convert to per class detection results
-nms = py_nms_wrapper(NMS_THRESH)
-all_boxes = [[] for _ in CLASSES]
-for cls in CLASSES:
-    cls_ind = CLASSES.index(cls)
-    cls_boxes = pred_boxes[:, 4 * cls_ind:4 * (cls_ind + 1)]
-    cls_scores = scores[:, cls_ind, np.newaxis]
-    keep = np.where(cls_scores >= CONF_THRESH)[0]
-    dets = np.hstack((cls_boxes, cls_scores)).astype(np.float32)[keep, :]
-    keep = nms(dets)
-    all_boxes[cls_ind] = dets[keep, :]
-boxes_this_image = [[]] + [all_boxes[j] for j in range(1, len(CLASSES))]
+cls = scores.argmax(axis=1, keepdims=True)
+conf = scores.max(axis=1, keepdims=True)
 
-# print results
-print('---class---')
-print('[[x1, x2, y1, y2, confidence]]')
-for ind, boxes in enumerate(boxes_this_image):
-    if len(boxes) > 0:
-        print('---%s---' % CLASSES[ind])
-        print('%s' % boxes)
+box_deltas = pick_deltas(cls, bbox_deltas)
+boxes = bbox_corner2center(rois)
+boxes = bbox_decode(box_deltas, boxes)
+pred_boxes = bbox_center2corner(boxes)
+
+# post process box
+data_dict = {dshape[0]: datum for dshape, datum in zip(data_batch.provide_data, data_batch.data)}
+height, width, scale = data_dict['im_info'].asnumpy()[0]
+
+pred_boxes = bbox_clip(pred_boxes, height, width)
+pred_boxes = pred_boxes / scale
+
+nms_in = mx.nd.concat(cls, conf, pred_boxes, dim=1)
+nms_out = mx.nd.contrib.box_nms(nms_in, overlap_thresh=NMS_THRESH)
+for [cls, conf, x1, y1, x2, y2] in nms_out.asnumpy():
+    if cls > 0:
+        print([cls, conf, x1, y1, x2, y2])
 
 # if vis
 if args.vis:
-    vis_all_detection(im_orig.asnumpy(), boxes_this_image, CLASSES)
+    vis_detection(im_orig.asnumpy(), nms_out.asnumpy(), CLASSES)
