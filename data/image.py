@@ -20,6 +20,7 @@ def resize(im, short, max_size):
     # prevent bigger axis from being more than max_size:
     if round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
+        short = int(im_size_min * im_scale)
     im = mx.image.resize_short(im, short)
     return im, im_scale
 
@@ -36,4 +37,4 @@ def transform_inverse(im_tensor, means, stds):
     means = mx.nd.array(means).reshape((1, 3))
     stds = mx.nd.array(stds).reshape((1, 3))
     im = im_tensor.transpose((1, 2, 0)) * stds + means
-    return im
+    return im.astype(int)

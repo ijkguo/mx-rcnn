@@ -1,7 +1,7 @@
 import argparse
 import mxnet as mx
 
-from data.bbox import bbox_corner2center, bbox_center2corner, bbox_decode, bbox_clip, pick_deltas
+from data.bbox import decode_detect
 from data.transform import load_test, generate_batch
 from data.vis import vis_detection
 from net.model import get_net
@@ -47,28 +47,16 @@ rois = output['rois_output'][:, 1:]
 scores = output['cls_prob_reshape_output'][0]
 bbox_deltas = output['bbox_pred_reshape_output'][0]
 
-# convert to per class detection results
-cls = scores.argmax(axis=1, keepdims=True)
-conf = scores.max(axis=1, keepdims=True)
+# decode detection
+im_info = im_info.asnumpy()[0]
+cls, conf, boxes = decode_detect(rois, scores, bbox_deltas, im_info, NMS_THRESH)
 
-box_deltas = pick_deltas(cls, bbox_deltas)
-boxes = bbox_corner2center(rois)
-boxes = bbox_decode(box_deltas, boxes)
-pred_boxes = bbox_center2corner(boxes)
-
-# post process box
-data_dict = {dshape[0]: datum for dshape, datum in zip(data_batch.provide_data, data_batch.data)}
-height, width, scale = data_dict['im_info'].asnumpy()[0]
-
-pred_boxes = bbox_clip(pred_boxes, height, width)
-pred_boxes = pred_boxes / scale
-
-nms_in = mx.nd.concat(cls, conf, pred_boxes, dim=1)
-nms_out = mx.nd.contrib.box_nms(nms_in, overlap_thresh=NMS_THRESH)
-for [cls, conf, x1, y1, x2, y2] in nms_out.asnumpy():
+# print out
+detections = mx.nd.concat(cls, conf, boxes, dim=-1)
+for [cls, conf, x1, y1, x2, y2] in detections.asnumpy():
     if cls > 0:
         print([cls, conf, x1, y1, x2, y2])
 
 # if vis
 if args.vis:
-    vis_detection(im_orig.asnumpy(), nms_out.asnumpy(), CLASSES)
+    vis_detection(im_orig.asnumpy(), detections.asnumpy(), CLASSES)

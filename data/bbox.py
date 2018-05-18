@@ -52,3 +52,36 @@ def pick_deltas(cls, deltas):
     delta2 = deltas.pick(4 * cls + 2, axis=1, keepdims=True)
     delta3 = deltas.pick(4 * cls + 3, axis=1, keepdims=True)
     return mx.nd.concat(delta0, delta1, delta2, delta3, dim=-1)
+
+
+def decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh):
+    """rois (nroi, 4), scores (nrois, nclasses), bbox_deltas (nrois, 4 * nclasses), im_info (3)"""
+    # convert to per class detection results
+    cls = scores.argmax(axis=1, keepdims=True)
+    conf = scores.max(axis=1, keepdims=True)
+    box_deltas = pick_deltas(cls, bbox_deltas)
+
+    # decode bbox regression
+    boxes = bbox_corner2center(rois)
+    boxes = bbox_decode(box_deltas, boxes)
+    pred_boxes = bbox_center2corner(boxes)
+
+    # clip to image boundary
+    height, width, scale = im_info
+    pred_boxes = bbox_clip(pred_boxes, height, width)
+
+    # revert to original scale
+    pred_boxes = pred_boxes / scale
+
+    # non maximum suppression
+    nms_in = mx.nd.concat(cls, conf, pred_boxes, dim=1)
+    nms_out = mx.nd.contrib.box_nms(nms_in, overlap_thresh=nms_thresh)
+
+    # slice into output
+    cls = nms_out.slice_axis(axis=-1, begin=0, end=1)
+    conf = nms_out.slice_axis(axis=-1, begin=1, end=2)
+    boxes = nms_out.slice_axis(axis=-1, begin=2, end=6)
+
+    # remove background class
+    cls -= 1
+    return cls, conf, boxes
