@@ -52,11 +52,12 @@ im_info = im_info.asnumpy()[0]
 cls, conf, boxes = decode_detect(rois, scores, bbox_deltas, im_info, NMS_THRESH)
 
 # print out
+CONF_THRESH = 0.7
 detections = mx.nd.concat(cls, conf, boxes, dim=-1)
 for [cls, conf, x1, y1, x2, y2] in detections.asnumpy():
-    if cls > 0:
+    if cls > 0 and conf > CONF_THRESH:
         print([cls, conf, x1, y1, x2, y2])
 
 # if vis
 if args.vis:
-    vis_detection(im_orig.asnumpy(), detections.asnumpy(), CLASSES)
+    vis_detection(im_orig.asnumpy(), detections.asnumpy(), CLASSES, thresh=CONF_THRESH)
