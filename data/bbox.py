@@ -48,6 +48,7 @@ def bbox_clip(x, height, width):
 
 def decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh):
     """rois (nroi, 4), scores (nrois, nclasses), bbox_deltas (nrois, 4 * nclasses), im_info (3)"""
+    im_info = im_info.asnumpy()
     height, width, scale = im_info
 
     # convert to per class detection results
@@ -76,12 +77,4 @@ def decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh):
 
     # assemble all classes
     det = mx.nd.concat(*det, dim=0)
-
-    # slice into output
-    cls = det.slice_axis(axis=-1, begin=0, end=1)
-    conf = det.slice_axis(axis=-1, begin=1, end=2)
-    boxes = det.slice_axis(axis=-1, begin=2, end=6)
-
-    # remove background class
-    cls -= 1
-    return cls, conf, boxes
+    return det

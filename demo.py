@@ -8,8 +8,7 @@ from net.model import get_net
 from net.config import *
 from rcnn.symbol.symbol_resnet import get_resnet_test
 
-CLASSES = ('__background__',
-           'aeroplane', 'bicycle', 'bird', 'boat',
+CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat',
            'bottle', 'bus', 'car', 'cat', 'chair',
            'cow', 'diningtable', 'dog', 'horse',
            'motorbike', 'person', 'pottedplant',
@@ -46,18 +45,20 @@ output = predictor.predict(data_batch)
 rois = output['rois_output'][:, 1:]
 scores = output['cls_prob_reshape_output'][0]
 bbox_deltas = output['bbox_pred_reshape_output'][0]
+im_info = im_info[0]
 
 # decode detection
-im_info = im_info.asnumpy()[0]
-cls, conf, boxes = decode_detect(rois, scores, bbox_deltas, im_info, NMS_THRESH)
+det = decode_detect(rois, scores, bbox_deltas, im_info, NMS_THRESH)
+
+# remove background class
+det[:, 0] -= 1
 
 # print out
 CONF_THRESH = 0.7
-detections = mx.nd.concat(cls, conf, boxes, dim=-1)
-for [cls, conf, x1, y1, x2, y2] in detections.asnumpy():
-    if cls > 0 and conf > CONF_THRESH:
+for [cls, conf, x1, y1, x2, y2] in det.asnumpy():
+    if cls >= 0 and conf > CONF_THRESH:
         print([cls, conf, x1, y1, x2, y2])
 
 # if vis
 if args.vis:
-    vis_detection(im_orig.asnumpy(), detections.asnumpy(), CLASSES, thresh=CONF_THRESH)
+    vis_detection(im_orig.asnumpy(), det.asnumpy(), CLASSES, thresh=CONF_THRESH)
