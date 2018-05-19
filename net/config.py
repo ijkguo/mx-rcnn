@@ -1,7 +1,7 @@
 SHORT_SIDE = 600
 LONG_SIDE = 1000
 
-PIXEL_MEANS = (123.68, 116.779, 103.939)
+PIXEL_MEANS = (0.0, 0.0, 0.0)
 PIXEL_STDS = (1.0, 1.0, 1.0)
 
 DATA_NAMES = ['data', 'im_info']

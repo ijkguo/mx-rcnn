@@ -1,15 +1,17 @@
 import argparse
 import pprint
+
+import mxnet as mx
 import numpy as np
 
+from net.module import MutableModule
+from net.load import load_param
 from rcnn.logger import logger
-from rcnn.config import default, generate_config
-from rcnn.symbol import *
+from rcnn.config import config, default
 from rcnn.core import callback, metric
 from rcnn.core.loader import AnchorLoader
-from net.module import MutableModule
 from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
-from net.load import load_param
+from rcnn.symbol.symbol_resnet import get_resnet_train
 
 
 def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
@@ -21,7 +23,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
 
     # load symbol
-    sym = eval('get_' + args.network + '_train')(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
+    sym = get_resnet_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
     feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu
@@ -139,10 +141,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
     # general
-    parser.add_argument('--network', help='network name', default=default.network, type=str)
     parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
-    args, rest = parser.parse_known_args()
-    generate_config(args.network, args.dataset)
     parser.add_argument('--image_set', help='image_set name', default=default.image_set, type=str)
     parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
     parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)

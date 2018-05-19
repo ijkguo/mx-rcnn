@@ -4,12 +4,12 @@ from easydict import EasyDict as edict
 config = edict()
 
 # network related params
-config.PIXEL_MEANS = np.array([103.939, 116.779, 123.68])
+config.PIXEL_MEANS = np.array([0, 0, 0])
 config.IMAGE_STRIDE = 0
 config.RPN_FEAT_STRIDE = 16
 config.RCNN_FEAT_STRIDE = 16
-config.FIXED_PARAMS = ['conv1', 'conv2']
-config.FIXED_PARAMS_SHARED = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+config.FIXED_PARAMS = ['conv0', 'stage1', 'gamma', 'beta']
+config.FIXED_PARAMS_SHARED = ['conv0', 'stage1', 'stage2', 'stage3', 'gamma', 'beta']
 
 # dataset related params
 config.NUM_CLASSES = 21
@@ -22,9 +22,9 @@ config.TRAIN = edict()
 
 # R-CNN and RPN
 # size of images for each device, 2 for rcnn, 1 for rpn and e2e
-config.TRAIN.BATCH_IMAGES = 2
+config.TRAIN.BATCH_IMAGES = 1
 # e2e changes behavior of anchor loader and metric
-config.TRAIN.END2END = False
+config.TRAIN.END2END = True
 # group images with similar aspect ratio
 config.TRAIN.ASPECT_GROUPING = True
 
@@ -60,7 +60,7 @@ config.TRAIN.RPN_PRE_NMS_TOP_N = 12000
 config.TRAIN.RPN_POST_NMS_TOP_N = 2000
 config.TRAIN.RPN_MIN_SIZE = config.RPN_FEAT_STRIDE
 # approximate bounding box regression
-config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = False
+config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
 config.TRAIN.BBOX_MEANS = (0.0, 0.0, 0.0, 0.0)
 config.TRAIN.BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
 
@@ -68,7 +68,7 @@ config.TEST = edict()
 
 # R-CNN testing
 # use rpn to generate proposal
-config.TEST.HAS_RPN = False
+config.TEST.HAS_RPN = True
 # size of images for each device
 config.TEST.BATCH_IMAGES = 1
 
@@ -92,8 +92,7 @@ config.TEST.NMS = 0.3
 default = edict()
 
 # default network
-default.network = 'vgg'
-default.pretrained = 'model/vgg16'
+default.pretrained = 'model/resnet-101'
 default.pretrained_epoch = 0
 default.base_lr = 0.001
 # default dataset
@@ -120,45 +119,3 @@ default.rcnn_prefix = 'model/rcnn'
 default.rcnn_epoch = 8
 default.rcnn_lr = default.base_lr
 default.rcnn_lr_step = '6'
-
-# network settings
-network = edict()
-
-network.vgg = edict()
-
-network.resnet = edict()
-network.resnet.pretrained = 'model/resnet-101'
-network.resnet.pretrained_epoch = 0
-network.resnet.PIXEL_MEANS = np.array([0, 0, 0])
-network.resnet.IMAGE_STRIDE = 0
-network.resnet.RPN_FEAT_STRIDE = 16
-network.resnet.RCNN_FEAT_STRIDE = 16
-network.resnet.FIXED_PARAMS = ['conv0', 'stage1', 'gamma', 'beta']
-network.resnet.FIXED_PARAMS_SHARED = ['conv0', 'stage1', 'stage2', 'stage3', 'gamma', 'beta']
-
-# dataset settings
-dataset = edict()
-
-dataset.PascalVOC = edict()
-
-dataset.coco = edict()
-dataset.coco.dataset = 'coco'
-dataset.coco.image_set = 'train2014'
-dataset.coco.test_image_set = 'val2014'
-dataset.coco.root_path = 'data'
-dataset.coco.dataset_path = 'data/coco'
-dataset.coco.NUM_CLASSES = 81
-
-
-def generate_config(_network, _dataset):
-    for k, v in network[_network].items():
-        if k in config:
-            config[k] = v
-        elif k in default:
-            default[k] = v
-    for k, v in dataset[_dataset].items():
-        if k in config:
-            config[k] = v
-        elif k in default:
-            default[k] = v
-
