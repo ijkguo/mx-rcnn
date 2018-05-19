@@ -111,11 +111,12 @@ def im_detect(rois, scores, bbox_deltas, im_info,
     for j in range(1, scores.shape[-1]):
         indexes = np.where(scores[:, j] > conf_thresh)[0]
         cls_scores = scores[indexes, j, np.newaxis]
-        cls_id = np.ones_like(cls_scores)
         cls_boxes = pred_boxes[indexes, j * 4:(j + 1) * 4]
-        cls_dets = np.hstack((cls_id, cls_scores, cls_boxes))
-        keep = nms(cls_dets[:, 1:])
-        det.append(cls_dets[keep, :])
+        cls_dets = np.hstack((cls_boxes, cls_scores))
+        keep = nms(cls_dets)
+
+        cls_id = np.ones_like(cls_scores) * j
+        det.append(np.hstack((cls_id, cls_scores, cls_boxes))[keep, :])
 
     # assemble all classes
     det = np.concatenate(det, axis=0)
@@ -175,7 +176,7 @@ def main():
 
         for j in range(1, imdb.num_classes):
             indexes = np.where(det[:, 0] == j)[0]
-            all_boxes[j][i] = det[indexes, 1:]
+            all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
 
     # evaluate model
     imdb.evaluate_detections(all_boxes)
