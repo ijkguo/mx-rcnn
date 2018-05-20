@@ -4,6 +4,7 @@ import pprint
 import mxnet as mx
 import numpy as np
 
+from data.bbox import decode_detect
 from net.config import *
 from net.model import get_net
 from rcnn.logger import logger
@@ -172,11 +173,17 @@ def main():
         scores = output['cls_prob_reshape_output'][0]
         bbox_deltas = output['bbox_pred_reshape_output'][0]
 
-        det = im_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH, conf_thresh=1e-3)
+        # det = im_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH, conf_thresh=1e-3)
+        #
+        # for j in range(1, imdb.num_classes):
+        #     indexes = np.where(det[:, 0] == j)[0]
+        #     all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
 
-        for j in range(1, imdb.num_classes):
-            indexes = np.where(det[:, 0] == j)[0]
-            all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
+        det = decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH)
+        dets = det.split(num_outputs=imdb.num_classes - 1, axis=0)
+        for j, det in enumerate(dets):
+            imdb_det = mx.nd.concat(det[:, 2:], det[:, 1:2], dim=-1)
+            all_boxes[j + 1][i] = imdb_det.asnumpy()
 
     # evaluate model
     imdb.evaluate_detections(all_boxes)
