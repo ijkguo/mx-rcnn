@@ -6,7 +6,10 @@ function. Results are written as the Pascal VOC format. Evaluation is based on m
 criterion.
 """
 
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import cv2
 import os
 import numpy as np

@@ -1,8 +1,12 @@
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import os
 import time
 import mxnet as mx
 import numpy as np
+from builtins import range
 
 from .module import MutableModule
 from rcnn.logger import logger

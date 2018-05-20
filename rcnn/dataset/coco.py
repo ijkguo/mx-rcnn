@@ -1,8 +1,12 @@
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import cv2
 import os
 import json
 import numpy as np
+from builtins import range
 
 from ..logger import logger
 from .imdb import IMDB

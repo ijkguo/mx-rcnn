@@ -5,8 +5,10 @@ given a pascal voc imdb, compute mAP
 from ..logger import logger
 import numpy as np
 import os
-import pickle
-
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 def parse_voc_rec(filename):
     """

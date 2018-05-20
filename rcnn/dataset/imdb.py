@@ -11,7 +11,10 @@ basic format [image_index]
 
 from ..logger import logger
 import os
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import numpy as np
 from ..processing.bbox_transform import bbox_overlaps
 

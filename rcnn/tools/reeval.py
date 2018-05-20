@@ -1,5 +1,8 @@
 import argparse
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import os
 import mxnet as mx
 
