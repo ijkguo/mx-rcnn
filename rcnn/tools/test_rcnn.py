@@ -19,7 +19,7 @@ def test_rcnn(network, dataset, image_set, root_path, dataset_path,
         config.TEST.HAS_RPN = True
 
     # print config
-    pprint.pprint(config)
+    logger.info(pprint.pformat(config))
 
     # load symbol and testing data
     if has_rpn:

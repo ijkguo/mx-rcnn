@@ -18,7 +18,7 @@ def test_rpn(network, dataset, image_set, root_path, dataset_path,
     config.TEST.HAS_RPN = True
 
     # print config
-    pprint.pprint(config)
+    logger.info(pprint.pformat(config))
 
     # load symbol
     sym = eval('get_' + network + '_rpn_test')(num_anchors=config.NUM_ANCHORS)
