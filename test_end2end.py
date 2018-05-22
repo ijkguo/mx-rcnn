@@ -126,11 +126,6 @@ def im_detect(rois, scores, bbox_deltas, im_info,
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Test a Fast R-CNN network')
-    # general
-    parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
-    parser.add_argument('--image_set', help='image_set name', default=default.test_image_set, type=str)
-    parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
-    parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)
     # testing
     parser.add_argument('prefix', help='model to test with', default=default.rcnn_prefix, type=str)
     parser.add_argument('epoch', help='model to test with', default=default.rcnn_epoch, type=int)
@@ -143,11 +138,11 @@ def main():
     # print config
     args = parse_args()
     logger.info('Called with argument: %s' % args)
-    pprint.pprint(config)
+    logger.info(pprint.pformat(config))
     ctx = mx.gpu(args.gpu)
 
     # load testing data
-    imdb = eval(args.dataset)(args.image_set, args.root_path, args.dataset_path)
+    imdb = PascalVOC("2007_test", "data", "data/VOCdevkit")
     roidb = imdb.gt_roidb()
     test_data = TestLoader(roidb, batch_size=1)
 
@@ -172,12 +167,6 @@ def main():
         rois = output['rois_output'][:, 1:]
         scores = output['cls_prob_reshape_output'][0]
         bbox_deltas = output['bbox_pred_reshape_output'][0]
-
-        # det = im_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH, conf_thresh=1e-3)
-        #
-        # for j in range(1, imdb.num_classes):
-        #     indexes = np.where(det[:, 0] == j)[0]
-        #     all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
 
         det = decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH)
         dets = det.split(num_outputs=imdb.num_classes - 1, axis=0)
