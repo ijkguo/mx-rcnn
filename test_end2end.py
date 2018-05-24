@@ -5,7 +5,6 @@ import mxnet as mx
 import numpy as np
 
 from data.bbox import decode_detect
-from net.config import *
 from net.model import get_net
 from rcnn.logger import logger
 from rcnn.config import config, default
@@ -148,7 +147,7 @@ def main():
 
     # load model
     sym = get_resnet_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
-    predictor = get_net(sym, args.prefix, args.epoch, ctx)
+    predictor = get_net(sym, args.prefix, args.epoch, ctx, short=config.SCALES[0][0], max_size=config.SCALES[0][1])
 
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
@@ -168,7 +167,8 @@ def main():
         scores = output['cls_prob_reshape_output'][0]
         bbox_deltas = output['bbox_pred_reshape_output'][0]
 
-        det = decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh=NMS_THRESH)
+        det = decode_detect(rois, scores, bbox_deltas, im_info,
+                            bbox_stds=config.TRAIN.BBOX_STDS, nms_thresh=config.TEST.NMS)
         dets = det.split(num_outputs=imdb.num_classes - 1, axis=0)
         for j, det in enumerate(dets):
             imdb_det = mx.nd.concat(det[:, 2:], det[:, 1:2], dim=-1)

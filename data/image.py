@@ -34,7 +34,7 @@ def transform(im, means, stds):
 
 def transform_inverse(im_tensor, means, stds):
     """transform from (C, H, W) tensor to RGB image"""
-    means = mx.nd.array(means).reshape((1, 3))
-    stds = mx.nd.array(stds).reshape((1, 3))
+    means = mx.nd.array(means, ctx=im_tensor.context).reshape((1, 3))
+    stds = mx.nd.array(stds, ctx=im_tensor.context).reshape((1, 3))
     im = im_tensor.transpose((1, 2, 0)) * stds + means
     return im.astype(int)

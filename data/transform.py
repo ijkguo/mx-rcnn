@@ -1,11 +1,9 @@
 import mxnet as mx
 
 from data.image import imdecode, resize, transform
-from net.config import *
 
 
-def load_test(filename, short=SHORT_SIDE, max_size=LONG_SIDE,
-              mean=PIXEL_MEANS, std=PIXEL_STDS):
+def load_test(filename, short, max_size, mean, std):
     # read and transform image
     im_orig = imdecode(filename)
     im, im_scale = resize(im_orig, short, max_size)
@@ -31,7 +29,7 @@ def generate_batch(im_tensor, im_info):
 
 
 class RCNNDefaultValTransform(object):
-    def __init__(self, short=SHORT_SIDE, max_size=LONG_SIDE, mean=PIXEL_MEANS, std=PIXEL_STDS):
+    def __init__(self, short, max_size, mean, std):
         self._short = short
         self._max_size = max_size
         self._mean = mean

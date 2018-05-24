@@ -27,7 +27,7 @@ def bbox_center2corner(x, split=False):
         return xmin, ymin, xmax, ymax
 
 
-def bbox_decode(x, anchors, stds=(1.0, 1.0, 1.0, 1.0)):
+def bbox_decode(x, anchors, stds):
     ax, ay, aw, ah = anchors.split(axis=-1, num_outputs=4)
     dx, dy, dw, dh = x.split(axis=-1, num_outputs=4)
     ox = dx * stds[0] * aw + ax
@@ -46,7 +46,7 @@ def bbox_clip(x, height, width):
     return mx.nd.concat(xmin, ymin, xmax, ymax, dim=-1)
 
 
-def decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh):
+def decode_detect(rois, scores, bbox_deltas, im_info, bbox_stds, nms_thresh):
     """rois (nroi, 4), scores (nrois, nclasses), bbox_deltas (nrois, 4 * nclasses), im_info (3)"""
     im_info = im_info.asnumpy()
     height, width, scale = im_info
@@ -60,7 +60,7 @@ def decode_detect(rois, scores, bbox_deltas, im_info, nms_thresh):
         # decode bbox regression
         box_deltas = bbox_deltas.slice_axis(axis=1, begin=4 * cls, end=4 * (cls + 1))
         boxes = bbox_corner2center(rois)
-        boxes = bbox_decode(box_deltas, boxes)
+        boxes = bbox_decode(box_deltas, boxes, bbox_stds)
         pred_boxes = bbox_center2corner(boxes)
 
         # clip to image boundary

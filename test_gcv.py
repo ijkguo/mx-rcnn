@@ -7,9 +7,20 @@ from tqdm import tqdm
 
 from data.bbox import decode_detect
 from data.transform import RCNNDefaultValTransform, generate_batch
-from net.config import *
 from net.model import get_net
 from rcnn.symbol.symbol_resnet import get_resnet_test
+
+
+IMG_SHORT_SIDE = 600
+IMG_LONG_SIDE = 1000
+IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
+IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
+
+RPN_ANCHORS = 9
+
+RCNN_CLASSES = 21
+RCNN_BBOX_STDS = (1.0, 1.0, 1.0, 1.0)
+RCNN_NMS_THRESH = 0.3
 
 
 def parse_args():
@@ -30,12 +41,14 @@ def main():
 
     # load testing data
     val_dataset = gdata.VOCDetection(splits=[(2007, 'test')])
-    val_loader = gdata.DetectionDataLoader(val_dataset.transform(RCNNDefaultValTransform()),
+    val_transform = RCNNDefaultValTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE,
+                                            mean=IMG_PIXEL_MEANS, std=IMG_PIXEL_STDS)
+    val_loader = gdata.DetectionDataLoader(val_dataset.transform(val_transform),
                                            batch_size=1, shuffle=False, last_batch="keep", num_workers=4)
 
     # load model
-    sym = get_resnet_test(num_classes=NUM_CLASSES, num_anchors=NUM_ANCHORS)
-    predictor = get_net(sym, args.prefix, args.epoch, ctx)
+    sym = get_resnet_test(num_classes=RCNN_CLASSES, num_anchors=RPN_ANCHORS)
+    predictor = get_net(sym, args.prefix, args.epoch, ctx, short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE)
 
     # start detection
     metric = VOC07MApMetric(iou_thresh=0.5, class_names=val_dataset.classes)
@@ -56,14 +69,15 @@ def main():
             bbox_deltas = output['bbox_pred_reshape_output'][0]
 
             # post processing
-            det = decode_detect(rois, scores, bbox_deltas, im_info, NMS_THRESH)
+            det = decode_detect(rois, scores, bbox_deltas, im_info,
+                                bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH)
             cls = det.slice_axis(axis=-1, begin=0, end=1)
             conf = det.slice_axis(axis=-1, begin=1, end=2)
             boxes = det.slice_axis(axis=-1, begin=2, end=6)
             cls -= 1
 
-            metric.update(boxes.expand_dims(0), cls.expand_dims(0), conf.expand_dims(0), gt_bboxes, gt_ids,
-                          gt_difficults)
+            metric.update(boxes.expand_dims(0), cls.expand_dims(0), conf.expand_dims(0),
+                          gt_bboxes, gt_ids, gt_difficults)
             pbar.update(batch[0].shape[0])
     names, values = metric.get()
 
