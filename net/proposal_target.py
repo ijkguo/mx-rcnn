@@ -7,7 +7,7 @@ import mxnet as mx
 import numpy as np
 from distutils.util import strtobool
 
-from ..logger import logger
+from rcnn.logger import logger
 from rcnn.io.rcnn import sample_rois
 
 

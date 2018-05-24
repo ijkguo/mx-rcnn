@@ -11,7 +11,7 @@ from rcnn.config import config, default
 from rcnn.core import callback, metric
 from rcnn.core.loader import AnchorLoader
 from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
-from rcnn.symbol.symbol_resnet import get_resnet_train
+from net.symbol_resnet import get_resnet_train
 
 
 def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,

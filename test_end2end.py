@@ -10,7 +10,7 @@ from rcnn.logger import logger
 from rcnn.config import config, default
 from rcnn.dataset import PascalVOC
 from rcnn.io.image import get_image
-from rcnn.symbol.symbol_resnet import get_resnet_test
+from net.symbol_resnet import get_resnet_test
 
 
 class TestLoader(mx.io.DataIter):

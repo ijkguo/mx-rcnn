@@ -5,7 +5,7 @@ from data.bbox import decode_detect
 from data.transform import load_test, generate_batch
 from data.vis import vis_detection
 from net.model import get_net
-from rcnn.symbol.symbol_resnet import get_resnet_test
+from net.symbol_resnet import get_resnet_test
 
 IMG_SHORT_SIDE = 600
 IMG_LONG_SIDE = 1000
