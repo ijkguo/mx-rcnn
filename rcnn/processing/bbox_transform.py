@@ -47,7 +47,7 @@ def clip_boxes(boxes, im_shape):
     return boxes
 
 
-def nonlinear_transform(ex_rois, gt_rois):
+def bbox_transform(ex_rois, gt_rois):
     """
     compute bounding box regression targets from ex_rois to gt_rois
     :param ex_rois: [N, 4]
@@ -76,7 +76,7 @@ def nonlinear_transform(ex_rois, gt_rois):
     return targets
 
 
-def nonlinear_pred(boxes, box_deltas):
+def bbox_pred(boxes, box_deltas, box_stds):
     """
     Transform the set of class-agnostic boxes into class-specific boxes
     by applying the predicted offsets (box_deltas)
@@ -93,10 +93,10 @@ def nonlinear_pred(boxes, box_deltas):
     ctr_x = boxes[:, 0] + 0.5 * (widths - 1.0)
     ctr_y = boxes[:, 1] + 0.5 * (heights - 1.0)
 
-    dx = box_deltas[:, 0::4]
-    dy = box_deltas[:, 1::4]
-    dw = box_deltas[:, 2::4]
-    dh = box_deltas[:, 3::4]
+    dx = box_deltas[:, 0::4] * box_stds[0]
+    dy = box_deltas[:, 1::4] * box_stds[1]
+    dw = box_deltas[:, 2::4] * box_stds[2]
+    dh = box_deltas[:, 3::4] * box_stds[3]
 
     pred_ctr_x = dx * widths[:, np.newaxis] + ctr_x[:, np.newaxis]
     pred_ctr_y = dy * heights[:, np.newaxis] + ctr_y[:, np.newaxis]
@@ -114,49 +114,3 @@ def nonlinear_pred(boxes, box_deltas):
     pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * (pred_h - 1.0)
 
     return pred_boxes
-
-
-def iou_transform(ex_rois, gt_rois):
-    """ return bbox targets, IoU loss uses gt_rois as gt """
-    assert ex_rois.shape[0] == gt_rois.shape[0], 'inconsistent rois number'
-    return gt_rois
-
-
-def iou_pred(boxes, box_deltas):
-    """
-    Transform the set of class-agnostic boxes into class-specific boxes
-    by applying the predicted offsets (box_deltas)
-    :param boxes: !important [N 4]
-    :param box_deltas: [N, 4 * num_classes]
-    :return: [N 4 * num_classes]
-    """
-    if boxes.shape[0] == 0:
-        return np.zeros((0, box_deltas.shape[1]))
-
-    boxes = boxes.astype(np.float, copy=False)
-    x1 = boxes[:, 0]
-    y1 = boxes[:, 1]
-    x2 = boxes[:, 2]
-    y2 = boxes[:, 3]
-
-    dx1 = box_deltas[:, 0::4]
-    dy1 = box_deltas[:, 1::4]
-    dx2 = box_deltas[:, 2::4]
-    dy2 = box_deltas[:, 3::4]
-
-    pred_boxes = np.zeros(box_deltas.shape)
-    # x1
-    pred_boxes[:, 0::4] = dx1 + x1[:, np.newaxis]
-    # y1
-    pred_boxes[:, 1::4] = dy1 + y1[:, np.newaxis]
-    # x2
-    pred_boxes[:, 2::4] = dx2 + x2[:, np.newaxis]
-    # y2
-    pred_boxes[:, 3::4] = dy2 + y2[:, np.newaxis]
-
-    return pred_boxes
-
-
-# define bbox_transform and bbox_pred
-bbox_transform = nonlinear_transform
-bbox_pred = nonlinear_pred

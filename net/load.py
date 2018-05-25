@@ -36,14 +36,13 @@ def convert_context(params, ctx):
     return new_params
 
 
-def load_param(prefix, epoch, convert=False, ctx=None, process=False):
+def load_param(prefix, epoch, convert=False, ctx=None):
     """
     wrapper for load checkpoint
     :param prefix: Prefix of model name.
     :param epoch: Epoch number of model we would like to load.
     :param convert: reference model should be converted to GPU NDArray first
     :param ctx: if convert then ctx must be designated.
-    :param process: model should drop any test
     :return: (arg_params, aux_params)
     """
     arg_params, aux_params = load_checkpoint(prefix, epoch)
@@ -52,8 +51,4 @@ def load_param(prefix, epoch, convert=False, ctx=None, process=False):
             ctx = mx.cpu()
         arg_params = convert_context(arg_params, ctx)
         aux_params = convert_context(aux_params, ctx)
-    if process:
-        tests = [k for k in arg_params.keys() if '_test' in k]
-        for test in tests:
-            arg_params[test.replace('_test', '')] = arg_params.pop(test)
     return arg_params, aux_params

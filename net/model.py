@@ -20,7 +20,7 @@ class Predictor(object):
 
 
 def get_net(symbol, prefix, epoch, ctx, short, max_size):
-    arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx, process=True)
+    arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx)
 
     # produce shape max possible
     data_names = ['data', 'im_info']
