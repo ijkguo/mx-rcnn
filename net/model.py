@@ -1,7 +1,22 @@
 import mxnet as mx
 
 from net.module import MutableModule
-from net.load import load_param
+
+
+def load_param(prefix, epoch, ctx=None):
+    """same as mx.model.load_checkpoint, but do not load symbol and will convert context"""
+    if ctx is None:
+        ctx = mx.cpu()
+    save_dict = mx.nd.load('%s-%04d.params' % (prefix, epoch))
+    arg_params = {}
+    aux_params = {}
+    for k, v in save_dict.items():
+        tp, name = k.split(':', 1)
+        if tp == 'arg':
+            arg_params[name] = v.as_in_context(ctx)
+        if tp == 'aux':
+            aux_params[name] = v.as_in_context(ctx)
+    return arg_params, aux_params
 
 
 class Predictor(object):
@@ -20,7 +35,7 @@ class Predictor(object):
 
 
 def get_net(symbol, prefix, epoch, ctx, short, max_size):
-    arg_params, aux_params = load_param(prefix, epoch, convert=True, ctx=ctx)
+    arg_params, aux_params = load_param(prefix, epoch, ctx=ctx)
 
     # produce shape max possible
     data_names = ['data', 'im_info']

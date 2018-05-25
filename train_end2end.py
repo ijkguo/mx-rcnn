@@ -5,7 +5,7 @@ import mxnet as mx
 import numpy as np
 
 from net.module import MutableModule
-from net.load import load_param
+from net.model import load_param
 from rcnn.logger import logger
 from rcnn.config import config, default
 from rcnn.core import callback, metric
