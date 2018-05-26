@@ -102,12 +102,6 @@ class MutableModule(BaseModule):
         self.inputs_need_grad = inputs_need_grad
         self.binded = True
 
-        max_shapes_dict = dict()
-        if self._max_data_shapes is not None:
-            max_shapes_dict.update(dict(self._max_data_shapes))
-        if self._max_label_shapes is not None:
-            max_shapes_dict.update(dict(self._max_label_shapes))
-
         if data_shapes is not None:
             data_shape_list = data_shapes
             for name, shape in data_shapes:
