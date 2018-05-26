@@ -1,30 +1,17 @@
 import mxnet as mx
 import numpy as np
 
-from rcnn.config import config
 
-
-def get_rpn_names():
-    pred = ['rpn_cls_prob', 'rpn_bbox_loss']
+def get_names():
+    pred = ['rpn_cls_prob', 'rpn_bbox_loss', 'rcnn_cls_prob', 'rcnn_bbox_loss', 'rcnn_label']
     label = ['rpn_label', 'rpn_bbox_target', 'rpn_bbox_weight']
-    return pred, label
-
-
-def get_rcnn_names():
-    pred = ['rcnn_cls_prob', 'rcnn_bbox_loss']
-    label = ['rcnn_label', 'rcnn_bbox_target', 'rcnn_bbox_weight']
-    if config.TRAIN.END2END:
-        pred.append('rcnn_label')
-        rpn_pred, rpn_label = get_rpn_names()
-        pred = rpn_pred + pred
-        label = rpn_label
     return pred, label
 
 
 class RPNAccMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RPNAccMetric, self).__init__('RPNAcc')
-        self.pred, self.label = get_rpn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         pred = preds[self.pred.index('rpn_cls_prob')]
@@ -48,15 +35,11 @@ class RPNAccMetric(mx.metric.EvalMetric):
 class RCNNAccMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RCNNAccMetric, self).__init__('RCNNAcc')
-        self.e2e = config.TRAIN.END2END
-        self.pred, self.label = get_rcnn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         pred = preds[self.pred.index('rcnn_cls_prob')]
-        if self.e2e:
-            label = preds[self.pred.index('rcnn_label')]
-        else:
-            label = labels[self.label.index('rcnn_label')]
+        label = preds[self.pred.index('rcnn_label')]
 
         last_dim = pred.shape[-1]
         pred_label = pred.asnumpy().reshape(-1, last_dim).argmax(axis=1).astype('int32')
@@ -69,7 +52,7 @@ class RCNNAccMetric(mx.metric.EvalMetric):
 class RPNLogLossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RPNLogLossMetric, self).__init__('RPNLogLoss')
-        self.pred, self.label = get_rpn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         pred = preds[self.pred.index('rpn_cls_prob')]
@@ -96,15 +79,11 @@ class RPNLogLossMetric(mx.metric.EvalMetric):
 class RCNNLogLossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RCNNLogLossMetric, self).__init__('RCNNLogLoss')
-        self.e2e = config.TRAIN.END2END
-        self.pred, self.label = get_rcnn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         pred = preds[self.pred.index('rcnn_cls_prob')]
-        if self.e2e:
-            label = preds[self.pred.index('rcnn_label')]
-        else:
-            label = labels[self.label.index('rcnn_label')]
+        label = preds[self.pred.index('rcnn_label')]
 
         last_dim = pred.shape[-1]
         pred = pred.asnumpy().reshape(-1, last_dim)
@@ -121,7 +100,7 @@ class RCNNLogLossMetric(mx.metric.EvalMetric):
 class RPNL1LossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RPNL1LossMetric, self).__init__('RPNL1Loss')
-        self.pred, self.label = get_rpn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         bbox_loss = preds[self.pred.index('rpn_bbox_loss')].asnumpy()
@@ -137,15 +116,11 @@ class RPNL1LossMetric(mx.metric.EvalMetric):
 class RCNNL1LossMetric(mx.metric.EvalMetric):
     def __init__(self):
         super(RCNNL1LossMetric, self).__init__('RCNNL1Loss')
-        self.e2e = config.TRAIN.END2END
-        self.pred, self.label = get_rcnn_names()
+        self.pred, self.label = get_names()
 
     def update(self, labels, preds):
         bbox_loss = preds[self.pred.index('rcnn_bbox_loss')].asnumpy()
-        if self.e2e:
-            label = preds[self.pred.index('rcnn_label')].asnumpy()
-        else:
-            label = labels[self.label.index('rcnn_label')].asnumpy()
+        label = preds[self.pred.index('rcnn_label')].asnumpy()
 
         # calculate num_inst
         keep_inds = np.where(label != 0)[0]

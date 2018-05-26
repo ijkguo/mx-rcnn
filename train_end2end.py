@@ -2,36 +2,55 @@ import argparse
 import pprint
 
 import mxnet as mx
-import numpy as np
 
 from net.module import MutableModule
-from net.model import load_param
+from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
+from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 from rcnn.logger import logger
 from rcnn.config import config, default
-from rcnn.core import callback, metric
 from rcnn.core.loader import AnchorLoader
 from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
 from net.symbol_resnet import get_resnet_train
 
 
+IMG_SHORT_SIDE = 600
+IMG_LONG_SIDE = 1000
+IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
+IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
+NET_FIXED_PARAM = []
+
+RPN_ANCHORS = 9
+RPN_ANCHOR_SCALES = (8, 16, 32)
+RPN_ANCHOR_RATIOS = (0.5, 1, 2)
+RPN_FEAT_STRIDE = 16
+RPN_PRE_NMS_TOP_N = 12000
+RPN_POST_NMS_TOP_N = 2000
+RPN_NMS_THRESH = 0.7
+RPN_MIN_SIZE = 16
+RPN_BATCH_ROIS = 256
+
+RCNN_CLASSES = 21
+RCNN_FEAT_STRIDE = 16
+RCNN_POOLED_SIZE = (14, 14)
+RCNN_BATCH_SIZE = 1
+RCNN_BATCH_ROIS = 128
+RCNN_FG_FRACTION = 0.25
+RCNN_BBOX_STDS = (1.0, 1.0, 1.0, 1.0)
+RCNN_NMS_THRESH = 0.3
+
+
 def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
               lr=0.001, lr_step='5'):
-    # setup config
-    config.TRAIN.BATCH_IMAGES = 1
-    config.TRAIN.BATCH_ROIS = 128
-    config.TRAIN.END2END = True
-    config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED = True
-
     # load symbol
-    sym = get_resnet_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
+    sym = get_resnet_train(num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
+                           rpn_feature_stride=RPN_FEAT_STRIDE, rpn_pre_topk=RPN_PRE_NMS_TOP_N, rpn_post_topk=RPN_POST_NMS_TOP_N,
+                           rpn_nms_thresh=RPN_NMS_THRESH, rpn_min_size=RPN_MIN_SIZE, rpn_batch_rois=RPN_BATCH_ROIS,
+                           num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE, rcnn_pooled_size=RCNN_POOLED_SIZE,
+                           rcnn_batch_size=RCNN_BATCH_SIZE, rcnn_batch_rois=RCNN_BATCH_SIZE, rcnn_fg_fraction=RCNN_BATCH_ROIS)
     feat_sym = sym.get_internals()['rpn_cls_score_output']
 
     # setup multi-gpu
     batch_size = len(ctx)
-    input_batch_size = config.TRAIN.BATCH_IMAGES * batch_size
-
-    # print config
-    logger.info(pprint.pformat(config))
 
     # load dataset and prepare imdb for training
     image_sets = [iset for iset in args.image_set.split('+')]
@@ -42,79 +61,56 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     roidb = filter_roidb(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=input_batch_size, shuffle=not args.no_shuffle,
+    train_data = AnchorLoader(feat_sym, roidb, batch_size=batch_size, shuffle=not args.no_shuffle,
                               ctx=ctx, work_load_list=args.work_load_list,
                               feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
                               anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECT_GROUPING)
 
-    # infer max shape
-    max_data_shape = [('data', (input_batch_size, 3, max([v[0] for v in config.SCALES]), max([v[1] for v in config.SCALES])))]
-    max_data_shape, max_label_shape = train_data.infer_shape(max_data_shape)
-    max_data_shape.append(('gt_boxes', (input_batch_size, 100, 5)))
-    logger.info('providing maximum shape %s %s' % (max_data_shape, max_label_shape))
+    # produce shape max possible
+    data_names = ['data', 'im_info']
+    label_names = ['label', 'bbox_target', 'bbox_weight']
+    data_shapes = [('data', (batch_size, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE)),
+                   ('im_info', (batch_size, 3)),
+                   ('gt_boxes', (batch_size, 100, 5))]
+    label_shapes = [('label', (batch_size, 1, RPN_ANCHORS * IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE)),
+                    ('bbox_target', (batch_size, 4 * RPN_ANCHORS, IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE)),
+                    ('bbox_weight', (batch_size, 4 * RPN_ANCHORS, IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE))]
 
-    # infer shape
-    data_shape_dict = dict(train_data.provide_data + train_data.provide_label)
-    arg_shape, out_shape, aux_shape = sym.infer_shape(**data_shape_dict)
-    arg_shape_dict = dict(zip(sym.list_arguments(), arg_shape))
-    out_shape_dict = dict(zip(sym.list_outputs(), out_shape))
-    aux_shape_dict = dict(zip(sym.list_auxiliary_states(), aux_shape))
-    logger.info('output shape %s' % pprint.pformat(out_shape_dict))
+    # print shapes
+    data_shape_dict, out_shape_dict = infer_data_shape(sym, data_shapes + label_shapes)
+    logger.info('max input shape\n%s' % pprint.pformat(data_shape_dict))
+    logger.info('max output shape\n%s' % pprint.pformat(out_shape_dict))
 
     # load and initialize params
     if args.resume:
-        arg_params, aux_params = load_param(prefix, begin_epoch, convert=True)
+        arg_params, aux_params = load_param(prefix, begin_epoch)
     else:
-        arg_params, aux_params = load_param(pretrained, epoch, convert=True)
-        arg_params['rpn_conv_3x3_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_conv_3x3_weight'])
-        arg_params['rpn_conv_3x3_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_conv_3x3_bias'])
-        arg_params['rpn_cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_cls_score_weight'])
-        arg_params['rpn_cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_cls_score_bias'])
-        arg_params['rpn_bbox_pred_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['rpn_bbox_pred_weight'])
-        arg_params['rpn_bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['rpn_bbox_pred_bias'])
-        arg_params['cls_score_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['cls_score_weight'])
-        arg_params['cls_score_bias'] = mx.nd.zeros(shape=arg_shape_dict['cls_score_bias'])
-        arg_params['bbox_pred_weight'] = mx.random.normal(0, 0.001, shape=arg_shape_dict['bbox_pred_weight'])
-        arg_params['bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['bbox_pred_bias'])
+        arg_params, aux_params = load_param(pretrained, epoch)
+        arg_params, aux_params = initialize_frcnn(sym, data_shapes, arg_params, aux_params)
 
     # check parameter shapes
-    for k in sym.list_arguments():
-        if k in data_shape_dict:
-            continue
-        assert k in arg_params, k + ' not initialized'
-        assert arg_params[k].shape == arg_shape_dict[k], \
-            'shape inconsistent for ' + k + ' inferred ' + str(arg_shape_dict[k]) + ' provided ' + str(arg_params[k].shape)
-    for k in sym.list_auxiliary_states():
-        assert k in aux_params, k + ' not initialized'
-        assert aux_params[k].shape == aux_shape_dict[k], \
-            'shape inconsistent for ' + k + ' inferred ' + str(aux_shape_dict[k]) + ' provided ' + str(aux_params[k].shape)
+    check_shape(sym, data_shapes + label_shapes, arg_params, aux_params)
 
-    # create solver
-    fixed_param_prefix = config.FIXED_PARAMS
-    data_names = [k[0] for k in train_data.provide_data]
-    label_names = [k[0] for k in train_data.provide_label]
-    mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=args.work_load_list,
-                        max_data_shapes=max_data_shape, max_label_shapes=max_label_shape,
-                        fixed_param_prefix=fixed_param_prefix)
+    # check fixed params
+    fixed_param_names = get_fixed_params(sym, NET_FIXED_PARAM)
+    logger.info('locking params\n%s' % pprint.pformat(fixed_param_names))
 
-    # decide training params
     # metric
-    rpn_eval_metric = metric.RPNAccMetric()
-    rpn_cls_metric = metric.RPNLogLossMetric()
-    rpn_bbox_metric = metric.RPNL1LossMetric()
-    eval_metric = metric.RCNNAccMetric()
-    cls_metric = metric.RCNNLogLossMetric()
-    bbox_metric = metric.RCNNL1LossMetric()
+    rpn_eval_metric = RPNAccMetric()
+    rpn_cls_metric = RPNLogLossMetric()
+    rpn_bbox_metric = RPNL1LossMetric()
+    eval_metric = RCNNAccMetric()
+    cls_metric = RCNNLogLossMetric()
+    bbox_metric = RCNNL1LossMetric()
     eval_metrics = mx.metric.CompositeEvalMetric()
     for child_metric in [rpn_eval_metric, rpn_cls_metric, rpn_bbox_metric, eval_metric, cls_metric, bbox_metric]:
         eval_metrics.add(child_metric)
+
     # callback
     batch_end_callback = mx.callback.Speedometer(train_data.batch_size, frequent=args.frequent, auto_reset=False)
-    means = np.tile(np.array(config.TRAIN.BBOX_MEANS), config.NUM_CLASSES)
-    stds = np.tile(np.array(config.TRAIN.BBOX_STDS), config.NUM_CLASSES)
-    epoch_end_callback = callback.do_checkpoint(prefix, means, stds)
-    # decide learning rate
+    epoch_end_callback = mx.callback.do_checkpoint(prefix)
+
+    # learning schedule
     base_lr = lr
     lr_factor = 0.1
     lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
@@ -132,6 +128,10 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
                         'clip_gradient': 5}
 
     # train
+    mod = MutableModule(sym, data_names=data_names, label_names=label_names,
+                        logger=logger, context=ctx, work_load_list=args.work_load_list,
+                        max_data_shapes=data_shapes, max_label_shapes=label_shapes,
+                        fixed_param_names=fixed_param_names)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore=args.kvstore,
             optimizer='sgd', optimizer_params=optimizer_params,
@@ -171,6 +171,7 @@ def main():
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     train_net(args, ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
               lr=args.lr, lr_step=args.lr_step)
+
 
 if __name__ == '__main__':
     main()

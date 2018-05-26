@@ -23,11 +23,11 @@ class MutableModule(BaseModule):
     work_load_list : list of number
     max_data_shapes : list of (name, shape) tuple, designating inputs whose shape vary
     max_label_shapes : list of (name, shape) tuple, designating inputs whose shape vary
-    fixed_param_prefix : list of str, indicating fixed parameters
+    fixed_param_names : list of str, indicating fixed parameters
     """
     def __init__(self, symbol, data_names, label_names,
                  logger=logging, context=ctx.cpu(), work_load_list=None,
-                 max_data_shapes=None, max_label_shapes=None, fixed_param_prefix=None):
+                 max_data_shapes=None, max_label_shapes=None, fixed_param_names=None):
         super(MutableModule, self).__init__(logger=logger)
         self._symbol = symbol
         self._data_names = data_names
@@ -36,16 +36,8 @@ class MutableModule(BaseModule):
         self._work_load_list = work_load_list
 
         self._curr_module = None
-        self._max_data_shapes = max_data_shapes
-        self._max_label_shapes = max_label_shapes
-        self._fixed_param_prefix = fixed_param_prefix
-
-        fixed_param_names = list()
-        if fixed_param_prefix is not None:
-            for name in self._symbol.list_arguments():
-                for prefix in self._fixed_param_prefix:
-                    if prefix in name:
-                        fixed_param_names.append(name)
+        self._max_data_shapes = {} if max_data_shapes is None else dict(max_data_shapes)
+        self._max_label_shapes = {} if max_label_shapes is None else dict(max_label_shapes)
         self._fixed_param_names = fixed_param_names
 
     def _reset_bind(self):
@@ -116,28 +108,28 @@ class MutableModule(BaseModule):
         if self._max_label_shapes is not None:
             max_shapes_dict.update(dict(self._max_label_shapes))
 
-        max_data_shapes = list()
-        for name, shape in data_shapes:
-            if name in max_shapes_dict:
-                max_data_shapes.append((name, max_shapes_dict[name]))
-            else:
-                max_data_shapes.append((name, shape))
-
-        max_label_shapes = list()
-        if label_shapes is not None:
-            for name, shape in label_shapes:
-                if name in max_shapes_dict:
-                    max_label_shapes.append((name, max_shapes_dict[name]))
+        if data_shapes is not None:
+            data_shape_list = data_shapes
+            for name, shape in data_shapes:
+                if name in self._max_data_shapes:
+                    data_shape_list.append((name, self._max_data_shapes[name]))
                 else:
-                    max_label_shapes.append((name, shape))
+                    data_shape_list.append((name, shape))
+            data_shapes = data_shape_list
 
-        if len(max_label_shapes) == 0:
-            max_label_shapes = None
+        if label_shapes is not None:
+            label_shape_list = label_shapes
+            for name, shape in label_shapes:
+                if name in self._max_label_shapes:
+                    label_shape_list.append((name, self._max_label_shapes[name]))
+                else:
+                    label_shape_list.append((name, shape))
+            label_shapes = label_shape_list
 
         module = Module(self._symbol, self._data_names, self._label_names, logger=self.logger,
                         context=self._context, work_load_list=self._work_load_list,
                         fixed_param_names=self._fixed_param_names)
-        module.bind(max_data_shapes, max_label_shapes, for_training, inputs_need_grad,
+        module.bind(data_shapes, label_shapes, for_training, inputs_need_grad,
                     force_rebind=False, shared_module=None)
         self._curr_module = module
 
@@ -210,6 +202,5 @@ class MutableModule(BaseModule):
         self._curr_module.update_metric(eval_metric, labels)
 
     def install_monitor(self, mon):
-        """ Install monitor on all executors """
         assert self.binded
         self._curr_module.install_monitor(mon)
