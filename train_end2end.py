@@ -67,14 +67,16 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
                               anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECT_GROUPING)
 
     # produce shape max possible
+    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE))
+    FEAT_HEIGHT, FEAT_WIDTH = out_shape[0][-2:]
     data_names = ['data', 'im_info']
     label_names = ['label', 'bbox_target', 'bbox_weight']
     data_shapes = [('data', (batch_size, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE)),
                    ('im_info', (batch_size, 3)),
                    ('gt_boxes', (batch_size, 100, 5))]
-    label_shapes = [('label', (batch_size, 1, RPN_ANCHORS * IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE)),
-                    ('bbox_target', (batch_size, 4 * RPN_ANCHORS, IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE)),
-                    ('bbox_weight', (batch_size, 4 * RPN_ANCHORS, IMG_SHORT_SIDE // RPN_FEAT_STRIDE, IMG_LONG_SIDE // RPN_FEAT_STRIDE))]
+    label_shapes = [('label', (batch_size, 1, RPN_ANCHORS * FEAT_HEIGHT, FEAT_WIDTH)),
+                    ('bbox_target', (batch_size, 4 * RPN_ANCHORS, FEAT_HEIGHT, FEAT_WIDTH)),
+                    ('bbox_weight', (batch_size, 4 * RPN_ANCHORS, FEAT_HEIGHT, FEAT_WIDTH))]
 
     # print shapes
     data_shape_dict, out_shape_dict = infer_data_shape(sym, data_shapes + label_shapes)
