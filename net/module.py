@@ -103,7 +103,7 @@ class MutableModule(BaseModule):
         self.binded = True
 
         if data_shapes is not None:
-            data_shape_list = data_shapes
+            data_shape_list = list()
             for name, shape in data_shapes:
                 if name in self._max_data_shapes:
                     data_shape_list.append((name, self._max_data_shapes[name]))
@@ -112,7 +112,7 @@ class MutableModule(BaseModule):
             data_shapes = data_shape_list
 
         if label_shapes is not None:
-            label_shape_list = label_shapes
+            label_shape_list = list()
             for name, shape in label_shapes:
                 if name in self._max_label_shapes:
                     label_shape_list.append((name, self._max_label_shapes[name]))

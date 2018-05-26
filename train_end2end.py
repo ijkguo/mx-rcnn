@@ -69,7 +69,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     # produce shape max possible
     _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE))
     FEAT_HEIGHT, FEAT_WIDTH = out_shape[0][-2:]
-    data_names = ['data', 'im_info']
+    data_names = ['data', 'im_info', 'gt_boxes']
     label_names = ['label', 'bbox_target', 'bbox_weight']
     data_shapes = [('data', (batch_size, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE)),
                    ('im_info', (batch_size, 3)),
