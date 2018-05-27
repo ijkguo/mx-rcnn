@@ -17,7 +17,7 @@ import numpy.random as npr
 
 from ..config import config
 from ..io.image import get_image, tensor_vstack
-from ..processing.bbox_transform import bbox_overlaps, bbox_transform
+from data.np_bbox import bbox_overlaps, bbox_transform
 from ..processing.bbox_regression import expand_bbox_regression_targets
 
 

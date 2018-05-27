@@ -7,8 +7,7 @@ from builtins import range
 from rcnn.logger import logger
 from rcnn.config import config
 from rcnn.io import image
-from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
-from rcnn.processing.nms import py_nms_wrapper
+from data.np_bbox import bbox_pred, clip_boxes, nms
 
 
 def im_proposal(predictor, data_batch, data_names, scale):
@@ -126,8 +125,6 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
     assert vis or not test_data.shuffle
     data_names = [k[0] for k in test_data.provide_data]
 
-    nms = py_nms_wrapper(config.TEST.NMS)
-
     # limit detections to max_per_image over all classes
     max_per_image = -1
 
@@ -155,7 +152,7 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
             cls_scores = scores[indexes, j, np.newaxis]
             cls_boxes = boxes[indexes, j * 4:(j + 1) * 4]
             cls_dets = np.hstack((cls_boxes, cls_scores))
-            keep = nms(cls_dets)
+            keep = nms(cls_dets, thresh=config.TEST.NMS)
             all_boxes[j][i] = cls_dets[keep, :]
 
         if max_per_image > 0:

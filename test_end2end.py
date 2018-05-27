@@ -108,8 +108,7 @@ class TestLoader(mx.io.DataIter):
 def im_detect(rois, scores, bbox_deltas, im_info,
               bbox_stds, nms_thresh, conf_thresh):
     """rois (nroi, 4), scores (nrois, nclasses), bbox_deltas (nrois, 4 * nclasses), im_info (3)"""
-    from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
-    from rcnn.processing.nms import py_nms_wrapper
+    from data.np_bbox import bbox_pred, clip_boxes, nms
 
     rois = rois.asnumpy()
     scores = scores.asnumpy()
@@ -126,15 +125,13 @@ def im_detect(rois, scores, bbox_deltas, im_info,
     pred_boxes = pred_boxes / scale
 
     # convert to per class detection results
-    nms = py_nms_wrapper(nms_thresh)
-
     det = []
     for j in range(1, scores.shape[-1]):
         indexes = np.where(scores[:, j] > conf_thresh)[0]
         cls_scores = scores[indexes, j, np.newaxis]
         cls_boxes = pred_boxes[indexes, j * 4:(j + 1) * 4]
         cls_dets = np.hstack((cls_boxes, cls_scores))
-        keep = nms(cls_dets)
+        keep = nms(cls_dets, thresh=nms_thresh)
 
         cls_id = np.ones_like(cls_scores) * j
         det.append(np.hstack((cls_id, cls_scores, cls_boxes))[keep, :])

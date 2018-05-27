@@ -16,7 +16,7 @@ try:
 except ImportError:
     import pickle
 import numpy as np
-from ..processing.bbox_transform import bbox_overlaps
+from data.np_bbox import bbox_overlaps
 
 
 class IMDB(object):

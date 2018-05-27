@@ -18,7 +18,7 @@ from ..logger import logger
 from ..config import config
 from .image import get_image, tensor_vstack
 from ..processing.generate_anchor import generate_anchors
-from ..processing.bbox_transform import bbox_overlaps, bbox_transform
+from data.np_bbox import bbox_overlaps, bbox_transform
 
 
 def get_rpn_testbatch(roidb):

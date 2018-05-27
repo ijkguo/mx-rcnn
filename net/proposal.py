@@ -9,9 +9,8 @@ import numpy.random as npr
 from distutils.util import strtobool
 
 from rcnn.logger import logger
-from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
+from data.np_bbox import bbox_pred, clip_boxes, nms
 from rcnn.processing.generate_anchor import generate_anchors
-from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 
 class ProposalOperator(mx.operator.CustomOp):
@@ -33,8 +32,6 @@ class ProposalOperator(mx.operator.CustomOp):
         logger.debug('anchors:\n%s' % self._anchors)
 
     def forward(self, is_train, req, in_data, out_data, aux):
-        nms = gpu_nms_wrapper(self._threshold, in_data[0].context.device_id)
-
         batch_size = in_data[0].shape[0]
         if batch_size > 1:
             raise ValueError("Sorry, multiple images each device is not implemented")
@@ -128,7 +125,7 @@ class ProposalOperator(mx.operator.CustomOp):
         # 7. take after_nms_topN (e.g. 300)
         # 8. return the top proposals (-> RoIs top)
         det = np.hstack((proposals, scores)).astype(np.float32)
-        keep = nms(det)
+        keep = nms(det, thresh=self._threshold)
         if post_nms_topN > 0:
             keep = keep[:post_nms_topN]
         # pad to ensure output size remains unchanged

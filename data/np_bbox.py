@@ -1,12 +1,7 @@
 import numpy as np
-# from ..cython.bbox import bbox_overlaps_cython
 
 
 def bbox_overlaps(boxes, query_boxes):
-    return bbox_overlaps_py(boxes, query_boxes)
-
-
-def bbox_overlaps_py(boxes, query_boxes):
     """
     determine overlaps between boxes and query_boxes
     :param boxes: n * 4 bounding boxes
@@ -47,7 +42,7 @@ def clip_boxes(boxes, im_shape):
     return boxes
 
 
-def bbox_transform(ex_rois, gt_rois):
+def bbox_transform(ex_rois, gt_rois, box_stds):
     """
     compute bounding box regression targets from ex_rois to gt_rois
     :param ex_rois: [N, 4]
@@ -66,13 +61,12 @@ def bbox_transform(ex_rois, gt_rois):
     gt_ctr_x = gt_rois[:, 0] + 0.5 * (gt_widths - 1.0)
     gt_ctr_y = gt_rois[:, 1] + 0.5 * (gt_heights - 1.0)
 
-    targets_dx = (gt_ctr_x - ex_ctr_x) / (ex_widths + 1e-14)
-    targets_dy = (gt_ctr_y - ex_ctr_y) / (ex_heights + 1e-14)
-    targets_dw = np.log(gt_widths / ex_widths)
-    targets_dh = np.log(gt_heights / ex_heights)
+    targets_dx = (gt_ctr_x - ex_ctr_x) / (ex_widths + 1e-14) / box_stds[0]
+    targets_dy = (gt_ctr_y - ex_ctr_y) / (ex_heights + 1e-14) / box_stds[1]
+    targets_dw = np.log(gt_widths / ex_widths) / box_stds[2]
+    targets_dh = np.log(gt_heights / ex_heights) / box_stds[3]
 
-    targets = np.vstack(
-        (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
+    targets = np.vstack((targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
     return targets
 
 
@@ -87,7 +81,6 @@ def bbox_pred(boxes, box_deltas, box_stds):
     if boxes.shape[0] == 0:
         return np.zeros((0, box_deltas.shape[1]))
 
-    boxes = boxes.astype(np.float, copy=False)
     widths = boxes[:, 2] - boxes[:, 0] + 1.0
     heights = boxes[:, 3] - boxes[:, 1] + 1.0
     ctr_x = boxes[:, 0] + 0.5 * (widths - 1.0)
@@ -114,3 +107,40 @@ def bbox_pred(boxes, box_deltas, box_stds):
     pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * (pred_h - 1.0)
 
     return pred_boxes
+
+
+def nms(dets, thresh):
+    """
+    greedily select boxes with high confidence and overlap with current maximum <= thresh
+    rule out overlap >= thresh
+    :param dets: [[x1, y1, x2, y2 score]]
+    :param thresh: retain overlap < thresh
+    :return: indexes to keep
+    """
+    x1 = dets[:, 0]
+    y1 = dets[:, 1]
+    x2 = dets[:, 2]
+    y2 = dets[:, 3]
+    scores = dets[:, 4]
+
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    order = scores.argsort()[::-1]
+
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1 + 1)
+        h = np.maximum(0.0, yy2 - yy1 + 1)
+        inter = w * h
+        ovr = inter / (areas[i] + areas[order[1:]] - inter)
+
+        inds = np.where(ovr <= thresh)[0]
+        order = order[inds + 1]
+
+    return keep
