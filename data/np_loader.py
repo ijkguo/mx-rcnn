@@ -73,7 +73,9 @@ class TestLoader(mx.io.DataIter):
             im_tensor, im_info, gt_boxes = get_image(roi_rec, self._short, self._max_size, self._mean, self._std)
             im_tensorl.append(im_tensor)
             im_infol.append(im_info)
-        self._data = mx.nd.array(tensor_vstack(im_tensorl)), mx.nd.array(tensor_vstack(im_infol))
+        im_tensor = mx.nd.array(tensor_vstack(im_tensorl, pad=0))
+        im_info = mx.nd.array(tensor_vstack(im_infol, pad=0))
+        self._data = im_tensor, im_info
         return self._data
 
     def getlabel(self):

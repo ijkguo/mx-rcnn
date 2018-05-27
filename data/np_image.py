@@ -15,7 +15,7 @@ def get_image(roi_rec, short, max_size, mean, std):
         im = im[:, ::-1, :]
     im, im_scale = resize(im, short, max_size)
     height, width = im.shape[:2]
-    im_info = np.array([[height, width, im_scale]], dtype=np.float32)
+    im_info = np.array([height, width, im_scale], dtype=np.float32)
     im_tensor = transform(im, mean, std)
 
     # gt boxes: (x1, y1, x2, y2, cls)
@@ -68,9 +68,9 @@ def transform(im, mean, std):
     :param std: [RGB pixel std var]
     :return: [batch, channel, height, width]
     """
-    im_tensor = np.zeros((1, 3, im.shape[0], im.shape[1]))
+    im_tensor = np.zeros((3, im.shape[0], im.shape[1]))
     for i in range(3):
-        im_tensor[0, i, :, :] = (im[:, :, 2 - i] - mean[i]) / std[i]
+        im_tensor[i, :, :] = (im[:, :, 2 - i] - mean[i]) / std[i]
     return im_tensor
 
 
@@ -84,8 +84,7 @@ def transform_inverse(im_tensor, mean, std):
     :return: im [height, width, channel(RGB)]
     """
     assert im_tensor.shape[0] == 1 and im_tensor.shape[1] == 3
-    im_tensor = im_tensor.transpose((0, 2, 3, 1))
-    im = im_tensor[0]
+    im = im_tensor.transpose((1, 2, 0))
     im = im * std + mean
     im = im.astype(np.uint8)
     return im
@@ -93,19 +92,16 @@ def transform_inverse(im_tensor, mean, std):
 
 def tensor_vstack(tensor_list, pad=0):
     """
-    vertically stack tensors
+    vertically stack tensors by adding a new axis
     :param tensor_list: list of tensor to be stacked vertically
     :param pad: label to pad with
     :return: tensor with max shape
     """
+    dimensions = [len(tensor_list)]
     ndim = len(tensor_list[0].shape)
-    dtype = tensor_list[0].dtype
-    islice = tensor_list[0].shape[0]
-    dimensions = []
-    first_dim = sum([tensor.shape[0] for tensor in tensor_list])
-    dimensions.append(first_dim)
-    for dim in range(1, ndim):
+    for dim in range(ndim):
         dimensions.append(max([tensor.shape[dim] for tensor in tensor_list]))
+    dtype = tensor_list[0].dtype
     if pad == 0:
         all_tensor = np.zeros(tuple(dimensions), dtype=dtype)
     elif pad == 1:
@@ -114,16 +110,13 @@ def tensor_vstack(tensor_list, pad=0):
         all_tensor = np.full(tuple(dimensions), pad, dtype=dtype)
     if ndim == 1:
         for ind, tensor in enumerate(tensor_list):
-            all_tensor[ind*islice:(ind+1)*islice] = tensor
+            all_tensor[ind, :tensor.shape[0]] = tensor
     elif ndim == 2:
         for ind, tensor in enumerate(tensor_list):
-            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1]] = tensor
+            all_tensor[ind, :tensor.shape[0], :tensor.shape[1]] = tensor
     elif ndim == 3:
         for ind, tensor in enumerate(tensor_list):
-            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1], :tensor.shape[2]] = tensor
-    elif ndim == 4:
-        for ind, tensor in enumerate(tensor_list):
-            all_tensor[ind*islice:(ind+1)*islice, :tensor.shape[1], :tensor.shape[2], :tensor.shape[3]] = tensor
+            all_tensor[ind, :tensor.shape[0], :tensor.shape[1], :tensor.shape[2]] = tensor
     else:
         raise Exception('Sorry, unimplemented.')
     return all_tensor
