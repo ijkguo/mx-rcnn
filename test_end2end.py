@@ -3,13 +3,13 @@ import argparse
 import mxnet as mx
 import numpy as np
 
+from data.np_bbox import im_detect
+from data.np_loader import TestLoader
 from net.model import get_net
 from net.symbol_resnet import get_resnet_test
 
 from rcnn.logger import logger
 from rcnn.dataset import PascalVOC
-from rcnn.io.image import get_image
-
 
 IMG_SHORT_SIDE = 600
 IMG_LONG_SIDE = 1000
@@ -32,113 +32,6 @@ RCNN_BATCH_SIZE = 1
 RCNN_BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
 RCNN_CONF_THRESH = 1e-3
 RCNN_NMS_THRESH = 0.3
-
-
-class TestLoader(mx.io.DataIter):
-    def __init__(self, roidb, batch_size=1):
-        super(TestLoader, self).__init__()
-
-        # save parameters as properties
-        self.roidb = roidb
-        self.batch_size = batch_size
-
-        # infer properties from roidb
-        self.size = len(self.roidb)
-        self.index = np.arange(self.size)
-
-        # decide data and label names (only for training)
-        self.data_name = ['data', 'im_info']
-        self.label_name = None
-
-        # status variable for synchronization between get_data and get_label
-        self.cur = 0
-        self.data = None
-        self.label = None
-
-        # get first batch to fill in provide_data and provide_label
-        self.get_batch()
-        self.reset()
-
-    @property
-    def provide_data(self):
-        return [(k, v.shape) for k, v in zip(self.data_name, self.data)]
-
-    @property
-    def provide_label(self):
-        return None
-
-    def reset(self):
-        self.cur = 0
-
-    def iter_next(self):
-        return self.cur + self.batch_size <= self.size
-
-    def next(self):
-        if self.iter_next():
-            self.get_batch()
-            self.cur += self.batch_size
-            return mx.io.DataBatch(data=self.data, label=self.label,
-                                   pad=self.getpad(), index=self.getindex(),
-                                   provide_data=self.provide_data, provide_label=self.provide_label)
-        else:
-            raise StopIteration
-
-    def getindex(self):
-        return self.cur / self.batch_size
-
-    def getpad(self):
-        if self.cur + self.batch_size > self.size:
-            return self.cur + self.batch_size - self.size
-        else:
-            return 0
-
-    def get_batch(self):
-        cur_from = self.cur
-        cur_to = min(cur_from + self.batch_size, self.size)
-
-        roidb = [self.roidb[self.index[i]] for i in range(cur_from, cur_to)]
-        imgs, roidb = get_image(roidb)
-        im_array = imgs[0]
-        im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
-        data = {'data': im_array, 'im_info': im_info}
-
-        self.data = [mx.nd.array(data[name]) for name in self.data_name]
-
-
-def im_detect(rois, scores, bbox_deltas, im_info,
-              bbox_stds, nms_thresh, conf_thresh):
-    """rois (nroi, 4), scores (nrois, nclasses), bbox_deltas (nrois, 4 * nclasses), im_info (3)"""
-    from data.np_bbox import bbox_pred, clip_boxes, nms
-
-    rois = rois.asnumpy()
-    scores = scores.asnumpy()
-    bbox_deltas = bbox_deltas.asnumpy()
-
-    im_info = im_info.asnumpy()
-    height, width, scale = im_info
-
-    # post processing
-    pred_boxes = bbox_pred(rois, bbox_deltas, bbox_stds)
-    pred_boxes = clip_boxes(pred_boxes, (height, width))
-
-    # we used scaled image & roi to train, so it is necessary to transform them back
-    pred_boxes = pred_boxes / scale
-
-    # convert to per class detection results
-    det = []
-    for j in range(1, scores.shape[-1]):
-        indexes = np.where(scores[:, j] > conf_thresh)[0]
-        cls_scores = scores[indexes, j, np.newaxis]
-        cls_boxes = pred_boxes[indexes, j * 4:(j + 1) * 4]
-        cls_dets = np.hstack((cls_boxes, cls_scores))
-        keep = nms(cls_dets, thresh=nms_thresh)
-
-        cls_id = np.ones_like(cls_scores) * j
-        det.append(np.hstack((cls_id, cls_scores, cls_boxes))[keep, :])
-
-    # assemble all classes
-    det = np.concatenate(det, axis=0)
-    return det
 
 
 def parse_args():
