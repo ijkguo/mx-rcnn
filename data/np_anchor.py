@@ -96,6 +96,10 @@ class AnchorSampler:
     def assign(self, anchors, gt_boxes, im_height, im_width):
         num_anchors = anchors.shape[0]
 
+        # filter out padded gt_boxes
+        valid_labels = np.where(gt_boxes[:, -1] > 0)[0]
+        gt_boxes = gt_boxes[valid_labels]
+
         # filter out anchors outside the region
         inds_inside = np.where((anchors[:, 0] >= -self._allowed_border) &
                                (anchors[:, 2] < im_width + self._allowed_border) &
