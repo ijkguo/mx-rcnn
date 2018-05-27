@@ -1,3 +1,4 @@
+import mxnet as mx
 import numpy as np
 import cv2
 
@@ -29,7 +30,7 @@ def get_image(roi_rec, short, max_size, mean, std):
     else:
         gt_boxes = np.empty((0, 5), dtype=np.float32)
 
-    return im_tensor, im_info, gt_boxes
+    return im_tensor, mx.nd.array(im_info), mx.nd.array(gt_boxes)
 
 
 def imdecode(image_path):
