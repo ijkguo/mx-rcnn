@@ -164,10 +164,7 @@ def sample_rois(rois, fg_rois_per_image, rois_per_image, num_classes,
     if bbox_targets is not None:
         bbox_target_data = bbox_targets[keep_indexes, :]
     else:
-        targets = bbox_transform(rois[:, 1:], gt_boxes[gt_assignment[keep_indexes], :4])
-        if config.TRAIN.BBOX_NORMALIZATION_PRECOMPUTED:
-            targets = ((targets - np.array(config.TRAIN.BBOX_MEANS))
-                       / np.array(config.TRAIN.BBOX_STDS))
+        targets = bbox_transform(rois[:, 1:], gt_boxes[gt_assignment[keep_indexes], :4], box_stds=config.TRAIN.BBOX_STDS)
         bbox_target_data = np.hstack((labels[:, np.newaxis], targets))
 
     bbox_targets, bbox_weights = \
