@@ -96,14 +96,18 @@ class AnchorSampler:
     def assign(self, anchors, gt_boxes, im_height, im_width):
         num_anchors = anchors.shape[0]
 
-        # label: 1 is positive, 0 is negative, -1 is dont care
-        labels = np.ones((num_anchors,), dtype=np.float32) * -1
-        bbox_targets = np.zeros((num_anchors, 4), dtype=np.float32)
-        bbox_weights = np.zeros((num_anchors, 4), dtype=np.float32)
+        # filter out anchors outside the region
+        inds_inside = np.where((anchors[:, 0] >= -self._allowed_border) &
+                               (anchors[:, 2] < im_width + self._allowed_border) &
+                               (anchors[:, 1] >= -self._allowed_border) &
+                               (anchors[:, 3] < im_height + self._allowed_border))[0]
+        anchors = anchors[inds_inside, :]
+        num_valid = len(inds_inside)
 
-        # the following
-        ind_mask = ((anchors[:, 0] >= -self._allowed_border) & (anchors[:, 2] < im_width + self._allowed_border) &
-                    (anchors[:, 1] >= -self._allowed_border) & (anchors[:, 3] < im_height + self._allowed_border))
+        # label: 1 is positive, 0 is negative, -1 is dont care
+        labels = np.ones((num_valid,), dtype=np.float32) * -1
+        bbox_targets = np.zeros((num_valid, 4), dtype=np.float32)
+        bbox_weights = np.zeros((num_valid, 4), dtype=np.float32)
 
         # sample for positive labels
         if gt_boxes.size > 0:
@@ -113,14 +117,14 @@ class AnchorSampler:
             gt_max_overlaps = overlaps.max(axis=0)
 
             # fg anchors: anchor with highest overlap for each gt; or overlap > iou thresh
-            fg_inds = np.where(ind_mask & ((overlaps >= self._fg_overlap) | (overlaps == gt_max_overlaps)))[0]
+            fg_inds = np.where((overlaps >= self._fg_overlap) | (overlaps == gt_max_overlaps))[0]
 
             # subsample to num_fg
             if len(fg_inds) > self._num_fg:
                 fg_inds = np.random.choice(fg_inds, size=self._num_fg, replace=False)
 
             # bg anchor: anchor with overlap < iou thresh but not highest overlap for some gt
-            bg_inds = np.where(ind_mask & (overlaps < self._bg_overlap) & (overlaps < gt_max_overlaps))[0]
+            bg_inds = np.where((overlaps < self._bg_overlap) & (overlaps < gt_max_overlaps))[0]
 
             if len(bg_inds) > self._num_batch - len(fg_inds):
                 bg_inds = np.random.choice(bg_inds, size=self._num_batch - len(fg_inds), replace=False)
@@ -131,13 +135,21 @@ class AnchorSampler:
 
             # assign to argmax overlap
             argmax_overlaps = overlaps.argmax(axis=1)
-            bbox_targets[fg_inds, :] = bbox_transform(anchors[fg_inds, :], gt_boxes[argmax_overlaps[fg_inds], :])
+            bbox_targets[fg_inds, :] = bbox_transform(anchors[fg_inds, :], gt_boxes[argmax_overlaps[fg_inds], :],
+                                                      box_stds=(1.0, 1.0, 1.0, 1.0))
 
             # only fg anchors has bbox_targets
             bbox_weights[fg_inds, :] = 1
         else:
             # randomly draw bg anchors
-            bg_inds = np.random.choice(np.where(ind_mask)[0], size=self._num_batch, replace=False)
+            bg_inds = np.random.choice(np.arange(num_valid)[0], size=self._num_batch, replace=False)
             labels[bg_inds] = 0
 
-        return labels, bbox_targets, bbox_weights
+        all_labels = np.ones((num_anchors,), dtype=np.float32) * -1
+        all_labels[inds_inside] = labels
+        all_bbox_targets = np.zeros((num_anchors, 4), dtype=np.float32)
+        all_bbox_targets[inds_inside, :] = bbox_targets
+        all_bbox_weights = np.zeros((num_anchors, 4), dtype=np.float32)
+        all_bbox_weights[inds_inside, :] = bbox_weights
+
+        return all_labels, all_bbox_targets, all_bbox_weights
