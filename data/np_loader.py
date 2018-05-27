@@ -1,7 +1,7 @@
 import mxnet as mx
 import numpy as np
 
-from rcnn.io.image import get_image
+from data.np_image import get_image, tensor_vstack
 
 
 def generate_batch(im_tensor, im_info):
@@ -13,71 +13,75 @@ def generate_batch(im_tensor, im_info):
 
 
 class TestLoader(mx.io.DataIter):
-    def __init__(self, roidb, batch_size=1):
+    def __init__(self, roidb, batch_size, short, max_size, mean, std):
         super(TestLoader, self).__init__()
 
         # save parameters as properties
-        self.roidb = roidb
-        self.batch_size = batch_size
+        self._roidb = roidb
+        self._batch_size = batch_size
+        self._short = short
+        self._max_size = max_size
+        self._mean = mean
+        self._std = std
 
         # infer properties from roidb
-        self.size = len(self.roidb)
-        self.index = np.arange(self.size)
+        self._size = len(self._roidb)
+        self._index = np.arange(self._size)
 
         # decide data and label names (only for training)
-        self.data_name = ['data', 'im_info']
-        self.label_name = None
+        self._data_name = ['data', 'im_info']
+        self._label_name = None
 
-        # status variable for synchronization between get_data and get_label
-        self.cur = 0
-        self.data = None
-        self.label = None
+        # status variable
+        self._cur = 0
+        self._data = None
+        self._label = None
 
         # get first batch to fill in provide_data and provide_label
-        self.get_batch()
+        self.next()
         self.reset()
 
     @property
     def provide_data(self):
-        return [(k, v.shape) for k, v in zip(self.data_name, self.data)]
+        return [(k, v.shape) for k, v in zip(self._data_name, self._data)]
 
     @property
     def provide_label(self):
         return None
 
     def reset(self):
-        self.cur = 0
+        self._cur = 0
 
     def iter_next(self):
-        return self.cur + self.batch_size <= self.size
+        return self._cur + self._batch_size <= self._size
 
     def next(self):
         if self.iter_next():
-            self.get_batch()
-            self.cur += self.batch_size
-            return mx.io.DataBatch(data=self.data, label=self.label,
-                                   pad=self.getpad(), index=self.getindex(),
-                                   provide_data=self.provide_data, provide_label=self.provide_label)
+            data_batch = mx.io.DataBatch(data=self.getdata(), label=self.getlabel(),
+                                         pad=self.getpad(), index=self.getindex(),
+                                         provide_data=self.provide_data, provide_label=self.provide_label)
+            self._cur += self._batch_size
+            return data_batch
         else:
             raise StopIteration
 
+    def getdata(self):
+        indices = self.getindex()
+        im_tensorl, im_infol = [], []
+        for index in indices:
+            roi_rec = self._roidb[index]
+            im_tensor, im_info, gt_boxes = get_image(roi_rec, self._short, self._max_size, self._mean, self._std)
+            im_tensorl.append(im_tensor)
+            im_infol.append(im_info)
+        return tensor_vstack(im_tensorl), tensor_vstack(im_infol)
+
+    def getlabel(self):
+        return None
+
     def getindex(self):
-        return self.cur / self.batch_size
+        cur_from = self._cur
+        cur_to = min(cur_from + self._batch_size, self._size)
+        return np.arange(cur_from, cur_to)
 
     def getpad(self):
-        if self.cur + self.batch_size > self.size:
-            return self.cur + self.batch_size - self.size
-        else:
-            return 0
-
-    def get_batch(self):
-        cur_from = self.cur
-        cur_to = min(cur_from + self.batch_size, self.size)
-
-        roidb = [self.roidb[self.index[i]] for i in range(cur_from, cur_to)]
-        imgs, roidb = get_image(roidb)
-        im_array = imgs[0]
-        im_info = np.array([roidb[0]['im_info']], dtype=np.float32)
-        data = {'data': im_array, 'im_info': im_info}
-
-        self.data = [mx.nd.array(data[name]) for name in self.data_name]
+        return max(self._cur + self.batch_size - self._size, 0)
