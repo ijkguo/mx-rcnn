@@ -116,7 +116,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         eval_metrics.add(child_metric)
 
     # callback
-    batch_end_callback = mx.callback.Speedometer(train_data.batch_size, frequent=args.frequent, auto_reset=False)
+    batch_end_callback = mx.callback.Speedometer(batch_size, frequent=args.frequent, auto_reset=False)
     epoch_end_callback = mx.callback.do_checkpoint(prefix)
 
     # learning schedule
