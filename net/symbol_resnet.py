@@ -69,7 +69,7 @@ def get_resnet_top_feature(data):
 def get_resnet_train(num_anchors, anchor_scales, anchor_ratios,
                      rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size, rpn_batch_rois,
                      num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
-                     rcnn_batch_rois, rcnn_fg_fraction):
+                     rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds):
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
     gt_boxes = mx.symbol.Variable(name="gt_boxes")
@@ -111,10 +111,10 @@ def get_resnet_train(num_anchors, anchor_scales, anchor_ratios,
         threshold=rpn_nms_thresh, rpn_min_size=rpn_min_size)
 
     # rcnn roi proposal target
-    gt_boxes_reshape = mx.symbol.Reshape(data=gt_boxes, shape=(-1, 5), name='gt_boxes_reshape')
-    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes_reshape, op_type='proposal_target',
+    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes, op_type='proposal_target',
                              num_classes=num_classes, batch_images=rcnn_batch_size,
-                             batch_rois=rcnn_batch_rois, fg_fraction=rcnn_fg_fraction)
+                             batch_rois=rcnn_batch_rois, fg_fraction=rcnn_fg_fraction,
+                             fg_overlap=rcnn_fg_overlap, box_stds=rcnn_bbox_stds)
     rois = group[0]
     label = group[1]
     bbox_target = group[2]
