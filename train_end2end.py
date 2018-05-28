@@ -3,12 +3,12 @@ import pprint
 
 import mxnet as mx
 
+from data.np_loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from net.module import MutableModule
 from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 from rcnn.logger import logger
 from rcnn.config import config, default
-from rcnn.core.loader import AnchorLoader
 from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
 from net.symbol_resnet import get_resnet_train
 
@@ -28,6 +28,10 @@ RPN_POST_NMS_TOP_N = 2000
 RPN_NMS_THRESH = 0.7
 RPN_MIN_SIZE = 16
 RPN_BATCH_ROIS = 256
+RPN_ALLOWED_BORDER = 0
+RPN_FG_FRACTION = 0.5
+RPN_FG_OVERLAP = 0.7
+RPN_BG_OVERLAP = 0.3
 
 RCNN_CLASSES = 21
 RCNN_FEAT_STRIDE = 16
@@ -61,10 +65,11 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     roidb = filter_roidb(roidb)
 
     # load training data
-    train_data = AnchorLoader(feat_sym, roidb, batch_size=batch_size, shuffle=not args.no_shuffle,
-                              ctx=ctx, work_load_list=args.work_load_list,
-                              feat_stride=config.RPN_FEAT_STRIDE, anchor_scales=config.ANCHOR_SCALES,
-                              anchor_ratios=config.ANCHOR_RATIOS, aspect_grouping=config.TRAIN.ASPECT_GROUPING)
+    ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
+    asp = AnchorSampler(allowed_border=RPN_ALLOWED_BORDER, batch_rois=RPN_BATCH_ROIS,
+                        fg_fraction=RPN_FG_FRACTION, fg_overlap=RPN_FG_OVERLAP)
+    train_data = AnchorLoader(roidb, batch_size, IMG_SHORT_SIDE, IMG_LONG_SIDE, IMG_PIXEL_MEANS, IMG_PIXEL_STDS,
+                              feat_sym, ag, asp, shuffle=not args.no_shuffle)
 
     # produce shape max possible
     _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE))
