@@ -102,7 +102,7 @@ class ProposalTargetOperator(mx.operator.CustomOp):
                             fg_rois_per_image=self._fg_rois_per_image, fg_overlap=self._fg_overlap, box_stds=self._box_stds)
 
             rois = np.vstack((rois, b_rois))
-            labels = np.vstack((labels, b_labels))
+            labels = np.hstack((labels, b_labels))
             bbox_targets = np.vstack((bbox_targets, b_bbox_targets))
             bbox_weights = np.vstack((bbox_weights, b_bbox_weights))
 
