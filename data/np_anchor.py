@@ -117,7 +117,7 @@ class AnchorSampler:
         if gt_boxes.size > 0:
             # overlap between the anchors and the gt boxes
             # overlaps (ex, gt)
-            overlaps = bbox_overlaps(anchors.astype(np.float32), gt_boxes.astype(np.float32))
+            overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes.astype(np.float))
             gt_max_overlaps = overlaps.max(axis=0)
 
             # fg anchors: anchor with highest overlap for each gt; or overlap > iou thresh

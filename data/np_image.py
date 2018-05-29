@@ -93,14 +93,19 @@ def transform_inverse(im_tensor, mean, std):
 def tensor_vstack(tensor_list, pad=0):
     """
     vertically stack tensors by adding a new axis
+    expand dims if only 1 tensor
     :param tensor_list: list of tensor to be stacked vertically
     :param pad: label to pad with
     :return: tensor with max shape
     """
-    dimensions = [len(tensor_list)]
+    if len(tensor_list) == 1:
+        return tensor_list[0][np.newaxis, :]
+
     ndim = len(tensor_list[0].shape)
+    dimensions = [len(tensor_list)]  # first dim is batch size
     for dim in range(ndim):
         dimensions.append(max([tensor.shape[dim] for tensor in tensor_list]))
+
     dtype = tensor_list[0].dtype
     if pad == 0:
         all_tensor = np.zeros(tuple(dimensions), dtype=dtype)
