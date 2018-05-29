@@ -6,8 +6,7 @@ from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from tqdm import tqdm
 
 from data.bbox import decode_detect
-from data.transform import RCNNDefaultValTransform
-from data.np_loader import generate_batch
+from data.transform import RCNNDefaultValTransform, generate_batch
 from net.model import get_net
 from net.symbol_resnet import get_resnet_test
 

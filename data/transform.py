@@ -20,6 +20,14 @@ def load_test(filename, short, max_size, mean, std):
     return im_tensor, im_info, im_orig
 
 
+def generate_batch(im_tensor, im_info):
+    """return batch"""
+    data = [im_tensor, im_info]
+    data_shapes = [('data', im_tensor.shape), ('im_info', im_info.shape)]
+    data_batch = mx.io.DataBatch(data=data, label=None, provide_data=data_shapes, provide_label=None)
+    return data_batch
+
+
 class RCNNDefaultValTransform(object):
     def __init__(self, short, max_size, mean, std):
         self._short = short

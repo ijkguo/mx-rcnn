@@ -2,8 +2,7 @@ import argparse
 import mxnet as mx
 
 from data.bbox import decode_detect
-from data.transform import load_test
-from data.np_loader import generate_batch
+from data.transform import load_test, generate_batch
 from data.vis import vis_detection
 from net.model import get_net
 from net.symbol_resnet import get_resnet_test
