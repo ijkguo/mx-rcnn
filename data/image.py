@@ -1,4 +1,5 @@
 import mxnet as mx
+import numpy as np
 
 
 def imdecode(image_name):
@@ -9,6 +10,14 @@ def imdecode(image_name):
         buf = f.read()
     im = mx.image.imdecode(buf)
     return im
+
+
+def random_flip(src, px=0):
+    """Flip x axis of image [height, width, channel] with prob px"""
+    flip_x = np.random.choice([False, True], p=[1 - px, px])
+    if flip_x:
+        src = mx.nd.flip(src, axis=1)
+    return src, flip_x
 
 
 def resize(im, short, max_size):
