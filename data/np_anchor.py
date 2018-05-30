@@ -146,7 +146,7 @@ class AnchorSampler:
             bbox_weights[fg_inds, :] = 1
         else:
             # randomly draw bg anchors
-            bg_inds = np.random.choice(np.arange(num_valid)[0], size=self._num_batch, replace=False)
+            bg_inds = np.random.choice(np.arange(num_valid), size=self._num_batch, replace=False)
             labels[bg_inds] = 0
 
         all_labels = np.ones((num_anchors,), dtype=np.float32) * -1

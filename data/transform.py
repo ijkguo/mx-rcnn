@@ -2,6 +2,7 @@ import mxnet as mx
 from gluoncv import data as gdata
 
 from data.image import imdecode, random_flip, resize, transform
+from data.np_bbox import bbox_flip
 from data.np_anchor import AnchorGenerator, AnchorSampler
 
 
@@ -64,9 +65,6 @@ class RCNNDefaultTrainTransform(object):
         im_height, im_width = im.shape[:2]
         im_info = mx.nd.array([im_height, im_width, im_scale])
 
-        # transform into tensor and normalize
-        im_tensor = transform(im, self._mean, self._std)
-
         # label is (np.array) gt_boxes [n, 6] (x1, y1, x2, y2, cls, difficult)
         # proposal target input (x1, y1, x2, y2)
         # important: need to copy this np.array (numpy will keep this array)
@@ -75,12 +73,15 @@ class RCNNDefaultTrainTransform(object):
         # resize bbox
         gt_bboxes[:, :4] *= im_scale
 
+        # add 1 to gt_bboxes for bg class
+        gt_bboxes[:, 4] += 1
+
         # random flip image and bbox
-        im, flip_x = random_flip(im, px=0.5)
-        # invalid value in bbox_transform if this wrong (no overlap), note index 0 and 2
-        if flip_x:
-            gt_bboxes[:, 0] = im_width - 1 - gt_bboxes[:, 2]
-            gt_bboxes[:, 2] = im_width - 1 - gt_bboxes[:, 0]
+        im, flip_x = random_flip(im, px=1)
+        gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
+
+        # transform into tensor and normalize
+        im_tensor = transform(im, self._mean, self._std)
 
         # compute anchor shape and generate anchors
         feat_height, feat_width = self._ac(im_height), self._ac(im_width)
