@@ -1,4 +1,5 @@
 import mxnet as mx
+from gluoncv import data as gdata
 
 from data.image import imdecode, random_flip, resize, transform
 from data.np_anchor import AnchorGenerator, AnchorSampler
@@ -98,3 +99,25 @@ class RCNNDefaultTrainTransform(object):
         bbox_target = mx.nd.array(bbox_target)
         bbox_weight = mx.nd.array(bbox_weight)
         return im_tensor, im_info, gt_bboxes, rpn_label, bbox_target, bbox_weight
+
+
+class AnchorIter(mx.io.DataIter):
+    def __init__(self, dataset, batch_size, shuffle, last_batch, num_workers):
+        super(AnchorIter, self).__init__(batch_size)
+        self._loader = gdata.DetectionDataLoader(dataset, batch_size=batch_size, shuffle=shuffle,
+                                                 last_batch=last_batch, num_workers=num_workers)
+        self._iter = iter(self._loader)
+
+    def reset(self):
+        self._iter = iter(self._loader)
+
+    def next(self):
+        data, im_info, gt_boxes, label, bbox_target, bbox_weight = next(self._iter)
+        data = [data, im_info, gt_boxes]
+        label = [label, bbox_target, bbox_weight]
+        data_name = ['data', 'im_info', 'gt_boxes']
+        label_name = ['label', 'bbox_target', 'bbox_weight']
+        provide_data = [(k, v.shape) for k, v in zip(data_name, data)]
+        provide_label = [(k, v.shape) for k, v in zip(label_name, label)]
+        return mx.io.DataBatch(data=data, label=label, pad=0, index=None,
+                               provide_data=provide_data, provide_label=provide_label)
