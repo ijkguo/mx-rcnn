@@ -50,14 +50,14 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     batch_size = len(ctx)
 
     # load training data
-    train_dataset = gdata.VOCDetection(splits=[(2007, 'train')])
+    train_dataset = gdata.VOCDetection(splits=[(2007, 'trainval')])
     ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
     asp = AnchorSampler(allowed_border=RPN_ALLOWED_BORDER, batch_rois=RPN_BATCH_ROIS,
                         fg_fraction=RPN_FG_FRACTION, fg_overlap=RPN_FG_OVERLAP)
     train_transform = RCNNDefaultTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
                                                 std=IMG_PIXEL_STDS, ac=get_feat_size, ag=ag, asp=asp)
     train_data = AnchorIter(train_dataset.transform(train_transform),
-                            batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=0)
+                            batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=4)
 
     # load symbol
     sym = get_resnet_train(num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
