@@ -77,7 +77,7 @@ class RCNNDefaultTrainTransform(object):
         gt_bboxes[:, 4] += 1
 
         # random flip image and bbox
-        im, flip_x = random_flip(im, px=1)
+        im, flip_x = random_flip(im, px=0.5)
         gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
 
         # transform into tensor and normalize
