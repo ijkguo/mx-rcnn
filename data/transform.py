@@ -60,6 +60,9 @@ class RCNNDefaultTrainTransform(object):
         self._asp = asp
 
     def __call__(self, src, label):
+        # random flip image
+        im, flip_x = random_flip(src, px=0.5)
+
         # resize image
         im, im_scale = resize(src, self._short, self._max_size)
         im_height, im_width = im.shape[:2]
@@ -76,8 +79,7 @@ class RCNNDefaultTrainTransform(object):
         # add 1 to gt_bboxes for bg class
         gt_bboxes[:, 4] += 1
 
-        # random flip image and bbox
-        im, flip_x = random_flip(im, px=0.5)
+        # random flip bbox
         gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
 
         # transform into tensor and normalize

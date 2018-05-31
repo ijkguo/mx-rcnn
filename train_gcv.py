@@ -118,7 +118,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
     lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
-    lr_iters = [int(epoch * len(train_dataset) * 2 / batch_size) for epoch in lr_epoch_diff]
+    lr_iters = [int(epoch * len(train_dataset) / batch_size) for epoch in lr_epoch_diff]
     logger.info('lr %f lr_epoch_diff %s lr_iters %s' % (lr, lr_epoch_diff, lr_iters))
     lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer
@@ -153,9 +153,9 @@ def parse_args():
     parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=0, type=int)
     parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
     parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
-    parser.add_argument('--end_epoch', help='end epoch of training', default=10, type=int)
+    parser.add_argument('--end_epoch', help='end epoch of training', default=20, type=int)
     parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='7', type=str)
+    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='14', type=str)
     args = parser.parse_args()
     return args
 
