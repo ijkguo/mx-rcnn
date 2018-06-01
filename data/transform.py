@@ -64,7 +64,7 @@ class RCNNDefaultTrainTransform(object):
         im, flip_x = random_flip(src, px=0.5)
 
         # resize image
-        im, im_scale = resize(src, self._short, self._max_size)
+        im, im_scale = resize(im, self._short, self._max_size)
         im_height, im_width = im.shape[:2]
         im_info = mx.nd.array([im_height, im_width, im_scale])
 
