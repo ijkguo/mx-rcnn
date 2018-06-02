@@ -3,7 +3,7 @@ from . import proposal_target
 
 eps=2e-5
 use_global_stats=True
-workspace=512
+workspace=1024
 units=(3, 4, 6, 3)
 filter_list=(256, 512, 1024, 2048)
 
