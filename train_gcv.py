@@ -149,7 +149,7 @@ def parse_args():
     parser.add_argument('--resume', help='continue training', action='store_true')
     # e2e
     parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
-    parser.add_argument('--pretrained', help='pretrained model prefix', default='model/resnet-101', type=str)
+    parser.add_argument('--pretrained', help='pretrained model prefix', default='model/resnet-50', type=str)
     parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=0, type=int)
     parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
     parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
