@@ -100,8 +100,8 @@ def get_resnet_train(num_anchors, anchor_scales, anchor_ratios,
         data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
     rpn_cls_prob = mx.symbol.SoftmaxOutput(data=rpn_cls_score_reshape, label=rpn_label, multi_output=True,
                                            normalization='valid', use_ignore=True, ignore_label=-1, name="rpn_cls_prob")
-    rpn_cls_act = mx.symbol.SoftmaxActivation(
-        data=rpn_cls_score_reshape, mode="channel", name="rpn_cls_act")
+    rpn_cls_act = mx.symbol.softmax(
+        data=rpn_cls_score_reshape, axis=1, name="rpn_cls_act")
     rpn_cls_act_reshape = mx.symbol.Reshape(
         data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
 
@@ -173,8 +173,8 @@ def get_resnet_test(num_anchors, anchor_scales, anchor_ratios,
         data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=2 * num_anchors, name="rpn_cls_score")
     rpn_cls_score_reshape = mx.symbol.Reshape(
         data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
-    rpn_cls_act = mx.symbol.SoftmaxActivation(
-        data=rpn_cls_score_reshape, mode="channel", name="rpn_cls_act")
+    rpn_cls_act = mx.symbol.softmax(
+        data=rpn_cls_score_reshape, axis=1, name="rpn_cls_act")
     rpn_cls_act_reshape = mx.symbol.Reshape(
         data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
 
