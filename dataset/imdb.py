@@ -9,7 +9,7 @@ basic format [image_index]
 'boxes', 'gt_classes', 'gt_overlaps', 'max_classes', 'max_overlaps', 'bbox_targets']
 """
 
-from ..logger import logger
+from net.logger import logger
 import os
 try:
     import cPickle as pickle

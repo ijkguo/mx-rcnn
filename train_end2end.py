@@ -4,12 +4,11 @@ import pprint
 import mxnet as mx
 
 from data.np_loader import AnchorGenerator, AnchorSampler, AnchorLoader
+from dataset.pascal_voc import PascalVOC
+from net.logger import logger
 from net.module import MutableModule
 from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
-from rcnn.logger import logger
-from rcnn.config import config, default
-from rcnn.utils.load_data import load_gt_roidb, merge_roidb, filter_roidb
 from net.symbol_resnet import get_resnet_train
 
 
@@ -59,19 +58,20 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     batch_size = len(ctx)
 
     # load dataset and prepare imdb for training
-    image_sets = [iset for iset in args.image_set.split('+')]
-    roidbs = [load_gt_roidb(args.dataset, image_set, args.root_path, args.dataset_path,
-                            flip=not args.no_flip)
-              for image_set in image_sets]
-    roidb = merge_roidb(roidbs)
-    roidb = filter_roidb(roidb)
+    image_sets = ['2007_trainval']
+    roidb = []
+    for iset in image_sets:
+        imdb = PascalVOC(iset, "data", "data/VOCdevkit")
+        iroidb = imdb.gt_roidb()
+        iroidb = imdb.append_flipped_images(iroidb)
+        roidb.extend(iroidb)
 
     # load training data
     ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
     asp = AnchorSampler(allowed_border=RPN_ALLOWED_BORDER, batch_rois=RPN_BATCH_ROIS,
                         fg_fraction=RPN_FG_FRACTION, fg_overlap=RPN_FG_OVERLAP)
     train_data = AnchorLoader(roidb, batch_size, IMG_SHORT_SIDE, IMG_LONG_SIDE, IMG_PIXEL_MEANS, IMG_PIXEL_STDS,
-                              feat_sym, ag, asp, shuffle=not args.no_shuffle)
+                              feat_sym, ag, asp, shuffle=True)
 
     # produce shape max possible
     _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE))
@@ -149,27 +149,20 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
-    # general
-    parser.add_argument('--dataset', help='dataset name', default=default.dataset, type=str)
-    parser.add_argument('--image_set', help='image_set name', default=default.image_set, type=str)
-    parser.add_argument('--root_path', help='output data folder', default=default.root_path, type=str)
-    parser.add_argument('--dataset_path', help='dataset path', default=default.dataset_path, type=str)
     # training
-    parser.add_argument('--frequent', help='frequency of logging', default=default.frequent, type=int)
-    parser.add_argument('--kvstore', help='the kv-store type', default=default.kvstore, type=str)
+    parser.add_argument('--frequent', help='frequency of logger', default=20, type=int)
+    parser.add_argument('--kvstore', help='the kv-store type', default='device', type=str)
     parser.add_argument('--work_load_list', help='work load for different devices', default=None, type=list)
-    parser.add_argument('--no_flip', help='disable flip images', action='store_true')
-    parser.add_argument('--no_shuffle', help='disable random shuffle', action='store_true')
     parser.add_argument('--resume', help='continue training', action='store_true')
     # e2e
     parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
-    parser.add_argument('--pretrained', help='pretrained model prefix', default=default.pretrained, type=str)
-    parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=default.pretrained_epoch, type=int)
-    parser.add_argument('--prefix', help='new model prefix', default=default.e2e_prefix, type=str)
+    parser.add_argument('--pretrained', help='pretrained model prefix', default='model/resnet-50', type=str)
+    parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=0, type=int)
+    parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
     parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
-    parser.add_argument('--end_epoch', help='end epoch of training', default=default.e2e_epoch, type=int)
-    parser.add_argument('--lr', help='base learning rate', default=default.e2e_lr, type=float)
-    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default=default.e2e_lr_step, type=str)
+    parser.add_argument('--end_epoch', help='end epoch of training', default=10, type=int)
+    parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
+    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='7', type=str)
     args = parser.parse_args()
     return args
 

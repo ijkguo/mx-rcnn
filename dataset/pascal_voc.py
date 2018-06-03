@@ -14,7 +14,7 @@ import cv2
 import os
 import numpy as np
 
-from ..logger import logger
+from net.logger import logger
 from .imdb import IMDB
 from .pascal_voc_eval import voc_eval
 from .ds_utils import unique_boxes, filter_small_boxes

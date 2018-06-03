@@ -2,6 +2,7 @@ import argparse
 import mxnet as mx
 
 from gluoncv import data as gdata
+
 from data.bbox import decode_detect
 from data.transform import load_test
 from data.vis import vis_detection
@@ -14,13 +15,13 @@ IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
 IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
 
 RPN_ANCHORS = 9
-RPN_ANCHOR_SCALES=(8, 16, 32)
-RPN_ANCHOR_RATIOS=(0.5, 1, 2)
-RPN_FEAT_STRIDE=16
-RPN_PRE_NMS_TOP_N=6000
-RPN_POST_NMS_TOP_N=300
-RPN_NMS_THRESH=0.7
-RPN_MIN_SIZE=16
+RPN_ANCHOR_SCALES = (8, 16, 32)
+RPN_ANCHOR_RATIOS = (0.5, 1, 2)
+RPN_FEAT_STRIDE = 16
+RPN_PRE_NMS_TOP_N = 6000
+RPN_POST_NMS_TOP_N = 300
+RPN_NMS_THRESH = 0.7
+RPN_MIN_SIZE = 16
 
 RCNN_CLASSES = 21
 RCNN_FEAT_STRIDE=16

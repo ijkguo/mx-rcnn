@@ -2,7 +2,7 @@
 given a pascal voc imdb, compute mAP
 """
 
-from ..logger import logger
+from net.logger import logger
 import numpy as np
 import os
 try:

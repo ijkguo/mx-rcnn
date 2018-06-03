@@ -5,11 +5,11 @@ import numpy as np
 
 from data.np_bbox import im_detect
 from data.np_loader import TestLoader
+from dataset import PascalVOC
+from net.logger import logger
 from net.model import get_net
 from net.symbol_resnet import get_resnet_test
 
-from rcnn.logger import logger
-from rcnn.dataset import PascalVOC
 
 IMG_SHORT_SIDE = 600
 IMG_LONG_SIDE = 1000

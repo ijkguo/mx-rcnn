@@ -2,19 +2,17 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import cv2
 import os
 import json
 import numpy as np
 from builtins import range
 
-from ..logger import logger
+from net.logger import logger
 from .imdb import IMDB
 
 # coco api
 from ..pycocotools.coco import COCO
 from ..pycocotools.cocoeval import COCOeval
-from ..pycocotools import mask as COCOmask
 
 
 class coco(IMDB):
