@@ -104,6 +104,20 @@ class RCNNDefaultTrainTransform(object):
         return im_tensor, im_info, gt_bboxes, rpn_label, bbox_target, bbox_weight
 
 
+class RCNNGluonTrainTransform(RCNNDefaultTrainTransform):
+    def __init__(self, short, max_size, mean, std, ac, ag: AnchorGenerator, asp: AnchorSampler):
+        super(RCNNGluonTrainTransform, self).__init__(short, max_size, mean, std, ac, ag, asp)
+
+    def __call__(self, src, label):
+        im_tensor, im_info, gt_bboxes, rpn_label, bbox_target, bbox_weight = super(RCNNGluonTrainTransform, self)(src, label)
+
+        # need different repr
+        rpn_weight = mx.nd.where(rpn_label > 0, mx.nd.ones_like(rpn_label), mx.nd.zeros_like(rpn_label))
+        rpn_label = mx.nd.where(rpn_label >= 0, rpn_label, mx.nd.zeros_like(rpn_label))
+
+        return im_tensor, im_info, gt_bboxes, rpn_label, rpn_weight, bbox_target, bbox_weight
+
+
 class AnchorIter(mx.io.DataIter):
     def __init__(self, dataset, batch_size, shuffle, last_batch, num_workers):
         super(AnchorIter, self).__init__(batch_size)

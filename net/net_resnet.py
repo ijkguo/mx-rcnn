@@ -1,4 +1,8 @@
+import mxnet as mx
+from mxnet import autograd
 from mxnet.gluon import nn, HybridBlock
+
+from . import proposal_target
 
 
 def _conv3x3(channels, stride, in_channels):
@@ -92,23 +96,26 @@ class RPN(HybridBlock):
         self._rpn_nms_thresh = rpn_nms_thresh
         self._rpn_min_size = rpn_min_size
 
+        weight_initializer = mx.initializer.Normal(0.01)
         with self.name_scope():
-            self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=1024, kernel_size=(3, 3), padding=(1, 1))
-            self.conv_cls = nn.Conv2D(in_channels=1024, channels=2 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
-            self.conv_reg = nn.Conv2D(in_channels=1024, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
+            self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=1024, kernel_size=(3, 3), padding=(1, 1), weight_initializer=weight_initializer)
+            self.conv_cls = nn.Conv2D(in_channels=1024, channels=2 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
+            self.conv_reg = nn.Conv2D(in_channels=1024, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
         cls = self.conv_cls(x)
         cls = F.reshape(cls, (0, 2, -1, 0))
-        cls = F.softmax(cls, axis=1)
-        cls = F.reshape(cls, (0, 2 * self._num_anchors, -1, 0))
+        cls_logits = F.log_softmax(cls, axis=1)
+        cls = F.reshape(cls_logits, (0, 2 * self._num_anchors, -1, 0))
         reg = self.conv_reg(x)
 
         rois = F.contrib.Proposal(cls_score=cls, bbox_pred=reg, im_info=im_info,
                                   rpn_pre_nms_top_n=self._rpn_pre_topk, rpn_post_nms_top_n=self._rpn_post_topk,
                                   threshold=self._rpn_nms_thresh, rpn_min_size=self._rpn_min_size,
                                   scales=self._anchor_scales, ratios=self._anchor_ratios)
+        if autograd.is_training():
+            return cls_logits, reg, rois
         return rois
 
 
@@ -116,24 +123,31 @@ class RCNN(HybridBlock):
     def __init__(self, in_units, num_classes, **kwargs):
         super(RCNN, self).__init__(**kwargs)
         with self.name_scope():
-            self.cls = nn.Dense(in_units=in_units, units=num_classes)
-            self.reg = nn.Dense(in_units=in_units, units=4 * num_classes)
+            self.cls = nn.Dense(in_units=in_units, units=num_classes, weight_initializer=mx.initializer.Normal(0.01))
+            self.reg = nn.Dense(in_units=in_units, units=4 * num_classes, weight_initializer=mx.initializer.Normal(0.001))
 
     def hybrid_forward(self, F, x):
         cls = self.cls(x)
-        cls = F.softmax(cls)
+        cls_logits = F.log_softmax(cls)
         reg = self.reg(x)
-        return cls, reg
+        return cls_logits, reg
 
 
 class FRCNNResNet(HybridBlock):
     def __init__(self, num_anchors=9, anchor_scales=(8, 16, 32), anchor_ratios=(0.5, 1, 2),
                  rpn_feature_stride=16, rpn_pre_topk=6000, rpn_post_topk=300, rpn_nms_thresh=0.7, rpn_min_size=16,
-                 num_classes=21, rcnn_feature_stride=16, rcnn_pooled_size=(14, 14),
+                 num_classes=21, rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_batch_size=1,
+                 rcnn_batch_rois=128, rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
                  **kwargs):
         super(FRCNNResNet, self).__init__(**kwargs)
+        self._num_classes = num_classes
         self._rcnn_feature_stride = rcnn_feature_stride
         self._rcnn_pooled_size = rcnn_pooled_size
+        self._rcnn_batch_size = rcnn_batch_size
+        self._rcnn_batch_rois = rcnn_batch_rois
+        self._rcnn_fg_fraction = rcnn_fg_fraction
+        self._rcnn_fg_overlap = rcnn_fg_overlap
+        self._rcnn_bbox_stds = rcnn_bbox_stds
 
         with self.name_scope():
             self.backbone = ResNet50V2(prefix='')
@@ -141,14 +155,24 @@ class FRCNNResNet(HybridBlock):
             self.rpn = RPN(1024, num_anchors, anchor_scales, anchor_ratios,
                            rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
 
-    def hybrid_forward(self, F, x, im_info):
+    def hybrid_forward(self, F, x, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
         x = self.backbone.layer1(x)
         x = self.backbone.layer2(x)
         feat = self.backbone.layer3(x)
 
-        rois = self.rpn(feat, im_info)
+        if autograd.is_training():
+            rpn_cls, rpn_reg, rois = self.rpn(feat, im_info)
+            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
+                F.Custom(rois, gt_boxes, op_type="proposal_target",
+                         num_classes=self._num_classes, batch_images=self._rcnn_batch_size,
+                         batch_rois=self._rcnn_batch_rois, fg_fraction=self._rcnn_fg_fraction,
+                         fg_overlap=self._rcnn_fg_overlap, box_stds=self._rcnn_bbox_stds)
+        else:
+            rois = self.rpn(feat, im_info)
         pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         top_feat = self.backbone.layer4(pooled_feat)
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)
+        if autograd.is_training():
+            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
         return rois, rcnn_cls, rcnn_reg
