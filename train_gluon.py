@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
     parser.add_argument('--pretrained', help='pretrained model params',
                         default='model/res50-converted-0000.params', type=str)
+    parser.add_argument('--frequent', help='frequency of logger', default=20, type=int)
     parser.add_argument('--resume', help='resume model prefix', default='', type=str)
     parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
     parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
@@ -63,7 +64,7 @@ def split_and_load(batch, ctx_list):
     """Split data to 1 batch each device."""
     new_batch = []
     for i, data in enumerate(batch):
-        new_data = [x.as_in_context(ctx) for x, ctx in zip(data, ctx_list)]
+        new_data = gluon.utils.split_and_load(data, ctx_list=ctx_list)
         new_batch.append(new_data)
     return new_batch
 
@@ -95,8 +96,8 @@ def main():
     if args.resume.strip():
         net.load_params(args.resume.strip)
     else:
-        net.backbone.load_params(args.pretrained)
-        net.initialize()
+        net.load_params(args.pretrained, allow_missing=True, ignore_extra=True)
+        net.collect_params(net.prefix + 'rpn.*|' + net.prefix + 'rcnn.*').initialize()
     net.collect_params().reset_ctx(ctx)
 
     # loss
@@ -113,17 +114,17 @@ def main():
     lr = args.lr
     lr_decay = 0.1
     lr_steps = [int(epoch) for epoch in args.lr_step.split(',')]
-    logger.info('lr {:f} lr_decay {:f}'.format(lr, lr_steps))
+    logger.info('lr {} lr_decay {}'.format(lr, lr_steps))
 
     # optimizer
+    select = ['rcnn', 'rpn', 'stage2_conv', 'stage3_conv', 'stage4_conv']
+    select = '|'.join([net.prefix + s for s in select])
     trainer = gluon.Trainer(
-        net.collect_params('.*stage2.*weight|.*stage2.*bias|.*stage3.*weight|.*stage3.*bias|'
-        '.*stage4.*weight|.*stage4.*bias|.*rcnn.*|.*rpn.*'),
+        net.collect_params(select),
         'sgd',
         {'learning_rate': lr,
          'wd': 0.0005,
          'momentum': 0.9,
-         'rescale_grad': (1.0 / batch_size),
          'clip_gradient': 5})
 
     # training loop
@@ -163,7 +164,7 @@ def main():
                     metric.update(0, record)
             trainer.step(batch_size)
             # (batch_end_callback) update metrics
-            if args.frequent and not (i + 1) % args.frequent:
+            if args.frequent and not i % args.frequent:
                 msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
                 logger.info('[Epoch {}][Batch {}], Speed: {:.3f} samples/sec, {}'.format(
                     epoch, i, batch_size / (time.time() - btic), msg))

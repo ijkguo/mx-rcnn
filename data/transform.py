@@ -92,7 +92,7 @@ class RCNNDefaultTrainTransform(object):
         # assign anchors
         rpn_label, bbox_target, bbox_weight = self._asp.assign(anchors, gt_bboxes, im_height, im_width)
 
-        rpn_label = rpn_label.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1)).flatten()
+        rpn_label = rpn_label.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
         bbox_target = bbox_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
         bbox_weight = bbox_weight.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
 
@@ -109,10 +109,12 @@ class RCNNGluonTrainTransform(RCNNDefaultTrainTransform):
         super(RCNNGluonTrainTransform, self).__init__(short, max_size, mean, std, ac, ag, asp)
 
     def __call__(self, src, label):
-        im_tensor, im_info, gt_bboxes, rpn_label, bbox_target, bbox_weight = super(RCNNGluonTrainTransform, self)(src, label)
+        im_tensor, im_info, gt_bboxes, rpn_label, bbox_target, bbox_weight = \
+            super(RCNNGluonTrainTransform, self).__call__(src, label)
 
         # need different repr
-        rpn_weight = mx.nd.where(rpn_label > 0, mx.nd.ones_like(rpn_label), mx.nd.zeros_like(rpn_label))
+        rpn_label = rpn_label.reshape((-3, 0)).expand_dims(0)
+        rpn_weight = mx.nd.where(rpn_label >= 0, mx.nd.ones_like(rpn_label), mx.nd.zeros_like(rpn_label))
         rpn_label = mx.nd.where(rpn_label >= 0, rpn_label, mx.nd.zeros_like(rpn_label))
 
         return im_tensor, im_info, gt_bboxes, rpn_label, rpn_weight, bbox_target, bbox_weight
