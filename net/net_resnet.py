@@ -40,9 +40,9 @@ class BottleneckV2(HybridBlock):
         return x + residual
 
 
-class ResNet101V2(HybridBlock):
+class ResNet50V2(HybridBlock):
     def __init__(self, **kwargs):
-        super(ResNet101V2, self).__init__(**kwargs)
+        super(ResNet50V2, self).__init__(**kwargs)
         with self.name_scope():
             self.layer0 = nn.HybridSequential(prefix='')
             self.layer0.add(nn.BatchNorm(scale=False, epsilon=2e-5, use_global_stats=True))
@@ -53,7 +53,7 @@ class ResNet101V2(HybridBlock):
 
             self.layer1 = self._make_layer(stage_index=1, layers=3, in_channels=64, channels=256, stride=1)
             self.layer2 = self._make_layer(stage_index=2, layers=4, in_channels=256, channels=512, stride=2)
-            self.layer3 = self._make_layer(stage_index=3, layers=23, in_channels=512, channels=1024, stride=2)
+            self.layer3 = self._make_layer(stage_index=3, layers=6, in_channels=512, channels=1024, stride=2)
             self.layer4 = self._make_layer(stage_index=4, layers=3, in_channels=1024, channels=2048, stride=2)
 
             self.layer4.add(nn.BatchNorm(epsilon=2e-5, use_global_stats=True))
@@ -93,9 +93,9 @@ class RPN(HybridBlock):
         self._rpn_min_size = rpn_min_size
 
         with self.name_scope():
-            self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=512, kernel_size=(3, 3), padding=(1, 1))
-            self.conv_cls = nn.Conv2D(in_channels=512, channels=2 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
-            self.conv_reg = nn.Conv2D(in_channels=512, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
+            self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=1024, kernel_size=(3, 3), padding=(1, 1))
+            self.conv_cls = nn.Conv2D(in_channels=1024, channels=2 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
+            self.conv_reg = nn.Conv2D(in_channels=1024, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0))
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
@@ -136,7 +136,7 @@ class FRCNNResNet(HybridBlock):
         self._rcnn_pooled_size = rcnn_pooled_size
 
         with self.name_scope():
-            self.backbone = ResNet101V2(prefix='')
+            self.backbone = ResNet50V2(prefix='')
             self.rcnn = RCNN(2048, num_classes)
             self.rpn = RPN(1024, num_anchors, anchor_scales, anchor_ratios,
                            rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
