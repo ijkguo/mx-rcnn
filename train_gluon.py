@@ -69,6 +69,86 @@ def split_and_load(batch, ctx_list):
     return new_batch
 
 
+class RPNAccMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(RPNAccMetric, self).__init__('RPNAcc')
+
+    def update(self, labels, preds):
+        # label: [rpn_label, rpn_weight]
+        # preds: [rpn_cls_logits]
+        rpn_label, rpn_weight = labels
+        rpn_cls_logits = preds[0]
+
+        # calculate num_inst (average on those fg anchors)
+        num_inst = mx.nd.sum(rpn_weight)
+
+        # cls_logits (b, c, h, w) red_label (b, 1, h, w)
+        pred_label = mx.nd.argmax(rpn_cls_logits, axis=1, keepdims=True)
+        # label (b, 1, h, w)
+        num_acc = mx.nd.sum((pred_label == rpn_label) * rpn_weight)
+
+        self.sum_metric += num_acc.asscalar()
+        self.num_inst += num_inst.asscalar()
+
+
+class RPNL1LossMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(RPNL1LossMetric, self).__init__('RPNL1Loss')
+
+    def update(self, labels, preds):
+        # label = [rpn_bbox_target, rpn_bbox_weight]
+        # pred = [rpn_bbox_reg]
+        rpn_bbox_target, rpn_bbox_weight = labels
+        rpn_bbox_reg = preds[0]
+
+        # calculate num_inst (average on those fg anchors)
+        num_inst = mx.nd.sum(rpn_bbox_weight) / 4
+
+        # calculate smooth_l1
+        loss = mx.nd.sum(rpn_bbox_weight * mx.nd.smooth_l1(rpn_bbox_reg - rpn_bbox_target, scalar=3))
+
+        self.sum_metric += loss.asscalar()
+        self.num_inst += num_inst.asscalar()
+
+
+class RCNNAccMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(RCNNAccMetric, self).__init__('RCNNAcc')
+
+    def update(self, labels, preds):
+        # label = [rcnn_label]
+        # pred = [rcnn_cls]
+        rcnn_label = labels[0]
+        rcnn_cls = preds[0]
+
+        # calculate num_acc
+        pred_label = mx.nd.argmax(rcnn_cls, axis=1)
+        num_acc = mx.nd.sum(pred_label == rcnn_label)
+
+        self.sum_metric += num_acc.asscalar()
+        self.num_inst += rcnn_label.size
+
+
+class RCNNL1LossMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(RCNNL1LossMetric, self).__init__('RCNNL1Loss')
+
+    def update(self, labels, preds):
+        # label = [rcnn_bbox_target, rcnn_bbox_weight]
+        # pred = [rcnn_reg]
+        rcnn_bbox_target, rcnn_bbox_weight = labels
+        rcnn_bbox_reg = preds[0]
+
+        # calculate num_inst
+        num_inst = mx.nd.sum(rcnn_bbox_weight) / 4
+
+        # calculate smooth_l1
+        loss = mx.nd.sum(rcnn_bbox_weight * mx.nd.smooth_l1(rcnn_bbox_reg - rcnn_bbox_target, scalar=1))
+
+        self.sum_metric += loss.asscalar()
+        self.num_inst += num_inst.asscalar()
+
+
 def main():
     # print config
     args = parse_args()
@@ -109,6 +189,11 @@ def main():
                mx.metric.Loss('RPN_SmoothL1'),
                mx.metric.Loss('RCNN_CE'),
                mx.metric.Loss('RCNN_SmoothL1')]
+    rpn_acc_metric = RPNAccMetric()
+    rpn_bbox_metric = RPNL1LossMetric()
+    rcnn_acc_metric = RCNNAccMetric()
+    rcnn_bbox_metric = RCNNL1LossMetric()
+    metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric]
 
     # learning rate
     lr = args.lr
@@ -159,13 +244,18 @@ def main():
                     metric_losses[1].append(rpn_loss2.sum())
                     metric_losses[2].append(rcnn_loss1.sum())
                     metric_losses[3].append(rcnn_loss2.sum())
+                    with autograd.pause():
+                        rpn_acc_metric.update([rpn_label, rpn_weight], [rpn_cls])
+                        rpn_bbox_metric.update([rpn_bbox_target, rpn_bbox_weight], [rpn_reg])
+                        rcnn_acc_metric.update([rcnn_label], [rcnn_cls])
+                        rcnn_bbox_metric.update([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg])
                 autograd.backward(losses)
                 for metric, record in zip(metrics, metric_losses):
                     metric.update(0, record)
             trainer.step(batch_size)
             # (batch_end_callback) update metrics
             if args.frequent and not i % args.frequent:
-                msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
+                msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics + metrics2])
                 logger.info('[Epoch {}][Batch {}], Speed: {:.3f} samples/sec, {}'.format(
                     epoch, i, batch_size / (time.time() - btic), msg))
             btic = time.time()
