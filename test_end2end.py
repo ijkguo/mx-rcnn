@@ -5,7 +5,7 @@ import numpy as np
 
 from data.np_bbox import im_detect
 from data.np_loader import TestLoader
-from dataset import PascalVOC
+from dataset.pascal_voc import PascalVOC
 from net.logger import logger
 from net.model import get_net
 from net.symbol_resnet import get_resnet_test

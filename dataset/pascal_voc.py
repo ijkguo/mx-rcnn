@@ -17,7 +17,6 @@ import numpy as np
 from net.logger import logger
 from .imdb import IMDB
 from .pascal_voc_eval import voc_eval
-from .ds_utils import unique_boxes, filter_small_boxes
 
 
 class PascalVOC(IMDB):
@@ -137,54 +136,6 @@ class PascalVOC(IMDB):
                         'max_overlaps': overlaps.max(axis=1),
                         'flipped': False})
         return roi_rec
-
-    def load_selective_search_roidb(self, gt_roidb):
-        """
-        turn selective search proposals into selective search roidb
-        :param gt_roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        :return: roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        """
-        import scipy.io
-        matfile = os.path.join(self.root_path, 'selective_search_data', self.name + '.mat')
-        assert os.path.exists(matfile), 'selective search data does not exist: {}'.format(matfile)
-        raw_data = scipy.io.loadmat(matfile)['boxes'].ravel()  # original was dict ['images', 'boxes']
-
-        box_list = []
-        for i in range(raw_data.shape[0]):
-            boxes = raw_data[i][:, (1, 0, 3, 2)] - 1  # pascal voc dataset starts from 1.
-            keep = unique_boxes(boxes)
-            boxes = boxes[keep, :]
-            keep = filter_small_boxes(boxes, self.config['min_size'])
-            boxes = boxes[keep, :]
-            box_list.append(boxes)
-
-        return self.create_roidb_from_box_list(box_list, gt_roidb)
-
-    def selective_search_roidb(self, gt_roidb, append_gt=False):
-        """
-        get selective search roidb and ground truth roidb
-        :param gt_roidb: ground truth roidb
-        :param append_gt: append ground truth
-        :return: roidb of selective search
-        """
-        cache_file = os.path.join(self.cache_path, self.name + '_ss_roidb.pkl')
-        if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as fid:
-                roidb = pickle.load(fid)
-            logger.info('%s ss roidb loaded from %s' % (self.name, cache_file))
-            return roidb
-
-        if append_gt:
-            logger.info('%s appending ground truth annotations' % self.name)
-            ss_roidb = self.load_selective_search_roidb(gt_roidb)
-            roidb = IMDB.merge_roidbs(gt_roidb, ss_roidb)
-        else:
-            roidb = self.load_selective_search_roidb(gt_roidb)
-        with open(cache_file, 'wb') as fid:
-            pickle.dump(roidb, fid, pickle.HIGHEST_PROTOCOL)
-        logger.info('%s wrote ss roidb to %s' % (self.name, cache_file))
-
-        return roidb
 
     def evaluate_detections(self, detections):
         """

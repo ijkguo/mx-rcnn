@@ -11,8 +11,8 @@ from net.logger import logger
 from .imdb import IMDB
 
 # coco api
-from ..pycocotools.coco import COCO
-from ..pycocotools.cocoeval import COCOeval
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
 
 class coco(IMDB):
