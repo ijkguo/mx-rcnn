@@ -164,7 +164,7 @@ def main():
     train_transform = RCNNGluonTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
                                               std=IMG_PIXEL_STDS, ac=get_feat_size, ag=ag, asp=asp)
     train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
-                                             batch_size=batch_size, shuffle=False, last_batch="keep", num_workers=4)
+                                             batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=0)
 
     # load model
     net = FRCNNResNet(
@@ -174,7 +174,7 @@ def main():
         num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE,
         rcnn_pooled_size=RCNN_POOLED_SIZE)
     if args.resume.strip():
-        net.load_params(args.resume.strip)
+        net.load_params(args.resume.strip())
     else:
         net.load_params(args.pretrained, allow_missing=True, ignore_extra=True)
         net.collect_params(net.prefix + 'rpn.*|' + net.prefix + 'rcnn.*').initialize()
@@ -232,11 +232,11 @@ def main():
                 for data, im_info, gt_bboxes, rpn_label, rpn_weight, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
                     rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = net(data, im_info, gt_bboxes)
                     # rpn loss
-                    rpn_loss1 = rpn_cls_loss(rpn_cls, rpn_label, rpn_weight) * rpn_weight.size
-                    rpn_loss2 = rpn_reg_loss(rpn_reg, rpn_bbox_target, rpn_bbox_weight) * rpn_bbox_weight.size
+                    rpn_loss1 = rpn_cls_loss(rpn_cls, rpn_label, rpn_weight) * rpn_label.size / rpn_label.shape[0]
+                    rpn_loss2 = rpn_reg_loss(rpn_reg, rpn_bbox_target, rpn_bbox_weight) * rpn_bbox_target.size / rpn_bbox_target.shape[0]
                     # rcnn loss
-                    rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label)
-                    rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_weight.shape[-1]
+                    rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label) * rcnn_label.size / rcnn_label.shape[0]
+                    rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_target.size / rcnn_bbox_weight.shape[0]
                     # loss for backprop
                     losses.append(rpn_loss1.sum() + rpn_loss2.sum() + rcnn_loss1.sum() + rcnn_loss2.sum())
                     # loss for metrics
@@ -254,17 +254,17 @@ def main():
                     metric.update(0, record)
             trainer.step(batch_size)
             # (batch_end_callback) update metrics
-            if args.frequent and not i % args.frequent:
+            if args.frequent and not (i + 1) % args.frequent:
                 msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics + metrics2])
                 logger.info('[Epoch {}][Batch {}], Speed: {:.3f} samples/sec, {}'.format(
-                    epoch, i, batch_size / (time.time() - btic), msg))
+                    epoch, i + 1, batch_size / (time.time() - btic), msg))
             btic = time.time()
 
         # (epoch_end_callback) save model
         msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
         logger.info('[Epoch {}] Training cost: {:.3f}, {}'.format(
             epoch, (time.time() - tic), msg))
-        net.save_params('{:s}_{:04d}.params'.format(args.prefix, epoch))
+        net.save_params('{:s}_{:04d}.params'.format(args.prefix, epoch + 1))
 
 
 if __name__ == '__main__':
