@@ -177,7 +177,7 @@ def main():
         net.load_params(args.resume.strip())
     else:
         net.load_params(args.pretrained, allow_missing=True, ignore_extra=True)
-        net.collect_params(net.prefix + 'rpn.*|' + net.prefix + 'rcnn.*').initialize()
+        net.collect_params('.*rpn|.*dense').initialize()
     net.collect_params().reset_ctx(ctx)
 
     # loss
@@ -202,8 +202,8 @@ def main():
     logger.info('lr {} lr_decay {}'.format(lr, lr_steps))
 
     # optimizer
-    select = ['rcnn', 'rpn', 'stage2_conv', 'stage3_conv', 'stage4_conv']
-    select = '|'.join([net.prefix + s for s in select])
+    select = ['.*stage2_conv', '.*stage3_conv', '.*stage4_conv', '.*rpn', '.*dense']
+    select = '|'.join([s for s in select])
     trainer = gluon.Trainer(
         net.collect_params(select),
         'sgd',
