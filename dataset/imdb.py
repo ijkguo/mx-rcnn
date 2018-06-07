@@ -1,14 +1,15 @@
 """
-General image database
-An image database creates a list of relative image path called image_set_index and
-transform index to absolute image path. As to training, it is necessary that ground
-truth and proposals are mixed together for training.
-Main functions of IMDB includes:
-_load_roidb
+Main functions of real IMDB includes:
+_load_gt_roidb
+_evaluate_detections
+
+General functions:
+property: name, classes, num_classes, roidb, num_images
 append_flipped_images
-evaluate_detection
+evaluate_detections
+
 roidb is a list of roi_rec
-roi_rec is a dict of keys ["image", "height", "width", "boxes", "gt_classes", "flipped"]
+roi_rec is a dict of keys ["index", "image", "height", "width", "boxes", "gt_classes", "flipped"]
 """
 
 from net.logger import logger
@@ -76,22 +77,30 @@ class IMDB(object):
             roidb_flipped.append(roi_rec_flipped)
         self._roidb.extend(roidb_flipped)
 
+    def evaluate_detections(self, detections, **kwargs):
+        cache_path = os.path.join(self._root_path, 'cache', '{}_{}.pkl'.format(self._name, 'detections'))
+        logger.info('saving cache {}'.format(cache_path))
+        with open(cache_path, 'wb') as fid:
+            pickle.dump(detections, fid, pickle.HIGHEST_PROTOCOL)
+        self._evaluate_detections(detections, **kwargs)
+
     def _get_cached(self, cache_item, fn):
         cache_path = os.path.join(self._root_path, 'cache', '{}_{}.pkl'.format(self._name, cache_item))
         if os.path.exists(cache_path):
+            logger.info('loading cache {}'.format(cache_path))
             with open(cache_path, 'rb') as fid:
                 cached = pickle.load(fid)
-            logger.info('loading cache {}'.format(cache_path))
             return cached
         else:
+            logger.info('computing cache {}'.format(cache_path))
             cached = fn()
+            logger.info('saving cache {}'.format(cache_path))
             with open(cache_path, 'wb') as fid:
                 pickle.dump(cached, fid, pickle.HIGHEST_PROTOCOL)
-            logger.info('saving cache {}'.format(cache_path))
             return cached
 
     def _load_gt_roidb(self):
         raise NotImplementedError
 
-    def evaluate_detections(self, detections):
+    def _evaluate_detections(self, detections, **kwargs):
         raise NotImplementedError

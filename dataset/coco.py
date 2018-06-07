@@ -1,7 +1,3 @@
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
 import os
 import json
 import numpy as np
@@ -20,67 +16,47 @@ class coco(IMDB):
         """
         fill basic information to initialize imdb
         :param image_set: train2014, val2014, test2015
-        :param root_path: 'data', will write 'rpn_data', 'cache'
-        :param data_path: 'data/coco'
+        :param root_path: 'data', will write 'cache'
+        :param data_path: 'data/coco', load data and write results
         """
-        super(coco, self).__init__('COCO', image_set, root_path, data_path)
-        self.root_path = root_path
-        self.data_path = data_path
-        self.coco = COCO(self._get_ann_file())
+        super(coco, self).__init__('coco_' + image_set, root_path)
+        prefix = 'instances' if 'test' not in image_set else 'image_info'
+        # example: annotations/instances_train2014.json
+        ann_file = os.path.join(data_path, 'annotations', prefix + '_' + image_set + '.json')
+        self._coco = COCO(ann_file)
 
         # deal with class names
-        cats = [cat['name'] for cat in self.coco.loadCats(self.coco.getCatIds())]
-        self.classes = ['__background__'] + cats
-        self.num_classes = len(self.classes)
-        self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
-        self._class_to_coco_ind = dict(zip(cats, self.coco.getCatIds()))
-        self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls], self._class_to_ind[cls])
+        cats = [cat['name'] for cat in self._coco.loadCats(self._coco.getCatIds())]
+        self._classes = ['__background__'] + cats
+        self._class_to_coco_ind = dict(zip(cats, self._coco.getCatIds()))
+        class_to_ind = dict(zip(self.classes, range(self.num_classes)))
+        self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls], class_to_ind[cls])
                                             for cls in self.classes[1:]])
-
-        # load image file names
-        self.image_set_index = self._load_image_set_index()
-        self.num_images = len(self.image_set_index)
-        logger.info('%s num_images %d' % (self.name, self.num_images))
 
         # deal with data name
         view_map = {'minival2014': 'val2014',
                     'valminusminival2014': 'val2014'}
-        self.data_name = view_map[image_set] if image_set in view_map else image_set
+        data_name = view_map[image_set] if image_set in view_map else image_set
+        # example images/train2014/COCO_train2014_000000119993.jpg
+        self._image_file_tmpl = os.path.join(data_path, 'images', data_name, 'COCO_' + data_name + '_{:012d}.jpg')
 
-    def _get_ann_file(self):
-        """ self.data_path / annotations / instances_train2014.json """
-        prefix = 'instances' if 'test' not in self.image_set else 'image_info'
-        return os.path.join(self.data_path, 'annotations',
-                            prefix + '_' + self.image_set + '.json')
+        # deal with result file
+        result_foler = os.path.join(data_path, 'results')
+        if not os.path.exists(result_foler):
+            os.makedirs(result_foler)
+        # example detections_val2014_results.json
+        self._result_file = os.path.join(result_foler, 'detections_{}_results.json'.format(image_set))
 
-    def _load_image_set_index(self):
-        """ image id: int """
-        image_ids = self.coco.getImgIds()
-        return image_ids
+        # get roidb
+        self._roidb = self._get_cached('roidb', self._load_gt_roidb)
+        logger.info('%s num_images %d' % (self.name, self.num_images))
 
-    def image_path_from_index(self, index):
-        """ example: images / train2014 / COCO_train2014_000000119993.jpg """
-        filename = 'COCO_%s_%012d.jpg' % (self.data_name, index)
-        image_path = os.path.join(self.data_path, 'images', self.data_name, filename)
-        assert os.path.exists(image_path), 'Path does not exist: {}'.format(image_path)
-        return image_path
-
-    def gt_roidb(self):
-        cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
-        if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as fid:
-                roidb = pickle.load(fid)
-            logger.info('%s gt roidb loaded from %s' % (self.name, cache_file))
-            return roidb
-
-        gt_roidb = [self._load_coco_annotation(index) for index in self.image_set_index]
-        with open(cache_file, 'wb') as fid:
-            pickle.dump(gt_roidb, fid, pickle.HIGHEST_PROTOCOL)
-        logger.info('%s wrote gt roidb to %s' % (self.name, cache_file))
-
+    def _load_gt_roidb(self):
+        image_ids = self._coco.getImgIds()
+        gt_roidb = [self._load_annotation(index) for index in image_ids]
         return gt_roidb
 
-    def _load_coco_annotation(self, index):
+    def _load_annotation(self, index):
         """
         coco ann: [u'segmentation', u'area', u'iscrowd', u'image_id', u'bbox', u'category_id', u'id']
         iscrowd:
@@ -91,12 +67,12 @@ class coco(IMDB):
         :param index: coco image id
         :return: roidb entry
         """
-        im_ann = self.coco.loadImgs(index)[0]
+        im_ann = self._coco.loadImgs(index)[0]
         width = im_ann['width']
         height = im_ann['height']
 
-        annIds = self.coco.getAnnIds(imgIds=index, iscrowd=None)
-        objs = self.coco.loadAnns(annIds)
+        annIds = self._coco.getAnnIds(imgIds=index, iscrowd=None)
+        objs = self._coco.loadAnns(annIds)
 
         # sanitize bboxes
         valid_objs = []
@@ -113,7 +89,7 @@ class coco(IMDB):
         num_objs = len(objs)
 
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
-        gt_classes = np.zeros((num_objs), dtype=np.int32)
+        gt_classes = np.zeros((num_objs,), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
 
         for ix, obj in enumerate(objs):
@@ -125,28 +101,21 @@ class coco(IMDB):
             else:
                 overlaps[ix, cls] = 1.0
 
-        roi_rec = {'image': self.image_path_from_index(index),
+        roi_rec = {'index': index,
+                   'image': self._image_file_tmpl.format(index),
                    'height': height,
                    'width': width,
                    'boxes': boxes,
                    'gt_classes': gt_classes,
-                   'gt_overlaps': overlaps,
-                   'max_classes': overlaps.argmax(axis=1),
-                   'max_overlaps': overlaps.max(axis=1),
                    'flipped': False}
         return roi_rec
 
-    def evaluate_detections(self, detections):
-        """ detections_val2014_results.json """
-        res_folder = os.path.join(self.cache_path, 'results')
-        if not os.path.exists(res_folder):
-            os.makedirs(res_folder)
-        res_file = os.path.join(res_folder, 'detections_%s_results.json' % self.image_set)
-        self._write_coco_results(detections, res_file)
-        if 'test' not in self.image_set:
-            self._do_python_eval(res_file, res_folder)
+    def _evaluate_detections(self, detections, **kargs):
+        self._write_coco_results(detections)
+        if 'test' not in self._result_file:
+            self._do_python_eval()
 
-    def _write_coco_results(self, detections, res_file):
+    def _write_coco_results(self, detections):
         """ example results
         [{"image_id": 42,
           "category_id": 18,
@@ -160,13 +129,14 @@ class coco(IMDB):
             logger.info('collecting %s results (%d/%d)' % (cls, cls_ind, self.num_classes - 1))
             coco_cat_id = self._class_to_coco_ind[cls]
             results.extend(self._coco_results_one_category(detections[cls_ind], coco_cat_id))
-        logger.info('writing results json to %s' % res_file)
-        with open(res_file, 'w') as f:
+        logger.info('writing results json to %s' % self._result_file)
+        with open(self._result_file, 'w') as f:
             json.dump(results, f, sort_keys=True, indent=4)
 
     def _coco_results_one_category(self, boxes, cat_id):
         results = []
-        for im_ind, index in enumerate(self.image_set_index):
+        for im_ind, roi_rec in enumerate(self.roidb):
+            index = roi_rec['index']
             dets = boxes[im_ind].astype(np.float)
             if len(dets) == 0:
                 continue
@@ -182,19 +152,14 @@ class coco(IMDB):
             results.extend(result)
         return results
 
-    def _do_python_eval(self, res_file, res_folder):
+    def _do_python_eval(self):
         ann_type = 'bbox'
-        coco_dt = self.coco.loadRes(res_file)
-        coco_eval = COCOeval(self.coco, coco_dt)
+        coco_dt = self._coco.loadRes(self._result_file)
+        coco_eval = COCOeval(self._coco, coco_dt)
         coco_eval.params.useSegm = (ann_type == 'segm')
         coco_eval.evaluate()
         coco_eval.accumulate()
         self._print_detection_metrics(coco_eval)
-
-        eval_file = os.path.join(res_folder, 'detections_%s_results.pkl' % self.image_set)
-        with open(eval_file, 'wb') as f:
-            pickle.dump(coco_eval, f, pickle.HIGHEST_PROTOCOL)
-        logger.info('eval results saved to %s' % eval_file)
 
     def _print_detection_metrics(self, coco_eval):
         IoU_lo_thresh = 0.5

@@ -1,15 +1,3 @@
-"""
-Pascal VOC database
-This class loads ground truth notations from standard Pascal VOC XML data formats
-and transform them into IMDB format. Selective search is used for proposals, see roidb
-function. Results are written as the Pascal VOC format. Evaluation is based on mAP
-criterion.
-"""
-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
 import cv2
 import os
 import numpy as np
@@ -24,9 +12,8 @@ class PascalVOC(IMDB):
         """
         fill basic information to initialize imdb
         :param image_set: 2007_trainval, 2007_test, etc
-        :param root_path: 'selective_search_data' and 'cache'
-        :param devkit_path: data and results
-        :return: imdb object
+        :param root_path: 'data', will write 'cache'
+        :param devkit_path: 'data/VOCdevkit', load data and write results
         """
         super(PascalVOC, self).__init__('voc_' + image_set, root_path)
         self._classes = ['__background__',  # always index 0
@@ -48,7 +35,7 @@ class PascalVOC(IMDB):
         result_folder = os.path.join(devkit_path, 'results', 'VOC' + year, 'Main')
         if not os.path.exists(result_folder):
             os.makedirs(result_folder)
-        self._result_file_tmpl = os.path.join(devkit_path, 'results', 'VOC' + year, 'Main', 'comp4_det_' + image_set + '_{}.txt')
+        self._result_file_tmpl = os.path.join(result_folder, 'comp4_det_' + image_set + '_{}.txt')
 
         # get roidb
         self._roidb = self._get_cached('roidb', self._load_gt_roidb)
@@ -67,6 +54,7 @@ class PascalVOC(IMDB):
     def _load_annotation(self, index):
         roi_rec = dict()
         # store image
+        roi_rec['index'] = index
         roi_rec['image'] = self._image_file_tmpl.format(index)
         size = cv2.imread(roi_rec['image']).shape
         roi_rec['height'] = size[0]
@@ -75,7 +63,6 @@ class PascalVOC(IMDB):
 
         # store original annotation
         objs = self._parse_voc_anno(self._image_anno_tmpl.format(index))
-        roi_rec['index'] = index
         roi_rec['objs'] = objs
 
         if not self._config['use_diff']:
@@ -118,7 +105,7 @@ class PascalVOC(IMDB):
             objects.append(obj_dict)
         return objects
 
-    def evaluate_detections(self, detections, use_07_metric=True):
+    def _evaluate_detections(self, detections, use_07_metric=True, **kargs):
         self._write_pascal_results(detections)
         self._do_python_eval(detections, use_07_metric)
 
