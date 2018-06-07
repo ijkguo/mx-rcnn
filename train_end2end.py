@@ -62,9 +62,8 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
     roidb = []
     for iset in image_sets:
         imdb = PascalVOC(iset, "data", "data/VOCdevkit")
-        iroidb = imdb.gt_roidb()
-        iroidb = imdb.append_flipped_images(iroidb)
-        roidb.extend(iroidb)
+        imdb.append_flipped_images()
+        roidb.extend(imdb.roidb)
 
     # load training data
     ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)

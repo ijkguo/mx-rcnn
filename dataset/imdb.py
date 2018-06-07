@@ -3,10 +3,12 @@ General image database
 An image database creates a list of relative image path called image_set_index and
 transform index to absolute image path. As to training, it is necessary that ground
 truth and proposals are mixed together for training.
-roidb
-basic format [image_index]
-['image', 'height', 'width', 'flipped',
-'boxes', 'gt_classes', 'gt_overlaps', 'max_classes', 'max_overlaps', 'bbox_targets']
+Main functions of IMDB includes:
+_load_roidb
+append_flipped_images
+evaluate_detection
+roidb is a list of roi_rec
+roi_rec is a dict of keys ["image", "height", "width", "boxes", "gt_classes", "flipped"]
 """
 
 from net.logger import logger
@@ -18,81 +20,78 @@ except ImportError:
 
 
 class IMDB(object):
-    def __init__(self, name, image_set, root_path, dataset_path):
+    def __init__(self, name, root_path):
         """
         basic information about an image database
-        :param name: name of image database will be used for any output
         :param root_path: root path store cache and proposal data
-        :param dataset_path: dataset path store images and image lists
         """
-        self.name = name + '_' + image_set
-        self.image_set = image_set
-        self.root_path = root_path
-        self.data_path = dataset_path
+        self._name = name
+        self._root_path = root_path
 
         # abstract attributes
-        self.classes = []
-        self.num_classes = 0
-        self.image_set_index = []
-        self.num_images = 0
+        self._classes = []
+        self._roidb = []
 
-        self.config = {}
-
-    def image_path_from_index(self, index):
-        raise NotImplementedError
-
-    def gt_roidb(self):
-        raise NotImplementedError
-
-    def evaluate_detections(self, detections):
-        raise NotImplementedError
+        # create cache
+        cache_folder = os.path.join(self._root_path, 'cache')
+        if not os.path.exists(cache_folder):
+            os.mkdir(cache_folder)
 
     @property
-    def cache_path(self):
-        """
-        make a directory to store all caches
-        :return: cache path
-        """
-        cache_path = os.path.join(self.root_path, 'cache')
-        if not os.path.exists(cache_path):
-            os.mkdir(cache_path)
-        return cache_path
+    def name(self):
+        return self._name
 
-    def image_path_at(self, index):
-        """
-        access image at index in image database
-        :param index: image index in image database
-        :return: image path
-        """
-        return self.image_path_from_index(self.image_set_index[index])
+    @property
+    def classes(self):
+        return self._classes
 
-    def append_flipped_images(self, roidb):
-        """
-        append flipped images to an roidb
-        flip boxes coordinates, images will be actually flipped when loading into network
-        :param roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        :return: roidb: [image_index]['boxes', 'gt_classes', 'gt_overlaps', 'flipped']
-        """
-        logger.info('%s append flipped images to roidb' % self.name)
-        assert self.num_images == len(roidb)
-        for i in range(self.num_images):
-            roi_rec = roidb[i]
+    @property
+    def num_classes(self):
+        return len(self._classes)
+
+    @property
+    def roidb(self):
+        return self._roidb
+
+    @property
+    def num_images(self):
+        return len(self._roidb)
+
+    def append_flipped_images(self):
+        """Only flip boxes coordinates, images will be flipped when loading into network"""
+        logger.info('%s append flipped images to roidb' % self._name)
+        roidb_flipped = []
+        for roi_rec in self._roidb:
             boxes = roi_rec['boxes'].copy()
             oldx1 = boxes[:, 0].copy()
             oldx2 = boxes[:, 2].copy()
             boxes[:, 0] = roi_rec['width'] - oldx2 - 1
             boxes[:, 2] = roi_rec['width'] - oldx1 - 1
             assert (boxes[:, 2] >= boxes[:, 0]).all()
-            entry = {'image': roi_rec['image'],
-                     'height': roi_rec['height'],
-                     'width': roi_rec['width'],
-                     'boxes': boxes,
-                     'gt_classes': roidb[i]['gt_classes'],
-                     'gt_overlaps': roidb[i]['gt_overlaps'],
-                     'max_classes': roidb[i]['max_classes'],
-                     'max_overlaps': roidb[i]['max_overlaps'],
-                     'flipped': True}
-            roidb.append(entry)
+            roi_rec_flipped = {'image': roi_rec['image'],
+                               'height': roi_rec['height'],
+                               'width': roi_rec['width'],
+                               'boxes': boxes,
+                               'gt_classes': roi_rec['gt_classes']}
+            roidb_flipped.append(roi_rec_flipped)
+        self._roidb.extend(roidb_flipped)
 
-        self.image_set_index *= 2
-        return roidb
+    def _get_cached(self, cache_item, fn):
+        cache_path = os.path.join(self._root_path, 'cache', '{}_{}.pkl'.format(self._name, cache_item))
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as fid:
+                cached = pickle.load(fid)
+            logger.info('loading cache {}'.format(cache_path))
+            return cached
+        else:
+            cached = fn()
+            with open(cache_path, 'wb') as fid:
+                pickle.dump(cached, fid, pickle.HIGHEST_PROTOCOL)
+            logger.info('saving cache {}'.format(cache_path))
+            return cached
+
+    def _load_gt_roidb(self):
+        raise NotImplementedError
+
+    def evaluate_detections(self, detections):
+        raise NotImplementedError

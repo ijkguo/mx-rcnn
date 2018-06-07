@@ -52,8 +52,7 @@ def main():
 
     # load testing data
     imdb = PascalVOC("2007_test", "data", "data/VOCdevkit")
-    roidb = imdb.gt_roidb()
-    test_data = TestLoader(roidb, batch_size=1, short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE,
+    test_data = TestLoader(imdb.roidb, batch_size=1, short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE,
                            mean=IMG_PIXEL_MEANS, std=IMG_PIXEL_STDS)
 
     # load model
