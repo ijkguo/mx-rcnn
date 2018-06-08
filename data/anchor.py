@@ -157,5 +157,5 @@ class RPNTargetGenerator:
         # training targets for RPN
         cls_target, cls_mask = self._cls_encoder(samples)
         box_target, box_mask = self._box_encoder(
-            samples, matches, anchor.expand_dims(axis=0), bbox)
+            samples, matches, anchor.expand_dims(axis=0), bbox, stds=self._stds)
         return cls_target, box_target, box_mask
