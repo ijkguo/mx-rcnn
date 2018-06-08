@@ -5,8 +5,9 @@ import mxnet as mx
 from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
-from data.np_loader import AnchorGenerator, AnchorSampler
-from data.np_transform import RCNNGluonTrainTransform
+from data.np_anchor import AnchorGenerator
+from data.anchor import RPNAnchorGenerator, RPNTargetGenerator
+from data.transform import RCNNDefaultTrainTransform
 from net.logger import logger
 from net.net_resnet import FRCNNResNet
 from net.symbol_resnet import get_feat_size
@@ -159,10 +160,11 @@ def main():
     # load testing data
     train_dataset = gdata.VOCDetection(splits=[(2007, 'trainval')])
     ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
-    asp = AnchorSampler(allowed_border=RPN_ALLOWED_BORDER, batch_rois=RPN_BATCH_ROIS,
-                        fg_fraction=RPN_FG_FRACTION, fg_overlap=RPN_FG_OVERLAP)
-    train_transform = RCNNGluonTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
-                                              std=IMG_PIXEL_STDS, ac=get_feat_size, ag=ag, asp=asp)
+    rag = RPNAnchorGenerator(ag)
+    rtg = RPNTargetGenerator(num_sample=RPN_BATCH_ROIS, pos_iou_thresh=RPN_FG_OVERLAP,
+                             neg_iou_thresh=RPN_BG_OVERLAP, pos_ratio=RPN_FG_FRACTION, stds=(1.0, 1.0, 1.0, 1.0))
+    train_transform = RCNNDefaultTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
+                                                std=IMG_PIXEL_STDS, ac=get_feat_size, rag=rag, rtg=rtg)
     train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
                                              batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=0)
 
