@@ -5,7 +5,7 @@ import mxnet as mx
 from gluoncv import data as gdata
 
 from data.np_loader import AnchorGenerator, AnchorSampler
-from data.transform import RCNNDefaultTrainTransform, AnchorIter
+from data.np_transform import RCNNDefaultTrainTransform, AnchorIter
 from net.logger import logger
 from net.module import MutableModule
 from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params

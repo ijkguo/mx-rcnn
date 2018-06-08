@@ -6,7 +6,7 @@ from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
 from data.np_loader import AnchorGenerator, AnchorSampler
-from data.transform import RCNNGluonTrainTransform
+from data.np_transform import RCNNGluonTrainTransform
 from net.logger import logger
 from net.net_resnet import FRCNNResNet
 from net.symbol_resnet import get_feat_size
