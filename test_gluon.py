@@ -78,6 +78,7 @@ def main():
             # forward
             rois, scores, bbox_deltas = net(im_tensor, im_info)
             rois = rois[:, 1:]
+            scores = mx.nd.softmax(scores)
             im_info = im_info[0]
 
             # post processing
