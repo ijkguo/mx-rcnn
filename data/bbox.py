@@ -39,10 +39,10 @@ def bbox_decode(x, anchors, stds):
 
 def bbox_clip(x, height, width):
     xmin, ymin, xmax, ymax = x.split(axis=-1, num_outputs=4)
-    xmin = xmin.clip(0, width)
-    ymin = ymin.clip(0, height)
-    xmax = xmax.clip(0, width)
-    ymax = ymax.clip(0, height)
+    xmin = xmin.clip(0, width - 1)
+    ymin = ymin.clip(0, height - 1)
+    xmax = xmax.clip(0, width - 1)
+    ymax = ymax.clip(0, height - 1)
     return mx.nd.concat(xmin, ymin, xmax, ymax, dim=-1)
 
 

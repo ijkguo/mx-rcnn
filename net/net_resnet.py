@@ -2,7 +2,7 @@ import mxnet as mx
 from mxnet import autograd
 from mxnet.gluon import nn, HybridBlock
 
-from . import proposal_target
+from .proposal import Proposal
 
 
 def _conv3x3(channels, stride, in_channels):
@@ -88,19 +88,14 @@ class RPN(HybridBlock):
                  **kwargs):
         super(RPN, self).__init__(**kwargs)
         self._num_anchors = num_anchors
-        self._anchor_scales = anchor_scales
-        self._anchor_ratios = anchor_ratios
-        self._rpn_feature_stride = rpn_feature_stride
-        self._rpn_pre_topk = rpn_pre_topk
-        self._rpn_post_topk = rpn_post_topk
-        self._rpn_nms_thresh = rpn_nms_thresh
-        self._rpn_min_size = rpn_min_size
 
         weight_initializer = mx.initializer.Normal(0.01)
         with self.name_scope():
             self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=1024, kernel_size=(3, 3), padding=(1, 1), weight_initializer=weight_initializer)
             self.conv_cls = nn.Conv2D(in_channels=1024, channels=2 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
             self.conv_reg = nn.Conv2D(in_channels=1024, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
+            self.proposal = Proposal(anchor_scales=anchor_scales, anchor_ratios=anchor_ratios, rpn_feature_stride=rpn_feature_stride,
+                                     rpn_pre_topk=rpn_pre_topk, rpn_post_topk=rpn_post_topk, rpn_nms_thresh=rpn_nms_thresh, rpn_min_size=rpn_min_size)
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
@@ -110,10 +105,8 @@ class RPN(HybridBlock):
 
         cls_score = F.softmax(cls, axis=1)
         cls_score = F.reshape(cls_score, (0, 2 * self._num_anchors, -1, 0))
-        rois = F.contrib.Proposal(cls_score=cls_score, bbox_pred=reg, im_info=im_info,
-                                  rpn_pre_nms_top_n=self._rpn_pre_topk, rpn_post_nms_top_n=self._rpn_post_topk,
-                                  threshold=self._rpn_nms_thresh, rpn_min_size=self._rpn_min_size,
-                                  scales=self._anchor_scales, ratios=self._anchor_ratios)
+        cls_score = F.slice_axis(cls_score, axis=1, begin=self._num_anchors, end=None)
+        rois = self.proposal(cls_score, reg, im_info)
         if autograd.is_training():
             return cls, reg, rois
         return rois
