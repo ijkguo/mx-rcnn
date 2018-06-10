@@ -106,7 +106,8 @@ class RPN(HybridBlock):
         cls_score = F.softmax(cls, axis=1)
         cls_score = F.reshape(cls_score, (0, 2 * self._num_anchors, -1, 0))
         cls_score = F.slice_axis(cls_score, axis=1, begin=self._num_anchors, end=None)
-        rois = self.proposal(cls_score, reg, im_info)
+        with autograd.pause():
+            rois = self.proposal(cls_score, reg, im_info)
         if autograd.is_training():
             return cls, reg, rois
         return rois

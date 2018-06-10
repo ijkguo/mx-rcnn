@@ -5,7 +5,7 @@ from data.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_
 from data.np_anchor import AnchorGenerator
 
 
-class Proposal(gluon.Block):
+class Proposal(gluon.HybridBlock):
     def __init__(self, anchor_scales, anchor_ratios, rpn_feature_stride,
                  rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
                  alloc_size=(128, 128), output_score=False, **kwargs):
