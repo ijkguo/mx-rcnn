@@ -77,11 +77,11 @@ class RCNNDefaultTrainTransform(object):
         gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
 
         # convert to ndarray
-        gt_bboxes = mx.nd.array(gt_bboxes)
+        gt_bboxes = mx.nd.array(gt_bboxes, ctx=im_tensor.context)
 
         # compute anchor shape and generate anchors
         feat_height, feat_width = self._ac(im_height), self._ac(im_width)
-        anchors = self._rag.generate(feat_height, feat_width)
+        anchors = self._rag.forward(feat_height, feat_width).as_in_context(im_tensor.context)
 
         # assign anchors
         boxes = gt_bboxes[:, :4].expand_dims(axis=0)

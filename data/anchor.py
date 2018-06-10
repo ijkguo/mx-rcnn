@@ -7,13 +7,9 @@ from .np_anchor import AnchorGenerator
 # generate and clip anchor
 class RPNAnchorGenerator:
     def __init__(self, ag: AnchorGenerator, alloc_size=(128, 128)):
-        self._anchors = mx.nd.array(
-            ag.generate(*alloc_size).reshape((1, 1, alloc_size[0], alloc_size[1], -1)).astype(np.float32))
+        self._anchors = mx.nd.array(ag.generate(*alloc_size).reshape((1, 1, alloc_size[0], alloc_size[1], -1)))
 
-    def forward(self, x):
-        return mx.nd.slice_like(self._anchors, x, axis=(2, 3)).reshape(1, -1, 4)
-
-    def generate(self, feat_height, feat_width):
+    def forward(self, feat_height, feat_width):
         return self._anchors[:, :, :feat_height, :feat_width, :].reshape(-1, 4)
 
 
