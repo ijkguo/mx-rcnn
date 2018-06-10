@@ -91,7 +91,7 @@ class RPNTargetGenerator:
                 disable_indices = np.random.choice(
                     np.where(result < 0)[0], size=(num_neg - max_neg), replace=False)
                 result[disable_indices] = 0
-            results.append(mx.nd.array(result))
+            results.append(mx.nd.array(result, ctx=matches.context))
         return mx.nd.stack(*results, axis=0)
 
     @staticmethod
