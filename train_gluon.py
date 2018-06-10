@@ -5,8 +5,7 @@ import mxnet as mx
 from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
-from data.np_anchor import AnchorGenerator
-from data.anchor import RPNAnchorGenerator, RPNTargetGenerator
+from data.anchor import AnchorGenerator, RPNAnchorGenerator, RPNTargetGenerator
 from data.transform import RCNNDefaultTrainTransform
 from net.logger import logger
 from net.net_resnet import FRCNNResNet
@@ -183,9 +182,9 @@ def main():
     net.collect_params().reset_ctx(ctx)
 
     # loss
-    rpn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, from_logits=True, weight=1. / RPN_BATCH_ROIS)
+    rpn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / RPN_BATCH_ROIS)
     rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9, weight=1. / RPN_BATCH_ROIS)
-    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, from_logits=True, weight=1. / RCNN_BATCH_ROIS)
+    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / RCNN_BATCH_ROIS)
     rcnn_reg_loss = gluon.loss.HuberLoss(rho=1, weight=1. / RCNN_BATCH_ROIS)
     metrics = [mx.metric.Loss('RPN_CE'),
                mx.metric.Loss('RPN_SmoothL1'),

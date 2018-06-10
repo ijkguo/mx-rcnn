@@ -106,16 +106,16 @@ class RPN(HybridBlock):
         x = F.relu(self.rpn_conv(x))
         cls = self.conv_cls(x)
         cls = F.reshape(cls, (0, 2, -1, 0))
-        cls_logits = F.log_softmax(cls, axis=1)
-        cls = F.reshape(cls_logits, (0, 2 * self._num_anchors, -1, 0))
         reg = self.conv_reg(x)
 
-        rois = F.contrib.Proposal(cls_score=cls, bbox_pred=reg, im_info=im_info,
+        cls_score = F.softmax(cls, axis=1)
+        cls_score = F.reshape(cls_score, (0, 2 * self._num_anchors, -1, 0))
+        rois = F.contrib.Proposal(cls_score=cls_score, bbox_pred=reg, im_info=im_info,
                                   rpn_pre_nms_top_n=self._rpn_pre_topk, rpn_post_nms_top_n=self._rpn_post_topk,
                                   threshold=self._rpn_nms_thresh, rpn_min_size=self._rpn_min_size,
                                   scales=self._anchor_scales, ratios=self._anchor_ratios)
         if autograd.is_training():
-            return cls_logits, reg, rois
+            return cls, reg, rois
         return rois
 
 
@@ -128,9 +128,8 @@ class RCNN(HybridBlock):
 
     def hybrid_forward(self, F, x):
         cls = self.cls(x)
-        cls_logits = F.log_softmax(cls)
         reg = self.reg(x)
-        return cls_logits, reg
+        return cls, reg
 
 
 class FRCNNResNet(HybridBlock):
