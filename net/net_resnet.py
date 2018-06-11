@@ -2,6 +2,7 @@ import mxnet as mx
 from mxnet import autograd
 from mxnet.gluon import nn, HybridBlock
 
+from . import proposal_target
 from .proposal import Proposal
 
 
@@ -160,6 +161,11 @@ class FRCNNResNet(HybridBlock):
                          fg_overlap=self._rcnn_fg_overlap, box_stds=self._rcnn_bbox_stds)
         else:
             rois = self.rpn(feat, im_info)
+        # create batch id and reshape for roi pooling
+        with autograd.pause():
+            rois = rois.reshape((-3, 0))
+            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
+            rois = F.concat(roi_batch_id, rois, dim=-1)
         pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         top_feat = self.backbone.layer4(pooled_feat)
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)

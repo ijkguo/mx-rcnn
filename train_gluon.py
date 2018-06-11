@@ -16,7 +16,6 @@ IMG_SHORT_SIDE = 600
 IMG_LONG_SIDE = 1000
 IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
 IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
-NET_FIXED_PARAM = ['conv0', 'stage1', 'gamma', 'beta']
 
 RPN_ANCHORS = 9
 RPN_ANCHOR_SCALES = (8, 16, 32)
@@ -172,8 +171,9 @@ def main():
         num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
         rpn_feature_stride=RPN_FEAT_STRIDE, rpn_pre_topk=RPN_PRE_NMS_TOP_N, rpn_post_topk=RPN_POST_NMS_TOP_N,
         rpn_nms_thresh=RPN_NMS_THRESH, rpn_min_size=RPN_MIN_SIZE,
-        num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE,
-        rcnn_pooled_size=RCNN_POOLED_SIZE)
+        num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE, rcnn_pooled_size=RCNN_POOLED_SIZE,
+        rcnn_batch_size=RCNN_BATCH_SIZE, rcnn_batch_rois=RCNN_BATCH_ROIS, rcnn_fg_fraction=RCNN_FG_FRACTION,
+        rcnn_fg_overlap=RCNN_FG_OVERLAP, rcnn_bbox_stds=RCNN_BBOX_STDS)
     if args.resume.strip():
         net.load_params(args.resume.strip())
     else:

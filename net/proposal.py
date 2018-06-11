@@ -1,6 +1,5 @@
 import mxnet as mx
 from mxnet import gluon
-from mxnet import nd as F
 from data.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_clip
 from data.np_anchor import AnchorGenerator
 
@@ -22,7 +21,7 @@ class Proposal(gluon.HybridBlock):
     def _generate_anchor(self, x):
         return mx.nd.slice_like(self._anchors.as_in_context(x.context), x, axes=(2, 3)).reshape(1, -1, 4)
 
-    def forward(self, cls, reg, im_info, **kwargs):
+    def hybrid_forward(self, F, cls, reg, im_info, **kwargs):
         # nd proposal
         anchors = self._generate_anchor(reg)
 
@@ -56,13 +55,6 @@ class Proposal(gluon.HybridBlock):
         result = F.slice_axis(tmp, axis=1, begin=0, end=self._rpn_post_topk)
         rpn_scores = F.slice_axis(result, axis=-1, begin=0, end=1)
         rpn_bbox = F.slice_axis(result, axis=-1, begin=1, end=None)
-
-        # concat batch ib and reshape
-        rpn_bbox = F.concat(F.zeros_like(rpn_scores), rpn_bbox, dim=-1)
-        for ib in range(rpn_bbox.shape[0]):
-            rpn_bbox[ib, :, 0] = ib
-        rpn_scores = rpn_scores.reshape((-3, 0))
-        rpn_bbox = rpn_bbox.reshape((-3, 0))
 
         if self._output_score:
             return rpn_bbox, rpn_scores
