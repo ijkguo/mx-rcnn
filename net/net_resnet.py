@@ -84,9 +84,7 @@ class ResNet50V2(HybridBlock):
 
 
 class RPN(HybridBlock):
-    def __init__(self, in_channels, num_anchors, anchor_scales, anchor_ratios,
-                 rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
-                 **kwargs):
+    def __init__(self, in_channels, num_anchors, **kwargs):
         super(RPN, self).__init__(**kwargs)
         self._num_anchors = num_anchors
 
@@ -95,20 +93,12 @@ class RPN(HybridBlock):
             self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=1024, kernel_size=(3, 3), padding=(1, 1), weight_initializer=weight_initializer)
             self.conv_cls = nn.Conv2D(in_channels=1024, channels=num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
             self.conv_reg = nn.Conv2D(in_channels=1024, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
-            self.proposal = Proposal(anchor_scales=anchor_scales, anchor_ratios=anchor_ratios, rpn_feature_stride=rpn_feature_stride,
-                                     rpn_pre_topk=rpn_pre_topk, rpn_post_topk=rpn_post_topk, rpn_nms_thresh=rpn_nms_thresh, rpn_min_size=rpn_min_size)
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
         cls = self.conv_cls(x)
         reg = self.conv_reg(x)
-
-        cls_score = F.sigmoid(cls)
-        with autograd.pause():
-            rois = self.proposal(cls_score, reg, im_info)
-        if autograd.is_training():
-            return cls, reg, rois
-        return rois
+        return cls, reg
 
 
 class RCNN(HybridBlock):
@@ -143,8 +133,9 @@ class FRCNNResNet(HybridBlock):
         with self.name_scope():
             self.backbone = ResNet50V2(prefix='')
             self.rcnn = RCNN(2048, num_classes)
-            self.rpn = RPN(1024, num_anchors, anchor_scales, anchor_ratios,
-                           rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
+            self.rpn = RPN(1024, num_anchors)
+            self.proposal = Proposal(anchor_scales, anchor_ratios, rpn_feature_stride, rpn_pre_topk,
+                                     rpn_post_topk, rpn_nms_thresh, rpn_min_size)
 
     def hybrid_forward(self, F, x, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
@@ -152,23 +143,31 @@ class FRCNNResNet(HybridBlock):
         x = self.backbone.layer2(x)
         feat = self.backbone.layer3(x)
 
-        if autograd.is_training():
-            rpn_cls, rpn_reg, rois = self.rpn(feat, im_info)
-            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
-                F.Custom(rois, gt_boxes, op_type="proposal_target",
-                         num_classes=self._num_classes, batch_images=self._rcnn_batch_size,
-                         batch_rois=self._rcnn_batch_rois, fg_fraction=self._rcnn_fg_fraction,
-                         fg_overlap=self._rcnn_fg_overlap, box_stds=self._rcnn_bbox_stds)
-        else:
-            rois = self.rpn(feat, im_info)
+        # generate proposals
+        rpn_cls, rpn_reg = self.rpn(feat, im_info)
+        with autograd.pause():
+            rpn_cls_prob = F.sigmoid(rpn_cls)
+            rois = self.proposal(rpn_cls_prob, rpn_reg, im_info)
+
         # create batch id and reshape for roi pooling
         with autograd.pause():
             rois = rois.reshape((-3, 0))
             roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
             rois = F.concat(roi_batch_id, rois, dim=-1)
+
+        # generate targets
+        if autograd.is_training():
+            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
+                F.Custom(rois, gt_boxes, op_type="proposal_target",
+                         num_classes=self._num_classes, batch_images=self._rcnn_batch_size,
+                         batch_rois=self._rcnn_batch_rois, fg_fraction=self._rcnn_fg_fraction,
+                         fg_overlap=self._rcnn_fg_overlap, box_stds=self._rcnn_bbox_stds)
+
+        # classify pooled features
         pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         top_feat = self.backbone.layer4(pooled_feat)
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)
+
         if autograd.is_training():
             return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
         return rois, rcnn_cls, rcnn_reg
