@@ -165,7 +165,7 @@ def main():
     train_transform = RCNNDefaultTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
                                                 std=IMG_PIXEL_STDS, ac=get_feat_size, rag=rag, rtg=rtg)
     train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
-                                             batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=0)
+                                             batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=4)
 
     # load model
     net = FRCNNResNet(
