@@ -122,6 +122,7 @@ class FRCNNResNet(HybridBlock):
                  **kwargs):
         super(FRCNNResNet, self).__init__(**kwargs)
         self._num_classes = num_classes
+        self._rpn_post_topk = rpn_post_topk
         self._rcnn_feature_stride = rcnn_feature_stride
         self._rcnn_pooled_size = rcnn_pooled_size
         self._rcnn_batch_size = rcnn_batch_size
@@ -152,7 +153,8 @@ class FRCNNResNet(HybridBlock):
         # create batch id and reshape for roi pooling
         with autograd.pause():
             rois = rois.reshape((-3, 0))
-            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
+            # todo change this back to batch_rois (after sample)
+            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rpn_post_topk).reshape((-1, 1))
             rois = F.concat(roi_batch_id, rois, dim=-1)
 
         # generate targets
