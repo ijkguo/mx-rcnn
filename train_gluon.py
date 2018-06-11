@@ -83,7 +83,7 @@ class RPNAccMetric(mx.metric.EvalMetric):
         num_inst = mx.nd.sum(rpn_weight)
 
         # cls_logits (b, c, h, w) red_label (b, 1, h, w)
-        pred_label = mx.nd.argmax(rpn_cls_logits, axis=1, keepdims=True)
+        pred_label = mx.nd.sigmoid(rpn_cls_logits) >= 0.5
         # label (b, 1, h, w)
         num_acc = mx.nd.sum((pred_label == rpn_label) * rpn_weight)
 
@@ -182,7 +182,7 @@ def main():
     net.collect_params().reset_ctx(ctx)
 
     # loss
-    rpn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / RPN_BATCH_ROIS)
+    rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / RPN_BATCH_ROIS)
     rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9, weight=1. / RPN_BATCH_ROIS)
     rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / RCNN_BATCH_ROIS)
     rcnn_reg_loss = gluon.loss.HuberLoss(rho=1, weight=1. / RCNN_BATCH_ROIS)
