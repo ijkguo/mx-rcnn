@@ -2,8 +2,8 @@ import mxnet as mx
 from mxnet import autograd
 from mxnet.gluon import nn, HybridBlock
 
-from . import proposal_target
 from .proposal import Proposal
+from .rcnn_target import RCNNTargetGenerator
 
 
 def _conv3x3(channels, stride, in_channels):
@@ -122,14 +122,10 @@ class FRCNNResNet(HybridBlock):
                  **kwargs):
         super(FRCNNResNet, self).__init__(**kwargs)
         self._num_classes = num_classes
-        self._rpn_post_topk = rpn_post_topk
         self._rcnn_feature_stride = rcnn_feature_stride
         self._rcnn_pooled_size = rcnn_pooled_size
         self._rcnn_batch_size = rcnn_batch_size
         self._rcnn_batch_rois = rcnn_batch_rois
-        self._rcnn_fg_fraction = rcnn_fg_fraction
-        self._rcnn_fg_overlap = rcnn_fg_overlap
-        self._rcnn_bbox_stds = rcnn_bbox_stds
 
         with self.name_scope():
             self.backbone = ResNet50V2(prefix='')
@@ -137,6 +133,8 @@ class FRCNNResNet(HybridBlock):
             self.rpn = RPN(1024, num_anchors)
             self.proposal = Proposal(anchor_scales, anchor_ratios, rpn_feature_stride, rpn_pre_topk,
                                      rpn_post_topk, rpn_nms_thresh, rpn_min_size)
+            self.rcnn_target = RCNNTargetGenerator(num_classes, rcnn_batch_size, rcnn_batch_rois,
+                                                   rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds)
 
     def hybrid_forward(self, F, x, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
@@ -150,20 +148,18 @@ class FRCNNResNet(HybridBlock):
             rpn_cls_prob = F.sigmoid(rpn_cls)
             rois = self.proposal(rpn_cls_prob, rpn_reg, im_info)
 
-        # create batch id and reshape for roi pooling
-        with autograd.pause():
-            rois = rois.reshape((-3, 0))
-            # todo change this back to batch_rois (after sample)
-            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rpn_post_topk).reshape((-1, 1))
-            rois = F.concat(roi_batch_id, rois, dim=-1)
+            # generate targets
+            if autograd.is_training():
+                rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
+                    self.rcnn_target(rois, gt_boxes)
+                rcnn_label = rcnn_label.reshape(-3)
+                rcnn_bbox_target = rcnn_bbox_target.reshape((-3, -3))
+                rcnn_bbox_weight = rcnn_bbox_weight.reshape((-3, -3))
 
-        # generate targets
-        if autograd.is_training():
-            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
-                F.Custom(rois, gt_boxes, op_type="proposal_target",
-                         num_classes=self._num_classes, batch_images=self._rcnn_batch_size,
-                         batch_rois=self._rcnn_batch_rois, fg_fraction=self._rcnn_fg_fraction,
-                         fg_overlap=self._rcnn_fg_overlap, box_stds=self._rcnn_bbox_stds)
+            # create batch id and reshape for roi pooling
+            rois = rois.reshape((-3, 0))
+            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
+            rois = F.concat(roi_batch_id, rois, dim=-1)
 
         # classify pooled features
         pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
