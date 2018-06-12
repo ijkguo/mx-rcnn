@@ -50,9 +50,7 @@ class RPNTargetGenerator:
         return result
 
     @staticmethod
-    def _matcher(x, pos_iou_thresh):
-        matches = [RPNTargetGenerator._maximum_matcher(x, pos_iou_thresh),
-                   RPNTargetGenerator._bipartite_matcher_v1(x)]
+    def _composite_matcher(matches):
         result = matches[0]
         for match in matches[1:]:
             result = mx.nd.where(result > -0.5, result, match)
@@ -68,7 +66,7 @@ class RPNTargetGenerator:
             # init with 0s, which are ignored
             result = mx.nd.zeros_like(matches[0])
             # negative samples with label -1
-            ious_max = ious.max(axis=-1)[i]
+            ious_max = ious[i].max(axis=-1)
             neg_mask = ious_max < neg_thresh_high
             neg_mask = neg_mask * (ious_max > neg_thresh_low)
             result = mx.nd.where(neg_mask, mx.nd.ones_like(result) * -1, result)
@@ -146,7 +144,8 @@ class RPNTargetGenerator:
         # ious is (N, M)
         ious = mx.nd.contrib.box_iou(anchor, bbox, format='corner').transpose((1, 0, 2))
         ious[:, invalid_mask, :] = -1
-        matches = self._matcher(ious, self._pos_iou_thresh)
+        matches = self._composite_matcher([self._maximum_matcher(ious, self._pos_iou_thresh),
+                                           self._bipartite_matcher_v1(ious)])
         samples = self._sampler(matches, ious, self._num_sample, self._pos_iou_thresh,
                                 self._neg_iou_thresh, 0., self._pos_ratio)
 
