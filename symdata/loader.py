@@ -19,6 +19,8 @@ def load_test(filename, short, max_size, mean, std):
     im_tensor = mx.nd.array(im_tensor).expand_dims(0)
     im_info = mx.nd.array(im_info).expand_dims(0)
 
+    # transform cv2 BRG image to RGB for matplotlib
+    im_orig = im_orig[:, :, (2, 1, 0)]
     return im_tensor, im_info, im_orig
 
 
