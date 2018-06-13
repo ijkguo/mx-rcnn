@@ -84,7 +84,7 @@ def main():
     det[:, 0] -= 1
 
     # print out
-    for [cls, conf, x1, y1, x2, y2] in det.asnumpy():
+    for [cls, conf, x1, y1, x2, y2] in det:
         if cls >= 0 and conf > VIS_THRESH:
             print([cls, conf, x1, y1, x2, y2])
 
