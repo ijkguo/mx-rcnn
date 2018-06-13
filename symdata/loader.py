@@ -2,7 +2,32 @@ import mxnet as mx
 import numpy as np
 
 from symdata.anchor import AnchorGenerator, AnchorSampler
-from symdata.image import get_image, tensor_vstack
+from symdata.image import imdecode, resize, transform, get_image, tensor_vstack
+
+
+def load_test(filename, short, max_size, mean, std):
+    # read and transform image
+    im_orig = imdecode(filename)
+    im, im_scale = resize(im_orig, short, max_size)
+    height, width = im.shape[:2]
+    im_info = mx.nd.array([height, width, im_scale])
+
+    # transform into tensor and normalize
+    im_tensor = transform(im, mean, std)
+
+    # for 1-batch inference purpose, cannot use batchify (or nd.stack) to expand dims
+    im_tensor = mx.nd.array(im_tensor).expand_dims(0)
+    im_info = mx.nd.array(im_info).expand_dims(0)
+
+    return im_tensor, im_info, im_orig
+
+
+def generate_batch(im_tensor, im_info):
+    """return batch"""
+    data = [im_tensor, im_info]
+    data_shapes = [('data', im_tensor.shape), ('im_info', im_info.shape)]
+    data_batch = mx.io.DataBatch(data=data, label=None, provide_data=data_shapes, provide_label=None)
+    return data_batch
 
 
 class TestLoader(mx.io.DataIter):

@@ -7,7 +7,7 @@ from gluoncv import data as gdata
 
 from data.anchor import AnchorGenerator, RPNAnchorGenerator, RPNTargetGenerator
 from data.transform import RCNNDefaultTrainTransform
-from net.logger import logger
+from symnet.logger import logger
 from net.net_resnet import FRCNNResNet
 from symnet.symbol_resnet import get_feat_size
 

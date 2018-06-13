@@ -2,11 +2,12 @@ import argparse
 
 import mxnet as mx
 import numpy as np
+from tqdm import tqdm
 
 from symdata.bbox import im_detect
 from symdata.loader import TestLoader
 from symimdb.pascal_voc import PascalVOC
-from net.logger import logger
+from symnet.logger import logger
 from symnet.model import get_net
 from symnet.symbol_resnet import get_resnet_test
 
@@ -72,22 +73,21 @@ def main():
                  for _ in range(imdb.num_classes)]
 
     # start detection
-    for i, data_batch in enumerate(test_data):
-        logger.info('testing %d/%d' % (i, imdb.num_images))
+    with tqdm(total=imdb.num_images) as pbar:
+        for i, data_batch in enumerate(test_data):
+            # forward
+            im_info = data_batch.data[1][0]
+            output = predictor.predict(data_batch)
+            rois = output['rois_output'][:, 1:]
+            scores = output['cls_prob_reshape_output'][0]
+            bbox_deltas = output['bbox_pred_reshape_output'][0]
 
-        im_info = data_batch.data[1][0]
-
-        # forward
-        output = predictor.predict(data_batch)
-        rois = output['rois_output'][:, 1:]
-        scores = output['cls_prob_reshape_output'][0]
-        bbox_deltas = output['bbox_pred_reshape_output'][0]
-
-        det = im_detect(rois, scores, bbox_deltas, im_info,
-                        bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH, conf_thresh=RCNN_CONF_THRESH)
-        for j in range(1, imdb.num_classes):
-            indexes = np.where(det[:, 0] == j)[0]
-            all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
+            det = im_detect(rois, scores, bbox_deltas, im_info,
+                            bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH, conf_thresh=RCNN_CONF_THRESH)
+            for j in range(1, imdb.num_classes):
+                indexes = np.where(det[:, 0] == j)[0]
+                all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
+            pbar.update(data_batch.data[0].shape[0])
 
     # evaluate model
     imdb.evaluate_detections(all_boxes)

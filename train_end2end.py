@@ -5,7 +5,7 @@ import mxnet as mx
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symimdb.pascal_voc import PascalVOC
-from net.logger import logger
+from symnet.logger import logger
 from symnet.module import MutableModule
 from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric

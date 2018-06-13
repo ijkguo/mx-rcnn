@@ -1,10 +1,9 @@
 import argparse
 import mxnet as mx
 
-from data.bbox import decode_detect
-from data.transform import load_test
-from symdata.transform import generate_batch
-from data.vis import vis_detection
+from symdata.bbox import im_detect
+from symdata.loader import load_test, generate_batch
+from symdata.vis import vis_detection
 from symnet.model import get_net
 from symnet.symbol_resnet import get_resnet_test
 
@@ -25,7 +24,9 @@ RPN_MIN_SIZE = 16
 RCNN_CLASSES = 21
 RCNN_FEAT_STRIDE = 16
 RCNN_POOLED_SIZE = (14, 14)
+RCNN_BATCH_SIZE = 1
 RCNN_BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
+RCNN_CONF_THRESH = 1e-3
 RCNN_NMS_THRESH = 0.3
 
 VIS_THRESH = 0.7
@@ -76,8 +77,8 @@ def main():
     im_info = im_info[0]
 
     # decode detection
-    det = decode_detect(rois, scores, bbox_deltas, im_info,
-                        bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH)
+    det = im_detect(rois, scores, bbox_deltas, im_info,
+                    bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH, conf_thresh=RCNN_CONF_THRESH)
 
     # remove background class
     det[:, 0] -= 1
@@ -89,7 +90,7 @@ def main():
 
     # if vis
     if args.vis:
-        vis_detection(im_orig.asnumpy(), det.asnumpy(), VIS_CLASSES, thresh=VIS_THRESH)
+        vis_detection(im_orig, det, VIS_CLASSES, thresh=VIS_THRESH)
 
 
 if __name__ == '__main__':

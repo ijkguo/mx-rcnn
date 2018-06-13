@@ -5,7 +5,7 @@ from gluoncv import data as gdata
 
 from data.bbox import decode_detect
 from data.transform import load_test
-from data.vis import vis_detection
+from symdata.vis import vis_detection
 from net.net_resnet import FRCNNResNet
 
 
