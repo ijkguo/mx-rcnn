@@ -83,7 +83,7 @@ def transform_inverse(im_tensor, mean, std):
     :param std: [RGB pixel std var]
     :return: im [height, width, channel(RGB)]
     """
-    assert im_tensor.shape[0] == 1 and im_tensor.shape[1] == 3
+    assert im_tensor.shape[0] == 3
     im = im_tensor.transpose((1, 2, 0))
     im = im * std + mean
     im = im.astype(np.uint8)
