@@ -48,8 +48,8 @@ class Proposal(gluon.HybridBlock):
         # nms
         # Non-maximum suppression
         pre = F.concat(score, boxes, dim=-1)
-        tmp = F.contrib.box_nms(pre, self._rpn_nms_thresh, self._rpn_pre_topk, coord_start=1,
-                                score_index=0, id_index=-1, force_suppress=True)
+        tmp = F.contrib.box_nms(pre, overlap_thresh=self._rpn_nms_thresh, topk=self._rpn_pre_topk,
+                                coord_start=1, score_index=0, id_index=-1, force_suppress=True)
 
         # slice post_nms number of boxes
         result = F.slice_axis(tmp, axis=1, begin=0, end=self._rpn_post_topk)
