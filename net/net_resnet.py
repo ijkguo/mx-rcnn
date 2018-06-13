@@ -163,7 +163,7 @@ class FRCNNResNet(HybridBlock):
             rois = F.concat(roi_batch_id, rois, dim=-1)
 
         # classify pooled features
-        pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+        pooled_feat = F.contrib.ROIAlign(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         top_feat = self.backbone.layer4(pooled_feat)
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)
 
