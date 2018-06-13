@@ -5,9 +5,9 @@ from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from tqdm import tqdm
 
-from data.bbox import decode_detect
-from data.transform import RCNNDefaultValTransform
-from net.net_resnet import FRCNNResNet
+from nddata.bbox import decode_detect
+from nddata.transform import RCNNDefaultValTransform
+from ndnet.net_resnet import FRCNNResNet
 
 
 IMG_SHORT_SIDE = 600

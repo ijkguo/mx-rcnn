@@ -3,10 +3,10 @@ import mxnet as mx
 
 from gluoncv import data as gdata
 
-from data.bbox import decode_detect
-from data.transform import load_test
+from nddata.bbox import decode_detect
+from nddata.transform import load_test
 from symdata.vis import vis_detection
-from net.net_resnet import FRCNNResNet
+from ndnet.net_resnet import FRCNNResNet
 
 
 IMG_SHORT_SIDE = 600

@@ -1,8 +1,8 @@
 import mxnet as mx
 
-from data.image import imdecode, random_flip, resize, transform
+from nddata.image import imdecode, random_flip, resize, transform
 from symdata.bbox import bbox_flip
-from data.anchor import RPNAnchorGenerator, RPNTargetGenerator
+from nddata.anchor import RPNAnchorGenerator, RPNTargetGenerator
 
 
 def load_test(filename, short, max_size, mean, std):

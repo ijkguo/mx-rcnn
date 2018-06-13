@@ -1,6 +1,6 @@
 import mxnet as mx
 from mxnet import gluon
-from data.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_clip
+from nddata.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_clip
 from symdata.anchor import AnchorGenerator
 
 
