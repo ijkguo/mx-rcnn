@@ -1,7 +1,7 @@
 import mxnet as mx
 from mxnet import gluon
 from data.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_clip
-from data.np_anchor import AnchorGenerator
+from symdata.anchor import AnchorGenerator
 
 
 class Proposal(gluon.HybridBlock):

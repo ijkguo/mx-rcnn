@@ -4,13 +4,13 @@ import pprint
 import mxnet as mx
 from gluoncv import data as gdata
 
-from data.np_loader import AnchorGenerator, AnchorSampler
-from data.np_transform import RCNNDefaultTrainTransform, AnchorIter
+from symdata.loader import AnchorGenerator, AnchorSampler
+from symdata.transform import RCNNDefaultTrainTransform, AnchorIter
 from net.logger import logger
-from net.module import MutableModule
-from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
-from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
-from net.symbol_resnet import get_resnet_train, get_feat_size
+from symnet.module import MutableModule
+from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
+from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
+from symnet.symbol_resnet import get_resnet_train, get_feat_size
 
 
 IMG_SHORT_SIDE = 600

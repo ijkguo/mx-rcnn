@@ -7,9 +7,9 @@ from tqdm import tqdm
 
 from data.bbox import decode_detect
 from data.transform import RCNNDefaultValTransform
-from data.np_transform import generate_batch
-from net.model import get_net
-from net.symbol_resnet import get_resnet_test
+from symdata.transform import generate_batch
+from symnet.model import get_net
+from symnet.symbol_resnet import get_resnet_test
 
 
 IMG_SHORT_SIDE = 600

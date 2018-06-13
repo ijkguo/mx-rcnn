@@ -1,10 +1,10 @@
 import mxnet as mx
 
-from net.module import MutableModule
+from symnet.module import MutableModule
 
 
 def load_param(prefix, epoch, ctx=None):
-    """same as mx.model.load_checkpoint, but do not load symbol and will convert context"""
+    """same as mx.model.load_checkpoint, but do not load symnet and will convert context"""
     if ctx is None:
         ctx = mx.cpu()
     save_dict = mx.nd.load('%s-%04d.params' % (prefix, epoch))

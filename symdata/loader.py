@@ -1,8 +1,8 @@
 import mxnet as mx
 import numpy as np
 
-from data.np_anchor import AnchorGenerator, AnchorSampler
-from data.np_image import get_image, tensor_vstack
+from symdata.anchor import AnchorGenerator, AnchorSampler
+from symdata.image import get_image, tensor_vstack
 
 
 class TestLoader(mx.io.DataIter):

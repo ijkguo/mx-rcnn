@@ -3,13 +3,13 @@ import pprint
 
 import mxnet as mx
 
-from data.np_loader import AnchorGenerator, AnchorSampler, AnchorLoader
-from dataset.pascal_voc import PascalVOC
+from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
+from symimdb.pascal_voc import PascalVOC
 from net.logger import logger
-from net.module import MutableModule
-from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
-from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
-from net.symbol_resnet import get_resnet_train
+from symnet.module import MutableModule
+from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
+from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
+from symnet.symbol_resnet import get_resnet_train
 
 
 IMG_SHORT_SIDE = 600

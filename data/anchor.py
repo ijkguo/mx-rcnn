@@ -1,7 +1,7 @@
 import mxnet as mx
 import numpy as np
 
-from .np_anchor import AnchorGenerator
+from symdata.anchor import AnchorGenerator
 
 
 # generate and clip anchor

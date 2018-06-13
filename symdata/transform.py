@@ -2,8 +2,8 @@ import mxnet as mx
 from gluoncv import data as gdata
 
 from data.image import random_flip, resize, transform
-from data.np_anchor import AnchorGenerator, AnchorSampler
-from data.np_bbox import bbox_flip
+from symdata.anchor import AnchorGenerator, AnchorSampler
+from symdata.bbox import bbox_flip
 
 
 def generate_batch(im_tensor, im_info):

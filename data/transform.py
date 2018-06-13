@@ -1,7 +1,7 @@
 import mxnet as mx
 
 from data.image import imdecode, random_flip, resize, transform
-from data.np_bbox import bbox_flip
+from symdata.bbox import bbox_flip
 from data.anchor import RPNAnchorGenerator, RPNTargetGenerator
 
 

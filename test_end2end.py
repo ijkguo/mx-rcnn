@@ -3,12 +3,12 @@ import argparse
 import mxnet as mx
 import numpy as np
 
-from data.np_bbox import im_detect
-from data.np_loader import TestLoader
-from dataset.pascal_voc import PascalVOC
+from symdata.bbox import im_detect
+from symdata.loader import TestLoader
+from symimdb.pascal_voc import PascalVOC
 from net.logger import logger
-from net.model import get_net
-from net.symbol_resnet import get_resnet_test
+from symnet.model import get_net
+from symnet.symbol_resnet import get_resnet_test
 
 
 IMG_SHORT_SIDE = 600

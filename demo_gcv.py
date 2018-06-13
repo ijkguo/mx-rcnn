@@ -3,10 +3,10 @@ import mxnet as mx
 
 from data.bbox import decode_detect
 from data.transform import load_test
-from data.np_transform import generate_batch
+from symdata.transform import generate_batch
 from data.vis import vis_detection
-from net.model import get_net
-from net.symbol_resnet import get_resnet_test
+from symnet.model import get_net
+from symnet.symbol_resnet import get_resnet_test
 
 IMG_SHORT_SIDE = 600
 IMG_LONG_SIDE = 1000
