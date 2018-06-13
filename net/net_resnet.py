@@ -127,13 +127,14 @@ class FRCNNResNet(HybridBlock):
                  rpn_feature_stride=16, rpn_pre_topk=6000, rpn_post_topk=300, rpn_nms_thresh=0.7, rpn_min_size=16,
                  num_classes=21, rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_batch_size=1,
                  rcnn_batch_rois=128, rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
-                 **kwargs):
+                 rcnn_roi_mode='align', **kwargs):
         super(FRCNNResNet, self).__init__(**kwargs)
         self._num_classes = num_classes
         self._rcnn_feature_stride = rcnn_feature_stride
         self._rcnn_pooled_size = rcnn_pooled_size
         self._rcnn_batch_size = rcnn_batch_size
         self._rcnn_batch_rois = rcnn_batch_rois
+        self._rcnn_roi_mode = rcnn_roi_mode
 
         with self.name_scope():
             self.backbone = ResNet50V2(prefix='')
@@ -170,8 +171,15 @@ class FRCNNResNet(HybridBlock):
             roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
             rois = F.concat(roi_batch_id, rois, dim=-1)
 
+        # pool to roi features
+        if self._rcnn_roi_mode == 'pool':
+            pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+        elif self._rcnn_roi_mode == 'align':
+            pooled_feat = F.contrib.ROIAlign(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+        else:
+            raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
+
         # classify pooled features
-        pooled_feat = F.contrib.ROIAlign(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         top_feat = self.backbone.layer4(pooled_feat)
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)
 
