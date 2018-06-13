@@ -8,14 +8,6 @@ units=(3, 4, 6, 3)
 filter_list=(256, 512, 1024, 2048)
 
 
-def get_feat_size(sz):
-    sz = (sz + 2 * 3 - 7) // 2 + 1  # conv0 7*7 stride 2 pad 3
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # pool0 3*3 stride 2 pad 1
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # stage2 3*3 stride 2 pad 1
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # stage3 3*3 stride 2 pad 1
-    return sz
-
-
 def residual_unit(data, num_filter, stride, dim_match, name):
     bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, eps=eps, use_global_stats=use_global_stats, name=name + '_bn1')
     act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
