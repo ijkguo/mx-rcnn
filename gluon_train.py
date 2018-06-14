@@ -76,7 +76,7 @@ def main():
                                                 std=IMG_PIXEL_STDS, ac=get_feat_size, rag=rag, rtg=rtg)
     train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
                                              batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
-                                             last_batch="keep", num_workers=4)
+                                             last_batch="rollover", num_workers=4)
 
     # load model
     net = FRCNNResNet(
