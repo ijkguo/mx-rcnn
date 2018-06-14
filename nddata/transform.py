@@ -78,10 +78,11 @@ class RCNNDefaultValTransform(object):
         # resize image
         im, im_scale = resize(src, self._short, self._max_size)
         height, width = im.shape[:2]
-        im_info = mx.nd.array([height, width, im_scale])
+        im_info = mx.nd.array([height, width, im_scale], ctx=src.context)
 
         # transform into tensor and normalize
         im_tensor = transform(im, self._mean, self._std)
+        label = mx.nd.array(label, ctx=src.context)
         return im_tensor, im_info, label
 
 
@@ -102,7 +103,7 @@ class RCNNDefaultTrainTransform(object):
         # resize image
         im, im_scale = resize(im, self._short, self._max_size)
         im_height, im_width = im.shape[:2]
-        im_info = mx.nd.array([im_height, im_width, im_scale])
+        im_info = mx.nd.array([im_height, im_width, im_scale], ctx=src.context)
 
         # transform into tensor and normalize
         im_tensor = transform(im, self._mean, self._std)
