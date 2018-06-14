@@ -1,73 +1,34 @@
 import argparse
+import ast
+import pprint
+
 import mxnet as mx
 
 from symdata.bbox import im_detect
 from symdata.loader import load_test, generate_batch
 from symdata.vis import vis_detection
 from symnet.model import get_net
-from symnet.symbol_resnet import get_resnet_test
-
-IMG_SHORT_SIDE = 600
-IMG_LONG_SIDE = 1000
-IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
-IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
-
-RPN_ANCHORS = 9
-RPN_ANCHOR_SCALES = (8, 16, 32)
-RPN_ANCHOR_RATIOS = (0.5, 1, 2)
-RPN_FEAT_STRIDE = 16
-RPN_PRE_NMS_TOP_N = 6000
-RPN_POST_NMS_TOP_N = 300
-RPN_NMS_THRESH = 0.7
-RPN_MIN_SIZE = 16
-
-RCNN_CLASSES = 21
-RCNN_FEAT_STRIDE = 16
-RCNN_POOLED_SIZE = (14, 14)
-RCNN_BATCH_SIZE = 1
-RCNN_BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
-RCNN_CONF_THRESH = 1e-3
-RCNN_NMS_THRESH = 0.3
-
-VIS_THRESH = 0.7
-VIS_CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat',
-           'bottle', 'bus', 'car', 'cat', 'chair',
-           'cow', 'diningtable', 'dog', 'horse',
-           'motorbike', 'person', 'pottedplant',
-           'sheep', 'sofa', 'train', 'tvmonitor')
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network')
-    parser.add_argument('prefix', help='saved model prefix', default="model/resnet_voc0712", type=str)
-    parser.add_argument('epoch', help='epoch of pretrained model', default=10, type=int)
-    parser.add_argument('gpu', help='GPU device to use', default=0, type=int)
-    parser.add_argument('image', help='custom image', default="street_small.jpg", type=str)
-    parser.add_argument('--vis', help='display result', action='store_true')
-    args = parser.parse_args()
-    return args
+def demo_net(sym, class_names, args):
+    # print config
+    print('called with args\n{}'.format(pprint.pformat(vars(args))))
 
-
-def main():
-    # parse args
-    args = parse_args()
-    ctx = mx.gpu(args.gpu)
+    # setup context
+    if args.gpu:
+        ctx = mx.gpu(int(args.gpu))
+    else:
+        ctx = mx.gpu(args.gpu)
 
     # load single test
-    im_tensor, im_info, im_orig = \
-        load_test(args.image, short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS, std=IMG_PIXEL_STDS)
+    im_tensor, im_info, im_orig = load_test(args.image, short=args.img_short_side, max_size=args.img_long_side,
+                                            mean=args.img_pixel_means, std=args.img_pixel_stds)
 
     # generate data batch
     data_batch = generate_batch(im_tensor, im_info)
 
     # assemble executor
-    symbol = get_resnet_test(
-        num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
-        rpn_feature_stride=RPN_FEAT_STRIDE, rpn_pre_topk=RPN_PRE_NMS_TOP_N, rpn_post_topk=RPN_POST_NMS_TOP_N,
-        rpn_nms_thresh=RPN_NMS_THRESH, rpn_min_size=RPN_MIN_SIZE,
-        num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE,
-        rcnn_pooled_size=RCNN_POOLED_SIZE, rcnn_batch_size=RCNN_BATCH_SIZE)
-    predictor = get_net(symbol, args.prefix, args.epoch, ctx, short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE)
+    predictor = get_net(sym, args.params, ctx, short=args.img_short_side, max_size=args.img_long_side)
 
     # forward
     output = predictor.predict(data_batch)
@@ -78,19 +39,101 @@ def main():
 
     # decode detection
     det = im_detect(rois, scores, bbox_deltas, im_info,
-                    bbox_stds=RCNN_BBOX_STDS, nms_thresh=RCNN_NMS_THRESH, conf_thresh=RCNN_CONF_THRESH)
-
-    # remove background class
-    det[:, 0] -= 1
+                    bbox_stds=args.rcnn_bbox_stds, nms_thresh=args.rcnn_nms_thresh,
+                    conf_thresh=args.rcnn_conf_thresh)
 
     # print out
     for [cls, conf, x1, y1, x2, y2] in det:
-        if cls >= 0 and conf > VIS_THRESH:
-            print([cls, conf, x1, y1, x2, y2])
+        if cls > 0 and conf > args.vis_thresh:
+            print(class_names[int(cls)], conf, [x1, y1, x2, y2])
 
     # if vis
     if args.vis:
-        vis_detection(im_orig, det, VIS_CLASSES, thresh=VIS_THRESH)
+        vis_detection(im_orig, det, class_names, thresh=args.vis_thresh)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network')
+    parser.add_argument('--network', type=str, default='resnet50', help='base network')
+    parser.add_argument('--params', type=str, default='', help='path to trained model')
+    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--image', type=str, default='', help='path to test image')
+    parser.add_argument('--gpu', type=str, default='', help='gpu device eg. 0')
+    parser.add_argument('--vis', action='store_true', help='display results')
+    parser.add_argument('--vis-thresh', type=float, default=0.7, help='threshold display boxes')
+    # faster rcnn params
+    parser.add_argument('--img-short-side', type=int, default=600)
+    parser.add_argument('--img-long-side', type=int, default=1000)
+    parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
+    parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
+    parser.add_argument('--rpn-feat-stride', type=int, default=16)
+    parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
+    parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
+    parser.add_argument('--rpn-pre-nms-topk', type=int, default=6000)
+    parser.add_argument('--rpn-post-nms-topk', type=int, default=300)
+    parser.add_argument('--rpn-nms-thresh', type=float, default=0.7)
+    parser.add_argument('--rpn-min-size', type=int, default=16)
+    parser.add_argument('--rcnn-num-classes', type=int, default=21)
+    parser.add_argument('--rcnn-feat-stride', type=int, default=16)
+    parser.add_argument('--rcnn-pooled-size', type=str, default='(14, 14)')
+    parser.add_argument('--rcnn-batch-size', type=int, default=1)
+    parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
+    parser.add_argument('--rcnn-nms-thresh', type=float, default=0.3)
+    parser.add_argument('--rcnn-conf-thresh', type=float, default=1e-3)
+    args = parser.parse_args()
+    args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
+    args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
+    args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
+    args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
+    args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
+    args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
+    return args
+
+
+def get_voc_names():
+    from symimdb.pascal_voc import PascalVOC
+    return PascalVOC.classes
+
+
+def get_resnet50_test(args):
+    from symnet.symbol_resnet import get_resnet_test
+    if not args.params:
+        args.params = 'model/resnet50-0010.params'
+    args.img_pixel_means = (0.0, 0.0, 0.0)
+    args.img_pixel_stds = (1.0, 1.0, 1.0)
+    args.rpn_feat_stride = 16
+    args.rcnn_feat_stride = 16
+    args.rcnn_pooled_size = (14, 14)
+    return get_resnet_test(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
+                           rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
+                           rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
+                           rpn_min_size=args.rpn_min_size,
+                           num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
+                           rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size)
+
+def get_class_names(dataset):
+    datasets = {
+        'voc': get_voc_names
+    }
+    if dataset not in datasets:
+        raise ValueError("dataset {} not supported".format(dataset))
+    return datasets[dataset]()
+
+
+def get_network(network, args):
+    networks = {
+        'resnet50': get_resnet50_test
+    }
+    if network not in networks:
+        raise ValueError("network {} not supported".format(network))
+    return networks[network](args)
+
+
+def main():
+    args = parse_args()
+    sym = get_network(args.network, args)
+    class_names = get_class_names(args.dataset)
+    demo_net(sym, class_names, args)
 
 
 if __name__ == '__main__':
