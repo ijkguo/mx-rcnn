@@ -18,7 +18,7 @@ def demo_net(sym, class_names, args):
     if args.gpu:
         ctx = mx.gpu(int(args.gpu))
     else:
-        ctx = mx.gpu(args.gpu)
+        ctx = mx.cpu(0)
 
     # load single test
     im_tensor, im_info, im_orig = load_test(args.image, short=args.img_short_side, max_size=args.img_long_side,

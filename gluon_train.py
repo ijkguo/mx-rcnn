@@ -1,4 +1,6 @@
 import argparse
+import ast
+import pprint
 import time
 
 import mxnet as mx
@@ -8,84 +10,32 @@ from gluoncv import data as gdata
 from nddata.anchor import AnchorGenerator, RPNAnchorGenerator, RPNTargetGenerator
 from nddata.transform import RCNNDefaultTrainTransform, split_and_load, pad_to_max
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
-from ndnet.net_resnet import FRCNNResNet, get_feat_size
 from symnet.logger import logger
 
 
-IMG_SHORT_SIDE = 600
-IMG_LONG_SIDE = 1000
-IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
-IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
-
-RPN_ANCHORS = 9
-RPN_ANCHOR_SCALES = (8, 16, 32)
-RPN_ANCHOR_RATIOS = (0.5, 1, 2)
-RPN_FEAT_STRIDE = 16
-RPN_PRE_NMS_TOP_N = 12000
-RPN_POST_NMS_TOP_N = 2000
-RPN_NMS_THRESH = 0.7
-RPN_MIN_SIZE = 16
-RPN_BATCH_ROIS = 256
-RPN_ALLOWED_BORDER = 0
-RPN_FG_FRACTION = 0.5
-RPN_FG_OVERLAP = 0.7
-RPN_BG_OVERLAP = 0.3
-
-RCNN_CLASSES = 21
-RCNN_FEAT_STRIDE = 16
-RCNN_POOLED_SIZE = (14, 14)
-RCNN_BATCH_SIZE = 1
-RCNN_BATCH_ROIS = 128
-RCNN_FG_FRACTION = 0.25
-RCNN_FG_OVERLAP = 0.5
-RCNN_BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
-RCNN_NMS_THRESH = 0.3
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network')
-    # training
-    parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
-    parser.add_argument('--pretrained', help='pretrained model params',
-                        default='model/res50-converted-0000.params', type=str)
-    parser.add_argument('--frequent', help='frequency of logger', default=20, type=int)
-    parser.add_argument('--resume', help='resume model prefix', default='', type=str)
-    parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
-    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
-    parser.add_argument('--end_epoch', help='end epoch of training', default=20, type=int)
-    parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='14', type=str)
-    args = parser.parse_args()
-    return args
-
-
-def main():
+def train_net(net, feat_shape, dataset, args):
     # print config
-    args = parse_args()
-    print('Called with argument: %s' % args)
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
+
+    # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = len(ctx)
 
-    # load testing data
-    train_dataset = gdata.VOCDetection(splits=[(2007, 'trainval')])
-    ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
+    # load training data
+    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
+                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
     rag = RPNAnchorGenerator(ag)
-    rtg = RPNTargetGenerator(num_sample=RPN_BATCH_ROIS, pos_iou_thresh=RPN_FG_OVERLAP,
-                             neg_iou_thresh=RPN_BG_OVERLAP, pos_ratio=RPN_FG_FRACTION, stds=(1.0, 1.0, 1.0, 1.0))
-    train_transform = RCNNDefaultTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
-                                                std=IMG_PIXEL_STDS, ac=get_feat_size, rag=rag, rtg=rtg)
-    train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
+    rtg = RPNTargetGenerator(num_sample=args.rpn_batch_rois, pos_iou_thresh=args.rpn_fg_overlap,
+                             neg_iou_thresh=args.rpn_fg_overlap, pos_ratio=args.rpn_fg_fraction,
+                             stds=(1.0, 1.0, 1.0, 1.0))
+    train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
+                                                mean=args.img_pixel_means, std=args.img_pixel_stds,
+                                                ac=feat_shape, rag=rag, rtg=rtg)
+    train_loader = gdata.DetectionDataLoader(dataset.transform(train_transform),
                                              batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
                                              last_batch="rollover", num_workers=4)
 
-    # load model
-    net = FRCNNResNet(
-        num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
-        rpn_feature_stride=RPN_FEAT_STRIDE, rpn_pre_topk=RPN_PRE_NMS_TOP_N, rpn_post_topk=RPN_POST_NMS_TOP_N,
-        rpn_nms_thresh=RPN_NMS_THRESH, rpn_min_size=RPN_MIN_SIZE,
-        num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE, rcnn_pooled_size=RCNN_POOLED_SIZE,
-        rcnn_batch_size=RCNN_BATCH_SIZE, rcnn_batch_rois=RCNN_BATCH_ROIS, rcnn_fg_fraction=RCNN_FG_FRACTION,
-        rcnn_fg_overlap=RCNN_FG_OVERLAP, rcnn_bbox_stds=RCNN_BBOX_STDS)
+    # load params
     if args.resume.strip():
         net.load_params(args.resume.strip())
     else:
@@ -94,10 +44,10 @@ def main():
     net.collect_params().reset_ctx(ctx)
 
     # loss
-    rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / RPN_BATCH_ROIS)
-    rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9, weight=1. / RPN_BATCH_ROIS)
-    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / RCNN_BATCH_ROIS)
-    rcnn_reg_loss = gluon.loss.HuberLoss(rho=1, weight=1. / RCNN_BATCH_ROIS)
+    rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / args.rpn_batch_rois)
+    rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9, weight=1. / args.rpn_batch_rois)
+    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / args.rcnn_batch_rois)
+    rcnn_reg_loss = gluon.loss.HuberLoss(rho=1, weight=1. / args.rcnn_batch_rois)
     metrics = [mx.metric.Loss('RPN_CE'),
                mx.metric.Loss('RPN_SmoothL1'),
                mx.metric.Loss('RCNN_CE'),
@@ -111,14 +61,13 @@ def main():
     # learning rate
     lr = args.lr
     lr_decay = 0.1
-    lr_steps = [int(epoch) for epoch in args.lr_step.split(',')]
-    logger.info('lr {} lr_decay {}'.format(lr, lr_steps))
+    lr_steps = [int(epoch) for epoch in args.lr_decay_epoch.split(',')]
 
     # optimizer
-    select = ['.*stage2_conv', '.*stage3_conv', '.*stage4_conv', '.*rpn', '.*dense']
-    select = '|'.join([s for s in select])
+    logger.info('training params\n{}'.format(pprint.pformat(list(net.collect_params(args.net_train_patterns).keys()))))
+    logger.info('lr {} lr_decay {}'.format(lr, lr_steps))
     trainer = gluon.Trainer(
-        net.collect_params(select),
+        net.collect_params(args.net_train_patterns),
         'sgd',
         {'learning_rate': lr,
          'wd': 0.0005,
@@ -126,7 +75,7 @@ def main():
          'clip_gradient': 5})
 
     # training loop
-    for epoch in range(args.begin_epoch, args.end_epoch):
+    for epoch in range(args.start_epoch, args.epochs):
         while lr_steps and epoch >= lr_steps[0]:
             new_lr = trainer.learning_rate * lr_decay
             lr_steps.pop(0)
@@ -170,7 +119,7 @@ def main():
                         metric.update(record[0], record[1])
             trainer.step(batch_size)
             # (batch_end_callback) update metrics
-            if args.frequent and not (i + 1) % args.frequent:
+            if args.log_interval and not (i + 1) % args.log_interval:
                 msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics + metrics2])
                 logger.info('[Epoch {}][Batch {}], Speed: {:.3f} samples/sec, {}'.format(
                     epoch, i + 1, batch_size / (time.time() - btic), msg))
@@ -180,7 +129,116 @@ def main():
         msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
         logger.info('[Epoch {}] Training cost: {:.3f}, {}'.format(
             epoch, (time.time() - tic), msg))
-        net.save_params('{:s}_{:04d}.params'.format(args.prefix, epoch + 1))
+        net.save_params('{:s}_{:04d}.params'.format(args.save_prefix, epoch + 1))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
+    parser.add_argument('--network', type=str, default='resnet50', help='base network')
+    parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
+    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
+    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
+    parser.add_argument('--epochs', type=int, default=20, help='training epochs')
+    parser.add_argument('--lr', type=float, default=0.001, help='base learning rate')
+    parser.add_argument('--lr-decay-epoch', type=str, default='14', help='epoch to decay lr')
+    parser.add_argument('--resume', type=str, default='', help='path to last saved model')
+    parser.add_argument('--start-epoch', type=int, default=0, help='start epoch for resuming')
+    parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
+    parser.add_argument('--save-prefix', type=str, default='', help='saving params prefix')
+    # faster rcnn params
+    parser.add_argument('--img-short-side', type=int, default=600)
+    parser.add_argument('--img-long-side', type=int, default=1000)
+    parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
+    parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
+    parser.add_argument('--net-train-patterns', type=str, default='')
+    parser.add_argument('--rpn-feat-stride', type=int, default=16)
+    parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
+    parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
+    parser.add_argument('--rpn-pre-nms-topk', type=int, default=12000)
+    parser.add_argument('--rpn-post-nms-topk', type=int, default=2000)
+    parser.add_argument('--rpn-nms-thresh', type=float, default=0.7)
+    parser.add_argument('--rpn-min-size', type=int, default=16)
+    parser.add_argument('--rpn-batch-rois', type=int, default=256)
+    parser.add_argument('--rpn-allowed-border', type=int, default=0)
+    parser.add_argument('--rpn-fg-fraction', type=float, default=0.5)
+    parser.add_argument('--rpn-fg-overlap', type=float, default=0.7)
+    parser.add_argument('--rpn-bg-overlap', type=float, default=0.3)
+    parser.add_argument('--rcnn-num-classes', type=int, default=21)
+    parser.add_argument('--rcnn-feat-stride', type=int, default=16)
+    parser.add_argument('--rcnn-pooled-size', type=str, default='(14, 14)')
+    parser.add_argument('--rcnn-batch-size', type=int, default=1)
+    parser.add_argument('--rcnn-batch-rois', type=int, default=128)
+    parser.add_argument('--rcnn-fg-fraction', type=float, default=0.25)
+    parser.add_argument('--rcnn-fg-overlap', type=float, default=0.5)
+    parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
+    args = parser.parse_args()
+    args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
+    args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
+    args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
+    args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
+    args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
+    args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
+    return args
+
+
+def get_voc(args):
+    from symimdb.pascal_voc import PascalVOC
+    if not args.imageset:
+        args.imageset = '2007_trainval'
+    args.rcnn_classes = len(PascalVOC.classes)
+
+    splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
+    return gdata.VOCDetection(splits=splits)
+
+
+def get_resnet50(args):
+    from ndnet.net_resnet import FRCNNResNet, get_feat_size
+    if not args.pretrained:
+        args.pretrained = 'model/res50-converted-0000.params'
+    if not args.save_prefix:
+        args.save_prefix = 'model/res50'
+    args.img_pixel_means = (0.0, 0.0, 0.0)
+    args.img_pixel_stds = (1.0, 1.0, 1.0)
+    args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
+    args.rpn_feat_stride = 16
+    args.rcnn_feat_stride = 16
+    args.rcnn_pooled_size = (14, 14)
+    return FRCNNResNet(
+        anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
+        rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
+        rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
+        rpn_min_size=args.rpn_min_size,
+        num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
+        rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
+        rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
+        rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
+        rcnn_roi_mode='align'), get_feat_size
+
+
+def get_dataset(dataset, args):
+    datasets = {
+        'voc': get_voc
+    }
+    if dataset not in datasets:
+        raise ValueError("dataset {} not supported".format(dataset))
+    return datasets[dataset](args)
+
+
+def get_network(network, args):
+    networks = {
+        'resnet50': get_resnet50
+    }
+    if network not in networks:
+        raise ValueError("network {} not supported".format(network))
+    return networks[network](args)
+
+
+def main():
+    args = parse_args()
+    net, feat_shape = get_network(args.network, args)
+    dataset = get_dataset(args.dataset, args)
+    train_net(net, feat_shape, dataset, args)
 
 
 if __name__ == '__main__':

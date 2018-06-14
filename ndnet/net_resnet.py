@@ -123,7 +123,7 @@ class RCNN(HybridBlock):
 
 
 class FRCNNResNet(HybridBlock):
-    def __init__(self, num_anchors=9, anchor_scales=(8, 16, 32), anchor_ratios=(0.5, 1, 2),
+    def __init__(self, anchor_scales=(8, 16, 32), anchor_ratios=(0.5, 1, 2),
                  rpn_feature_stride=16, rpn_pre_topk=6000, rpn_post_topk=300, rpn_nms_thresh=0.7, rpn_min_size=16,
                  num_classes=21, rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_batch_size=1,
                  rcnn_batch_rois=128, rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
@@ -139,7 +139,7 @@ class FRCNNResNet(HybridBlock):
         with self.name_scope():
             self.backbone = ResNet50V2(prefix='')
             self.rcnn = RCNN(2048, num_classes)
-            self.rpn = RPN(1024, num_anchors)
+            self.rpn = RPN(1024, len(anchor_scales) * len(anchor_ratios))
             self.proposal = Proposal(anchor_scales, anchor_ratios, rpn_feature_stride, rpn_pre_topk,
                                      rpn_post_topk, rpn_nms_thresh, rpn_min_size)
             self.rcnn_target = RCNNTargetGenerator(num_classes, rcnn_batch_size, rcnn_batch_rois,
