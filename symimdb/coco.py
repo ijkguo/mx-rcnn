@@ -12,6 +12,21 @@ from pycocotools.cocoeval import COCOeval
 
 
 class coco(IMDB):
+    classes = ['__background__',  # always index 0
+               'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
+               'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
+               'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep',
+               'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
+               'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard',
+               'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard',
+               'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork',
+               'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
+               'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
+               'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv',
+               'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
+               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+               'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+
     def __init__(self, image_set, root_path, data_path):
         """
         fill basic information to initialize imdb
@@ -27,7 +42,6 @@ class coco(IMDB):
 
         # deal with class names
         cats = [cat['name'] for cat in self._coco.loadCats(self._coco.getCatIds())]
-        self._classes = ['__background__'] + cats
         self._class_to_coco_ind = dict(zip(cats, self._coco.getCatIds()))
         class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls], class_to_ind[cls])

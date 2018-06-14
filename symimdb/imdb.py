@@ -21,6 +21,8 @@ except ImportError:
 
 
 class IMDB(object):
+    classes = []
+
     def __init__(self, name, root_path):
         """
         basic information about an image database
@@ -43,12 +45,8 @@ class IMDB(object):
         return self._name
 
     @property
-    def classes(self):
-        return self._classes
-
-    @property
     def num_classes(self):
-        return len(self._classes)
+        return len(self.classes)
 
     @property
     def roidb(self):

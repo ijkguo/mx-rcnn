@@ -7,6 +7,13 @@ from .imdb import IMDB
 
 
 class PascalVOC(IMDB):
+    classes = ['__background__',  # always index 0
+               'aeroplane', 'bicycle', 'bird', 'boat',
+               'bottle', 'bus', 'car', 'cat', 'chair',
+               'cow', 'diningtable', 'dog', 'horse',
+               'motorbike', 'person', 'pottedplant',
+               'sheep', 'sofa', 'train', 'tvmonitor']
+
     def __init__(self, image_set, root_path, devkit_path):
         """
         fill basic information to initialize imdb
@@ -15,12 +22,6 @@ class PascalVOC(IMDB):
         :param devkit_path: 'data/VOCdevkit', load data and write results
         """
         super(PascalVOC, self).__init__('voc_' + image_set, root_path)
-        self._classes = ['__background__',  # always index 0
-                         'aeroplane', 'bicycle', 'bird', 'boat',
-                         'bottle', 'bus', 'car', 'cat', 'chair',
-                         'cow', 'diningtable', 'dog', 'horse',
-                         'motorbike', 'person', 'pottedplant',
-                         'sheep', 'sofa', 'train', 'tvmonitor']
 
         year, image_set = image_set.split('_')
         self._config = {'comp_id': 'comp4',
