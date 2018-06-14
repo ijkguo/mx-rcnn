@@ -1,4 +1,5 @@
 import mxnet as mx
+from mxnet import gluon
 
 from nddata.image import imdecode, random_flip, resize, transform
 from symdata.bbox import bbox_flip
@@ -20,6 +21,50 @@ def load_test(filename, short, max_size, mean, std):
     im_info = im_info.expand_dims(0)
 
     return im_tensor, im_info, im_orig
+
+
+def split_and_load(batch, ctx_list):
+    """Split data to 1 batch each device."""
+    new_batch = []
+    for i, data in enumerate(batch):
+        new_data = gluon.utils.split_and_load(data, ctx_list=ctx_list)
+        new_batch.append(new_data)
+    return new_batch
+
+
+def pad_to_max(tensors_list):
+    batch_size = len(tensors_list)
+    num_tensor = len(tensors_list[0])
+    all_tensor_list = []
+
+    if batch_size == 1:
+        for i in range(num_tensor):
+            all_tensor_list.append(tensors_list[0][i].expand_dims(0))
+        return all_tensor_list
+
+    for i in range(num_tensor):
+        ndim = len(tensors_list[0][i].shape)
+        if ndim > 3:
+            raise Exception('Sorry, unimplemented.')
+
+        dimensions = [batch_size]
+        for dim in range(ndim):
+            dimensions.append(max(tensors_list[j][i].shape[dim] for j in range(batch_size)))
+
+        all_tensor = mx.nd.zeros(tuple(dimensions), mx.Context('cpu_shared', 0))
+        if ndim == 1:
+            for j in range(batch_size):
+                all_tensor[j, :tensors_list[j][i].shape[0]] = tensors_list[j][i]
+        elif ndim == 2:
+            for j in range(batch_size):
+                all_tensor[j, :tensors_list[j][i].shape[0], :tensors_list[j][i].shape[1]] = tensors_list[j][i]
+        elif ndim == 3:
+            for j in range(batch_size):
+                all_tensor[j, :tensors_list[j][i].shape[0], :tensors_list[j][i].shape[1],
+                :tensors_list[j][i].shape[2]] = tensors_list[j][i]
+
+        all_tensor_list.append(all_tensor)
+    return all_tensor_list
 
 
 class RCNNDefaultValTransform(object):

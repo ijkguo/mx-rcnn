@@ -6,7 +6,7 @@ from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
 from nddata.anchor import AnchorGenerator, RPNAnchorGenerator, RPNTargetGenerator
-from nddata.transform import RCNNDefaultTrainTransform
+from nddata.transform import RCNNDefaultTrainTransform, split_and_load, pad_to_max
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
 from ndnet.net_resnet import FRCNNResNet, get_feat_size
 from symnet.logger import logger
@@ -59,15 +59,6 @@ def parse_args():
     return args
 
 
-def split_and_load(batch, ctx_list):
-    """Split data to 1 batch each device."""
-    new_batch = []
-    for i, data in enumerate(batch):
-        new_data = gluon.utils.split_and_load(data, ctx_list=ctx_list)
-        new_batch.append(new_data)
-    return new_batch
-
-
 def main():
     # print config
     args = parse_args()
@@ -84,7 +75,8 @@ def main():
     train_transform = RCNNDefaultTrainTransform(short=IMG_SHORT_SIDE, max_size=IMG_LONG_SIDE, mean=IMG_PIXEL_MEANS,
                                                 std=IMG_PIXEL_STDS, ac=get_feat_size, rag=rag, rtg=rtg)
     train_loader = gdata.DetectionDataLoader(train_dataset.transform(train_transform),
-                                             batch_size=batch_size, shuffle=True, last_batch="keep", num_workers=4)
+                                             batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
+                                             last_batch="keep", num_workers=4)
 
     # load model
     net = FRCNNResNet(
