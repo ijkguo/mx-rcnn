@@ -3,11 +3,11 @@ import mxnet as mx
 from symnet.module import MutableModule
 
 
-def load_param(prefix, epoch, ctx=None):
+def load_param(params, ctx=None):
     """same as mx.model.load_checkpoint, but do not load symnet and will convert context"""
     if ctx is None:
         ctx = mx.cpu()
-    save_dict = mx.nd.load('%s-%04d.params' % (prefix, epoch))
+    save_dict = mx.nd.load(params)
     arg_params = {}
     aux_params = {}
     for k, v in save_dict.items():
@@ -63,8 +63,8 @@ def check_shape(symbol, data_shapes, arg_params, aux_params):
             'shape inconsistent for %s inferred %s provided %s' % (k, aux_shape_dict[k], aux_params[k].shape)
 
 
-def get_net(symbol, prefix, epoch, ctx, short, max_size):
-    arg_params, aux_params = load_param(prefix, epoch, ctx=ctx)
+def get_net(symbol, params, ctx, short, max_size):
+    arg_params, aux_params = load_param(params, ctx=ctx)
 
     # produce shape max possible
     data_names = ['data', 'im_info']

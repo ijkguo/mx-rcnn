@@ -1,88 +1,46 @@
 import argparse
+import ast
 import pprint
 
 import mxnet as mx
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
-from symimdb.pascal_voc import PascalVOC
 from symnet.logger import logger
 from symnet.module import MutableModule
 from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
-from symnet.symbol_resnet import get_resnet_train
 
 
-IMG_SHORT_SIDE = 600
-IMG_LONG_SIDE = 1000
-IMG_PIXEL_MEANS = (0.0, 0.0, 0.0)
-IMG_PIXEL_STDS = (1.0, 1.0, 1.0)
-NET_FIXED_PARAM = ['conv0', 'stage1', 'gamma', 'beta']
-
-RPN_ANCHORS = 9
-RPN_ANCHOR_SCALES = (8, 16, 32)
-RPN_ANCHOR_RATIOS = (0.5, 1, 2)
-RPN_FEAT_STRIDE = 16
-RPN_PRE_NMS_TOP_N = 12000
-RPN_POST_NMS_TOP_N = 2000
-RPN_NMS_THRESH = 0.7
-RPN_MIN_SIZE = 16
-RPN_BATCH_ROIS = 256
-RPN_ALLOWED_BORDER = 0
-RPN_FG_FRACTION = 0.5
-RPN_FG_OVERLAP = 0.7
-RPN_BG_OVERLAP = 0.3
-
-RCNN_CLASSES = 21
-RCNN_FEAT_STRIDE = 16
-RCNN_POOLED_SIZE = (14, 14)
-RCNN_BATCH_SIZE = 1
-RCNN_BATCH_ROIS = 128
-RCNN_FG_FRACTION = 0.25
-RCNN_FG_OVERLAP = 0.5
-RCNN_BBOX_STDS = (0.1, 0.1, 0.2, 0.2)
-RCNN_NMS_THRESH = 0.3
-
-
-def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
-              lr=0.001, lr_step='5'):
-    # load symbol
-    sym = get_resnet_train(num_anchors=RPN_ANCHORS, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS,
-                           rpn_feature_stride=RPN_FEAT_STRIDE, rpn_pre_topk=RPN_PRE_NMS_TOP_N, rpn_post_topk=RPN_POST_NMS_TOP_N,
-                           rpn_nms_thresh=RPN_NMS_THRESH, rpn_min_size=RPN_MIN_SIZE, rpn_batch_rois=RPN_BATCH_ROIS,
-                           num_classes=RCNN_CLASSES, rcnn_feature_stride=RCNN_FEAT_STRIDE, rcnn_pooled_size=RCNN_POOLED_SIZE,
-                           rcnn_batch_size=RCNN_BATCH_SIZE, rcnn_batch_rois=RCNN_BATCH_ROIS, rcnn_fg_fraction=RCNN_FG_FRACTION,
-                           rcnn_fg_overlap=RCNN_FG_OVERLAP, rcnn_bbox_stds=RCNN_BBOX_STDS)
-    feat_sym = sym.get_internals()['rpn_cls_score_output']
+def train_net(sym, roidb, args):
+    # print config
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # setup multi-gpu
-    batch_size = len(ctx)
-
-    # load dataset and prepare imdb for training
-    image_sets = ['2007_trainval']
-    roidb = []
-    for iset in image_sets:
-        imdb = PascalVOC(iset, "data", "data/VOCdevkit")
-        imdb.append_flipped_images()
-        roidb.extend(imdb.roidb)
+    ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
+    batch_size = args.rcnn_batch_size * len(ctx)
 
     # load training data
-    ag = AnchorGenerator(feat_stride=RPN_FEAT_STRIDE, anchor_scales=RPN_ANCHOR_SCALES, anchor_ratios=RPN_ANCHOR_RATIOS)
-    asp = AnchorSampler(allowed_border=RPN_ALLOWED_BORDER, batch_rois=RPN_BATCH_ROIS,
-                        fg_fraction=RPN_FG_FRACTION, fg_overlap=RPN_FG_OVERLAP)
-    train_data = AnchorLoader(roidb, batch_size, IMG_SHORT_SIDE, IMG_LONG_SIDE, IMG_PIXEL_MEANS, IMG_PIXEL_STDS,
-                              feat_sym, ag, asp, shuffle=True)
+    feat_sym = sym.get_internals()['rpn_cls_score_output']
+    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
+                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
+    asp = AnchorSampler(allowed_border=args.rpn_allowed_border, batch_rois=args.rpn_batch_rois,
+                        fg_fraction=args.rpn_fg_fraction, fg_overlap=args.rpn_fg_overlap,
+                        bg_overlap=args.rpn_bg_overlap)
+    train_data = AnchorLoader(roidb, batch_size, args.img_short_side, args.img_long_side,
+                              args.img_pixel_means, args.img_pixel_stds, feat_sym, ag, asp, shuffle=True)
 
     # produce shape max possible
-    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE))
-    FEAT_HEIGHT, FEAT_WIDTH = out_shape[0][-2:]
+    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, args.img_short_side, args.img_long_side))
+    feat_height, feat_width = out_shape[0][-2:]
+    rpn_num_anchors = len(args.rpn_anchor_scales) * len(args.rpn_anchor_ratios)
     data_names = ['data', 'im_info', 'gt_boxes']
     label_names = ['label', 'bbox_target', 'bbox_weight']
-    data_shapes = [('data', (batch_size, 3, IMG_SHORT_SIDE, IMG_LONG_SIDE)),
+    data_shapes = [('data', (batch_size, 3, args.img_short_side, args.img_long_side)),
                    ('im_info', (batch_size, 3)),
                    ('gt_boxes', (batch_size, 100, 5))]
-    label_shapes = [('label', (batch_size, 1, RPN_ANCHORS * FEAT_HEIGHT, FEAT_WIDTH)),
-                    ('bbox_target', (batch_size, 4 * RPN_ANCHORS, FEAT_HEIGHT, FEAT_WIDTH)),
-                    ('bbox_weight', (batch_size, 4 * RPN_ANCHORS, FEAT_HEIGHT, FEAT_WIDTH))]
+    label_shapes = [('label', (batch_size, 1, rpn_num_anchors * feat_height, feat_width)),
+                    ('bbox_target', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width)),
+                    ('bbox_weight', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width))]
 
     # print shapes
     data_shape_dict, out_shape_dict = infer_data_shape(sym, data_shapes + label_shapes)
@@ -91,16 +49,16 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # load and initialize params
     if args.resume:
-        arg_params, aux_params = load_param(prefix, begin_epoch)
+        arg_params, aux_params = load_param(args.resume)
     else:
-        arg_params, aux_params = load_param(pretrained, epoch)
+        arg_params, aux_params = load_param(args.pretrained)
         arg_params, aux_params = initialize_frcnn(sym, data_shapes, arg_params, aux_params)
 
     # check parameter shapes
     check_shape(sym, data_shapes + label_shapes, arg_params, aux_params)
 
     # check fixed params
-    fixed_param_names = get_fixed_params(sym, NET_FIXED_PARAM)
+    fixed_param_names = get_fixed_params(sym, args.net_fixed_param)
     logger.info('locking params\n%s' % pprint.pformat(fixed_param_names))
 
     # metric
@@ -115,14 +73,14 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         eval_metrics.add(child_metric)
 
     # callback
-    batch_end_callback = mx.callback.Speedometer(batch_size, frequent=args.frequent, auto_reset=False)
-    epoch_end_callback = mx.callback.do_checkpoint(prefix)
+    batch_end_callback = mx.callback.Speedometer(batch_size, frequent=args.log_interval, auto_reset=False)
+    epoch_end_callback = mx.callback.do_checkpoint(args.save_prefix)
 
     # learning schedule
-    base_lr = lr
+    base_lr = args.lr
     lr_factor = 0.1
-    lr_epoch = [int(epoch) for epoch in lr_step.split(',')]
-    lr_epoch_diff = [epoch - begin_epoch for epoch in lr_epoch if epoch > begin_epoch]
+    lr_epoch = [int(epoch) for epoch in args.lr_decay_epoch.split(',')]
+    lr_epoch_diff = [epoch - args.start_epoch for epoch in lr_epoch if epoch > args.start_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
     lr_iters = [int(epoch * len(roidb) / batch_size) for epoch in lr_epoch_diff]
     logger.info('lr %f lr_epoch_diff %s lr_iters %s' % (lr, lr_epoch_diff, lr_iters))
@@ -137,41 +95,126 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
 
     # train
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=args.work_load_list,
+                        logger=logger, context=ctx, work_load_list=None,
                         max_data_shapes=data_shapes, max_label_shapes=label_shapes,
                         fixed_param_names=fixed_param_names)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
-            batch_end_callback=batch_end_callback, kvstore=args.kvstore,
+            batch_end_callback=batch_end_callback, kvstore='device',
             optimizer='sgd', optimizer_params=optimizer_params,
-            arg_params=arg_params, aux_params=aux_params, begin_epoch=begin_epoch, num_epoch=end_epoch)
+            arg_params=arg_params, aux_params=aux_params, begin_epoch=args.start_epoch, num_epoch=args.epochs)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
-    # training
-    parser.add_argument('--frequent', help='frequency of logger', default=20, type=int)
-    parser.add_argument('--kvstore', help='the kv-store type', default='device', type=str)
-    parser.add_argument('--work_load_list', help='work load for different devices', default=None, type=list)
-    parser.add_argument('--resume', help='continue training', action='store_true')
-    # e2e
-    parser.add_argument('--gpus', help='GPU device to train with', default='0', type=str)
-    parser.add_argument('--pretrained', help='pretrained model prefix', default='model/resnet-50', type=str)
-    parser.add_argument('--pretrained_epoch', help='pretrained model epoch', default=0, type=int)
-    parser.add_argument('--prefix', help='new model prefix', default='model/e2e', type=str)
-    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=0, type=int)
-    parser.add_argument('--end_epoch', help='end epoch of training', default=10, type=int)
-    parser.add_argument('--lr', help='base learning rate', default=0.001, type=float)
-    parser.add_argument('--lr_step', help='learning rate steps (in epoch)', default='7', type=str)
+    parser.add_argument('--network', type=str, default='resnet50', help='base network')
+    parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
+    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
+    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
+    parser.add_argument('--epochs', type=int, default=10, help='training epochs')
+    parser.add_argument('--lr', type=float, default=0.001, help='base learning rate')
+    parser.add_argument('--lr-decay-epoch', type=str, default='7', help='epoch to decay lr')
+    parser.add_argument('--resume', type=str, default='', help='path to last saved model')
+    parser.add_argument('--start-epoch', type=int, default=0, help='start epoch for resuming')
+    parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
+    parser.add_argument('--save-prefix', type=str, default='', help='saving params prefix')
+    # faster rcnn params
+    parser.add_argument('--img-short-side', type=int, default=600)
+    parser.add_argument('--img-long-side', type=int, default=1000)
+    parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
+    parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
+    parser.add_argument('--net-fixed-param', type=str, default='["conv0", "stage1", "gamma", "beta"]')
+    parser.add_argument('--rpn-feat-stride', type=int, default=16)
+    parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
+    parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
+    parser.add_argument('--rpn-pre-nms-topk', type=int, default=12000)
+    parser.add_argument('--rpn-post-nms-topk', type=int, default=2000)
+    parser.add_argument('--rpn-nms-thresh', type=float, default=0.7)
+    parser.add_argument('--rpn-min-size', type=int, default=16)
+    parser.add_argument('--rpn-batch-rois', type=int, default=256)
+    parser.add_argument('--rpn-allowed-border', type=int, default=0)
+    parser.add_argument('--rpn-fg-fraction', type=float, default=0.5)
+    parser.add_argument('--rpn-fg-overlap', type=float, default=0.7)
+    parser.add_argument('--rpn-bg-overlap', type=float, default=0.3)
+    parser.add_argument('--rcnn-num-classes', type=int, default=21)
+    parser.add_argument('--rcnn-feat-stride', type=int, default=16)
+    parser.add_argument('--rcnn-pooled-size', type=str, default='(14, 14)')
+    parser.add_argument('--rcnn-batch-size', type=int, default=1)
+    parser.add_argument('--rcnn-batch-rois', type=int, default=128)
+    parser.add_argument('--rcnn-fg-fraction', type=float, default=0.25)
+    parser.add_argument('--rcnn-fg-overlap', type=float, default=0.5)
+    parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
     args = parser.parse_args()
+    args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
+    args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
+    args.net_fixed_param = ast.literal_eval(args.net_fixed_param)
+    args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
+    args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
+    args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
+    args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
     return args
+
+
+def get_voc(args):
+    from symimdb.pascal_voc import PascalVOC
+    if not args.imageset:
+        args.imageset = '2007_trainval'
+    args.rcnn_classes = len(PascalVOC.classes)
+
+    isets = args.imageset.split('+')
+    roidb = []
+    for iset in isets:
+        imdb = PascalVOC(iset, 'data', 'data/VOCdevkit')
+        imdb.append_flipped_images()
+        roidb.extend(imdb.roidb)
+    return roidb
+
+
+def get_resnet50_train(args):
+    from symnet.symbol_resnet import get_resnet_train
+    if not args.pretrained:
+        args.pretrained = 'model/resnet-50-0000.params'
+    if not args.save_prefix:
+        args.save_prefix = 'model/resnet50'
+    args.img_pixel_means = (0.0, 0.0, 0.0)
+    args.img_pixel_stds = (1.0, 1.0, 1.0)
+    args.net_fixed_param = ['conv0', 'stage1', 'gamma', 'beta']
+    args.rpn_feat_stride = 16
+    args.rcnn_feat_stride = 16
+    args.rcnn_pooled_size = (14, 14)
+    return get_resnet_train(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
+                            rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
+                            rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
+                            rpn_min_size=args.rpn_min_size, rpn_batch_rois=args.rpn_batch_rois,
+                            num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
+                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
+                            rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
+                            rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds)
+
+
+def get_dataset(dataset, args):
+    datasets = {
+        'voc': get_voc
+    }
+    if dataset not in datasets:
+        raise ValueError("dataset {} not supported".format(dataset))
+    return datasets[dataset](args)
+
+
+def get_network(network, args):
+    networks = {
+        'resnet50': get_resnet50_train
+    }
+    if network not in networks:
+        raise ValueError("network {} not supported".format(network))
+    return networks[network](args)
 
 
 def main():
     args = parse_args()
-    logger.info('Called with argument: %s' % args)
-    ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    train_net(args, ctx, args.pretrained, args.pretrained_epoch, args.prefix, args.begin_epoch, args.end_epoch,
-              lr=args.lr, lr_step=args.lr_step)
+    sym = get_network(args.network, args)
+    roidb = get_dataset(args.dataset, args)
+    train_net(sym, roidb, args)
 
 
 if __name__ == '__main__':

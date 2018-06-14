@@ -66,10 +66,12 @@ def get_resnet_top_feature(data):
     return pool1
 
 
-def get_resnet_train(num_anchors, anchor_scales, anchor_ratios,
+def get_resnet_train(anchor_scales, anchor_ratios,
                      rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size, rpn_batch_rois,
                      num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
                      rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds):
+    num_anchors = len(anchor_scales) * len(anchor_ratios)
+
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
     gt_boxes = mx.symbol.Variable(name="gt_boxes")
@@ -146,9 +148,11 @@ def get_resnet_train(num_anchors, anchor_scales, anchor_ratios,
     return group
 
 
-def get_resnet_test(num_anchors, anchor_scales, anchor_ratios,
+def get_resnet_test(anchor_scales, anchor_ratios,
                     rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
                     num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size):
+    num_anchors = len(anchor_scales) * len(anchor_ratios)
+
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
 
