@@ -69,11 +69,9 @@ class IMDB(object):
             boxes[:, 0] = roi_rec['width'] - oldx2 - 1
             boxes[:, 2] = roi_rec['width'] - oldx1 - 1
             assert (boxes[:, 2] >= boxes[:, 0]).all()
-            roi_rec_flipped = {'image': roi_rec['image'],
-                               'height': roi_rec['height'],
-                               'width': roi_rec['width'],
-                               'boxes': boxes,
-                               'gt_classes': roi_rec['gt_classes']}
+            roi_rec_flipped = roi_rec.copy()
+            roi_rec_flipped['boxes'] = boxes
+            roi_rec_flipped['flipped'] = True
             roidb_flipped.append(roi_rec_flipped)
         self._roidb.extend(roidb_flipped)
 
