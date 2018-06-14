@@ -105,7 +105,8 @@ def train_net(sym, roidb, args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
+    parser = argparse.ArgumentParser(description='Train Faster R-CNN network',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--network', type=str, default='resnet50', help='base network')
     parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
     parser.add_argument('--dataset', type=str, default='voc', help='training dataset')

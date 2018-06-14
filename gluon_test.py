@@ -66,7 +66,8 @@ def test_net(net, dataset, args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network')
+    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--network', type=str, default='resnet50', help='base network')
     parser.add_argument('--params', type=str, default='', help='path to trained model')
     parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
