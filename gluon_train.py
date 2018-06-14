@@ -132,7 +132,7 @@ def main():
             lr_steps.pop(0)
             trainer.set_learning_rate(new_lr)
             logger.info("[Epoch {}] Set learning rate to {}".format(epoch, new_lr))
-        for metric in metrics:
+        for metric in metrics + metrics2:
             metric.reset()
         tic = time.time()
         btic = time.time()
@@ -141,6 +141,7 @@ def main():
             batch_size = len(batch[0])
             losses = []
             metric_losses = [[] for _ in metrics]
+            add_losses = [[] for _ in metrics2]
             with autograd.record():
                 for data, im_info, gt_bboxes, rpn_label, rpn_weight, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
                     rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = net(data, im_info, gt_bboxes)
@@ -157,14 +158,16 @@ def main():
                     metric_losses[1].append(rpn_loss2.sum())
                     metric_losses[2].append(rcnn_loss1.sum())
                     metric_losses[3].append(rcnn_loss2.sum())
-                    with autograd.pause():
-                        rpn_acc_metric.update([rpn_label, rpn_weight], [rpn_cls])
-                        rpn_bbox_metric.update([rpn_bbox_target, rpn_bbox_weight], [rpn_reg])
-                        rcnn_acc_metric.update([rcnn_label], [rcnn_cls])
-                        rcnn_bbox_metric.update([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg])
+                    add_losses[0].append(([rpn_label, rpn_weight], [rpn_cls]))
+                    add_losses[1].append(([rpn_bbox_target, rpn_bbox_weight], [rpn_reg]))
+                    add_losses[2].append(([rcnn_label], [rcnn_cls]))
+                    add_losses[3].append(([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg]))
                 autograd.backward(losses)
                 for metric, record in zip(metrics, metric_losses):
                     metric.update(0, record)
+                for metric, records in zip(metrics2, add_losses):
+                    for record in records:
+                        metric.update(record[0], record[1])
             trainer.step(batch_size)
             # (batch_end_callback) update metrics
             if args.frequent and not (i + 1) % args.frequent:
