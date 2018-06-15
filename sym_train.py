@@ -30,12 +30,12 @@ def train_net(sym, roidb, args):
                               args.img_pixel_means, args.img_pixel_stds, feat_sym, ag, asp, shuffle=True)
 
     # produce shape max possible
-    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, args.img_short_side, args.img_long_side))
+    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, args.img_long_side, args.img_long_side))
     feat_height, feat_width = out_shape[0][-2:]
     rpn_num_anchors = len(args.rpn_anchor_scales) * len(args.rpn_anchor_ratios)
     data_names = ['data', 'im_info', 'gt_boxes']
     label_names = ['label', 'bbox_target', 'bbox_weight']
-    data_shapes = [('data', (batch_size, 3, args.img_short_side, args.img_long_side)),
+    data_shapes = [('data', (batch_size, 3, args.img_long_side, args.img_long_side)),
                    ('im_info', (batch_size, 3)),
                    ('gt_boxes', (batch_size, 100, 5))]
     label_shapes = [('label', (batch_size, 1, rpn_num_anchors * feat_height, feat_width)),
