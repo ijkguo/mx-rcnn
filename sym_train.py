@@ -167,7 +167,6 @@ def get_voc(args):
     for iset in isets:
         imdb = PascalVOC(iset, 'data', 'data/VOCdevkit')
         imdb.append_flipped_images()
-        imdb.filter_roidb()
         roidb.extend(imdb.roidb)
     return roidb
 
@@ -182,8 +181,8 @@ def get_coco(args):
     roidb = []
     for iset in isets:
         imdb = coco(iset, 'data', 'data/coco')
-        imdb.append_flipped_images()
         imdb.filter_roidb()
+        imdb.append_flipped_images()
         roidb.extend(imdb.roidb)
     return roidb
 
