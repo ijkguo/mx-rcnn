@@ -30,14 +30,13 @@ class coco(IMDB):
     def __init__(self, image_set, root_path, data_path):
         """
         fill basic information to initialize imdb
-        :param image_set: train2014, val2014, test2015
+        :param image_set: train2017, val2017
         :param root_path: 'data', will write 'cache'
         :param data_path: 'data/coco', load data and write results
         """
         super(coco, self).__init__('coco_' + image_set, root_path)
-        prefix = 'instances' if 'test' not in image_set else 'image_info'
-        # example: annotations/instances_train2014.json
-        ann_file = os.path.join(data_path, 'annotations', prefix + '_' + image_set + '.json')
+        # example: annotations/instances_train2017.json
+        ann_file = os.path.join(data_path, 'annotations', 'instances_' + image_set + '.json')
         self._coco = COCO(ann_file)
 
         # deal with class names
@@ -47,19 +46,10 @@ class coco(IMDB):
         self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls], class_to_ind[cls])
                                             for cls in self.classes[1:]])
 
-        # deal with data name
-        view_map = {'minival2014': 'val2014',
-                    'valminusminival2014': 'val2014'}
-        data_name = view_map[image_set] if image_set in view_map else image_set
-        # example images/train2014/COCO_train2014_000000119993.jpg
-        self._image_file_tmpl = os.path.join(data_path, 'images', data_name, 'COCO_' + data_name + '_{:012d}.jpg')
-
-        # deal with result file
-        result_foler = os.path.join(data_path, 'results')
-        if not os.path.exists(result_foler):
-            os.makedirs(result_foler)
-        # example detections_val2014_results.json
-        self._result_file = os.path.join(result_foler, 'detections_{}_results.json'.format(image_set))
+        # example train2017/000000119993.jpg
+        self._image_file_tmpl = os.path.join(data_path, image_set, '{:012d}.jpg')
+        # example detections_val2017_results.json
+        self._result_file = os.path.join(data_path, 'detections_{}_results.json'.format(image_set))
 
         # get roidb
         self._roidb = self._get_cached('roidb', self._load_gt_roidb)

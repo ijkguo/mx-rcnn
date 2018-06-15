@@ -99,6 +99,14 @@ def get_voc(args):
     return PascalVOC(args.imageset, 'data', 'data/VOCdevkit')
 
 
+def get_coco(args):
+    from symimdb.coco import coco
+    if not args.imageset:
+        args.imageset = 'val2017'
+    args.rcnn_classes = len(coco.classes)
+    return coco(args.imageset, 'data', 'data/coco')
+
+
 def get_vgg16_test(args):
     from symnet.symbol_vgg import get_vgg_test
     if not args.params:
@@ -155,7 +163,8 @@ def get_resnet101_test(args):
 
 def get_dataset(dataset, args):
     datasets = {
-        'voc': get_voc
+        'voc': get_voc,
+        'coco': get_coco
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))

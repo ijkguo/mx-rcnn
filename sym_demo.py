@@ -97,6 +97,12 @@ def get_voc_names(args):
     return PascalVOC.classes
 
 
+def get_coco_names(args):
+    from symimdb.coco import coco
+    args.rcnn_classes = len(coco.classes)
+    return coco.classes
+
+
 def get_vgg16_test(args):
     from symnet.symbol_vgg import get_vgg_test
     if not args.params:
@@ -152,7 +158,8 @@ def get_resnet101_test(args):
 
 def get_class_names(dataset, args):
     datasets = {
-        'voc': get_voc_names
+        'voc': get_voc_names,
+        'coco': get_coco_names
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))

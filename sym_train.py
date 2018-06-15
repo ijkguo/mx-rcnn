@@ -171,6 +171,21 @@ def get_voc(args):
     return roidb
 
 
+def get_coco(args):
+    from symimdb.coco import coco
+    if not args.imageset:
+        args.imageset = 'train2017'
+    args.rcnn_classes = len(coco.classes)
+
+    isets = args.imageset.split('+')
+    roidb = []
+    for iset in isets:
+        imdb = coco(iset, 'data', 'data/coco')
+        imdb.append_flipped_images()
+        roidb.extend(imdb.roidb)
+    return roidb
+
+
 def get_vgg16_train(args):
     from symnet.symbol_vgg import get_vgg_train
     if not args.pretrained:
@@ -241,7 +256,8 @@ def get_resnet101_train(args):
 
 def get_dataset(dataset, args):
     datasets = {
-        'voc': get_voc
+        'voc': get_voc,
+        'coco': get_coco
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))
