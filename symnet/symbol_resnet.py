@@ -4,8 +4,6 @@ from . import proposal_target
 eps=2e-5
 use_global_stats=True
 workspace=1024
-units=(3, 4, 6, 3)
-filter_list=(256, 512, 1024, 2048)
 
 
 def residual_unit(data, num_filter, stride, dim_match, name):
@@ -30,7 +28,7 @@ def residual_unit(data, num_filter, stride, dim_match, name):
     return sum
 
 
-def get_resnet_feature(data):
+def get_resnet_feature(data, units, filter_list):
     # res1
     data_bn = mx.sym.BatchNorm(data=data, fix_gamma=True, eps=eps, use_global_stats=use_global_stats, name='bn_data')
     conv0 = mx.sym.Convolution(data=data_bn, num_filter=64, kernel=(7, 7), stride=(2, 2), pad=(3, 3),
@@ -56,7 +54,7 @@ def get_resnet_feature(data):
     return unit
 
 
-def get_resnet_top_feature(data):
+def get_resnet_top_feature(data, units, filter_list):
     unit = residual_unit(data=data, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
     for i in range(2, units[3] + 1):
         unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True, name='stage4_unit%s' % i)
@@ -66,10 +64,11 @@ def get_resnet_top_feature(data):
     return pool1
 
 
-def get_resnet_train(anchor_scales, anchor_ratios,
-                     rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size, rpn_batch_rois,
+def get_resnet_train(anchor_scales, anchor_ratios, rpn_feature_stride,
+                     rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size, rpn_batch_rois,
                      num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
-                     rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds):
+                     rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds,
+                     units, filter_list):
     num_anchors = len(anchor_scales) * len(anchor_ratios)
 
     data = mx.symbol.Variable(name="data")
@@ -80,7 +79,7 @@ def get_resnet_train(anchor_scales, anchor_ratios,
     rpn_bbox_weight = mx.symbol.Variable(name='bbox_weight')
 
     # shared convolutional layers
-    conv_feat = get_resnet_feature(data)
+    conv_feat = get_resnet_feature(data, units=units, filter_list=filter_list)
 
     # rpn feature
     rpn_conv = mx.symbol.Convolution(
@@ -127,7 +126,7 @@ def get_resnet_train(anchor_scales, anchor_ratios,
         name='roi_pool', data=conv_feat, rois=rois, pooled_size=rcnn_pooled_size, spatial_scale=1.0 / rcnn_feature_stride)
 
     # rcnn top feature
-    top_feat = get_resnet_top_feature(roi_pool)
+    top_feat = get_resnet_top_feature(roi_pool, units=units, filter_list=filter_list)
 
     # rcnn classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=top_feat, num_hidden=num_classes)
@@ -148,16 +147,17 @@ def get_resnet_train(anchor_scales, anchor_ratios,
     return group
 
 
-def get_resnet_test(anchor_scales, anchor_ratios,
-                    rpn_feature_stride, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
-                    num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size):
+def get_resnet_test(anchor_scales, anchor_ratios, rpn_feature_stride,
+                    rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
+                    num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
+                    units, filter_list):
     num_anchors = len(anchor_scales) * len(anchor_ratios)
 
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
 
     # shared convolutional layers
-    conv_feat = get_resnet_feature(data)
+    conv_feat = get_resnet_feature(data, units=units, filter_list=filter_list)
 
     # rpn feature
     rpn_conv = mx.symbol.Convolution(
@@ -190,7 +190,7 @@ def get_resnet_test(anchor_scales, anchor_ratios,
         name='roi_pool', data=conv_feat, rois=rois, pooled_size=rcnn_pooled_size, spatial_scale=1.0 / rcnn_feature_stride)
 
     # rcnn top feature
-    top_feat = get_resnet_top_feature(roi_pool)
+    top_feat = get_resnet_top_feature(roi_pool, units=units, filter_list=filter_list)
 
     # rcnn classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=top_feat, num_hidden=num_classes)

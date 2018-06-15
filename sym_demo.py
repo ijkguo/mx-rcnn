@@ -129,7 +129,26 @@ def get_resnet50_test(args):
                            rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
                            rpn_min_size=args.rpn_min_size,
                            num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                           rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size)
+                           rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
+                           units=(3, 4, 6, 3), filter_list=(256, 512, 1024, 2048))
+
+
+def get_resnet101_test(args):
+    from symnet.symbol_resnet import get_resnet_test
+    if not args.params:
+        args.params = 'model/resnet101-0010.params'
+    args.img_pixel_means = (0.0, 0.0, 0.0)
+    args.img_pixel_stds = (1.0, 1.0, 1.0)
+    args.rpn_feat_stride = 16
+    args.rcnn_feat_stride = 16
+    args.rcnn_pooled_size = (14, 14)
+    return get_resnet_test(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
+                           rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
+                           rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
+                           rpn_min_size=args.rpn_min_size,
+                           num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
+                           rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
+                           units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
 
 def get_class_names(dataset, args):
     datasets = {
@@ -143,7 +162,8 @@ def get_class_names(dataset, args):
 def get_network(network, args):
     networks = {
         'vgg16': get_vgg16_test,
-        'resnet50': get_resnet50_test
+        'resnet50': get_resnet50_test,
+        'resnet101': get_resnet101_test
     }
     if network not in networks:
         raise ValueError("network {} not supported".format(network))
