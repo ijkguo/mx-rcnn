@@ -176,7 +176,7 @@ def get_vgg_test(anchor_scales, anchor_ratios, rpn_feature_stride,
         data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=2 * num_anchors, name="rpn_cls_score")
     rpn_cls_score_reshape = mx.symbol.Reshape(
         data=rpn_cls_score, shape=(0, 2, -1, 0), name="rpn_cls_score_reshape")
-    rpn_cls_act = mx.symbol.Softmax(
+    rpn_cls_act = mx.symbol.softmax(
         data=rpn_cls_score_reshape, axis=1, name="rpn_cls_act")
     rpn_cls_act_reshape = mx.symbol.Reshape(
         data=rpn_cls_act, shape=(0, 2 * num_anchors, -1, 0), name='rpn_cls_act_reshape')
