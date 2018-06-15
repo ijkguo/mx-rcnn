@@ -73,11 +73,12 @@ def get_vgg_top_feature(data):
 
 
 
-def get_vgg_train(num_classes, num_anchors,
-                  rpn_feature_stride, anchor_scales, anchor_ratios,
+def get_vgg_train(anchor_scales, anchor_ratios, rpn_feature_stride,
                   rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size, rpn_batch_rois,
-                  rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
+                  num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size,
                   rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds):
+    num_anchors = len(anchor_scales) * len(anchor_ratios)
+
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
     gt_boxes = mx.symbol.Variable(name="gt_boxes")
@@ -154,10 +155,11 @@ def get_vgg_train(num_classes, num_anchors,
     return group
 
 
-def get_vgg_test(num_classes, num_anchors,
-                 rpn_feature_stride, anchor_scales, anchor_ratios,
+def get_vgg_test(anchor_scales, anchor_ratios, rpn_feature_stride,
                  rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
-                 rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size):
+                 num_classes, rcnn_feature_stride, rcnn_pooled_size, rcnn_batch_size):
+    num_anchors = len(anchor_scales) * len(anchor_ratios)
+
     data = mx.symbol.Variable(name="data")
     im_info = mx.symbol.Variable(name="im_info")
 

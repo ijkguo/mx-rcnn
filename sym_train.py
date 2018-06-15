@@ -171,6 +171,28 @@ def get_voc(args):
     return roidb
 
 
+def get_vgg16_train(args):
+    from symnet.symbol_vgg import get_vgg_train
+    if not args.pretrained:
+        args.pretrained = 'model/vgg16-0000.params'
+    if not args.save_prefix:
+        args.save_prefix = 'model/vgg16'
+    args.img_pixel_means = (123.68, 116.779, 103.939)
+    args.img_pixel_stds = (1.0, 1.0, 1.0)
+    args.net_fixed_params = ['conv1', 'conv2']
+    args.rpn_feat_stride = 16
+    args.rcnn_feat_stride = 16
+    args.rcnn_pooled_size = (7, 7)
+    return get_vgg_train(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
+                         rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
+                         rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
+                         rpn_min_size=args.rpn_min_size, rpn_batch_rois=args.rpn_batch_rois,
+                         num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
+                         rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
+                         rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
+                         rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds)
+
+
 def get_resnet50_train(args):
     from symnet.symbol_resnet import get_resnet_train
     if not args.pretrained:
@@ -204,6 +226,7 @@ def get_dataset(dataset, args):
 
 def get_network(network, args):
     networks = {
+        'vgg16': get_vgg16_train,
         'resnet50': get_resnet50_train
     }
     if network not in networks:
