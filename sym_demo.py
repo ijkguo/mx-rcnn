@@ -91,8 +91,9 @@ def parse_args():
     return args
 
 
-def get_voc_names():
+def get_voc_names(args):
     from symimdb.pascal_voc import PascalVOC
+    args.rcnn_num_classes = len(PascalVOC.classes)
     return PascalVOC.classes
 
 
@@ -112,13 +113,13 @@ def get_resnet50_test(args):
                            num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size)
 
-def get_class_names(dataset):
+def get_class_names(dataset, args):
     datasets = {
         'voc': get_voc_names
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset]()
+    return datasets[dataset](args)
 
 
 def get_network(network, args):
@@ -133,7 +134,7 @@ def get_network(network, args):
 def main():
     args = parse_args()
     sym = get_network(args.network, args)
-    class_names = get_class_names(args.dataset)
+    class_names = get_class_names(args.dataset, args)
     demo_net(sym, class_names, args)
 
 

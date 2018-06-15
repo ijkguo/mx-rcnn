@@ -94,6 +94,11 @@ def parse_args():
     return args
 
 
+def get_voc_names(args):
+    args.rcnn_num_classes = len(gdata.VOCDetection.CLASSES)
+    return gdata.VOCDetection.CLASSES
+
+
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
     if not args.params:
@@ -116,13 +121,13 @@ def get_resnet50(args):
         rcnn_roi_mode='align'), get_feat_size
 
 
-def get_class_names(dataset):
+def get_class_names(dataset, args):
     datasets = {
-        'voc': gdata.VOCDetection.CLASSES
+        'voc': get_voc_names
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset]
+    return datasets[dataset](args)
 
 
 def get_network(network, args):
@@ -137,7 +142,7 @@ def get_network(network, args):
 def main():
     args = parse_args()
     net, _ = get_network(args.network, args)
-    class_names = get_class_names(args.dataset)
+    class_names = get_class_names(args.dataset, args)
     demo_net(net, class_names, args)
 
 
