@@ -59,7 +59,7 @@ class IMDB(object):
     def filter_roidb(self):
         """Remove images without usable rois"""
         num_roidb = len(self._roidb)
-        self._roidb = [roi_rec for roi_rec in self._roidb if roi_rec['gt_classes']]
+        self._roidb = [roi_rec for roi_rec in self._roidb if len(roi_rec['gt_classes'])]
         num_after = len(self._roidb)
         logger.info('filter roidb: {} -> {}'.format(num_roidb, num_after))
 
