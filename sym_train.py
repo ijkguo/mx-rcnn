@@ -175,6 +175,7 @@ def get_coco(args):
     from symimdb.coco import coco
     if not args.imageset:
         args.imageset = 'train2017'
+    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_classes = len(coco.classes)
 
     isets = args.imageset.split('+')
