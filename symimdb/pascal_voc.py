@@ -90,8 +90,8 @@ class PascalVOC(IMDB):
     def _parse_voc_anno(filename):
         import xml.etree.ElementTree as ET
         tree = ET.parse(filename)
-        height = int(tree.find('height').text)
-        width = int(tree.find('width').text)
+        height = int(tree.find('size').find('height').text)
+        width = int(tree.find('size').find('width').text)
         objects = []
         for obj in tree.findall('object'):
             obj_dict = dict()
