@@ -56,6 +56,13 @@ class IMDB(object):
     def num_images(self):
         return len(self._roidb)
 
+    def filter_roidb(self):
+        """Remove images without usable rois"""
+        num_roidb = len(self._roidb)
+        self._roidb = [roi_rec for roi_rec in self._roidb if roi_rec['gt_classes']]
+        num_after = len(self._roidb)
+        logger.info('filter roidb: {} -> {}'.format(num_roidb, num_after))
+
     def append_flipped_images(self):
         """Only flip boxes coordinates, images will be flipped when loading into network"""
         logger.info('%s append flipped images to roidb' % self._name)
