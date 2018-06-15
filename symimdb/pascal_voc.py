@@ -1,4 +1,3 @@
-import cv2
 import os
 import numpy as np
 
@@ -27,6 +26,7 @@ class PascalVOC(IMDB):
         self._config = {'comp_id': 'comp4',
                         'use_diff': False,
                         'min_size': 2}
+        self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._image_index_file = os.path.join(devkit_path, 'VOC' + year, 'ImageSets', 'Main', image_set + '.txt')
         self._image_file_tmpl = os.path.join(devkit_path, 'VOC' + year, 'JPEGImages', '{}.jpg')
         self._image_anno_tmpl = os.path.join(devkit_path, 'VOC' + year, 'Annotations', '{}.xml')
@@ -52,27 +52,19 @@ class PascalVOC(IMDB):
         return image_set_index
 
     def _load_annotation(self, index):
-        roi_rec = dict()
-        # store image
-        roi_rec['index'] = index
-        roi_rec['image'] = self._image_file_tmpl.format(index)
-        size = cv2.imread(roi_rec['image']).shape
-        roi_rec['height'] = size[0]
-        roi_rec['width'] = size[1]
-        roi_rec['flipped'] = False
+        # store original annotation as orig_objs
+        height, width, orig_objs = self._parse_voc_anno(self._image_anno_tmpl.format(index))
 
-        # store original annotation
-        objs = self._parse_voc_anno(self._image_anno_tmpl.format(index))
-        roi_rec['objs'] = objs
-
+        # filter difficult objects
         if not self._config['use_diff']:
-            non_diff_objs = [obj for obj in objs if obj['difficult'] == 0]
+            non_diff_objs = [obj for obj in orig_objs if obj['difficult'] == 0]
             objs = non_diff_objs
+        else:
+            objs = orig_objs
         num_objs = len(objs)
 
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs,), dtype=np.int32)
-        class_to_index = dict(zip(self.classes, range(self.num_classes)))
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
             # Make pixel indexes 0-based
@@ -80,18 +72,26 @@ class PascalVOC(IMDB):
             y1 = obj['bbox'][1] - 1
             x2 = obj['bbox'][2] - 1
             y2 = obj['bbox'][3] - 1
-            cls = class_to_index[obj['name'].lower().strip()]
+            cls = self._class_to_ind[obj['name'].lower().strip()]
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
 
-        roi_rec['boxes'] = boxes
-        roi_rec['gt_classes'] = gt_classes
+        roi_rec = {'index': index,
+                   'objs': objs,
+                   'image': self._image_file_tmpl.format(index),
+                   'height': height,
+                   'width': width,
+                   'boxes': boxes,
+                   'gt_classes': gt_classes,
+                   'flipped': False}
         return roi_rec
 
     @staticmethod
     def _parse_voc_anno(filename):
         import xml.etree.ElementTree as ET
         tree = ET.parse(filename)
+        height = int(tree.find('height').text)
+        width = int(tree.find('width').text)
         objects = []
         for obj in tree.findall('object'):
             obj_dict = dict()
@@ -103,7 +103,7 @@ class PascalVOC(IMDB):
                                 int(float(bbox.find('xmax').text)),
                                 int(float(bbox.find('ymax').text))]
             objects.append(obj_dict)
-        return objects
+        return height, width, objects
 
     def _evaluate_detections(self, detections, use_07_metric=True, **kargs):
         self._write_pascal_results(detections)
