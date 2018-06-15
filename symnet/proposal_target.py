@@ -92,6 +92,7 @@ class ProposalTargetOperator(mx.operator.CustomOp):
         for batch_idx in range(self._batch_images):
             b_rois = all_rois[np.where(all_rois[:, 0] == batch_idx)[0]]
             b_gt_boxes = all_gt_boxes[batch_idx]
+            b_gt_boxes = b_gt_boxes[np.where(b_gt_boxes[:, -1] > 0)[0]]
 
             # Include ground-truth boxes in the set of candidate rois
             batch_pad = batch_idx * np.ones((b_gt_boxes.shape[0], 1), dtype=b_gt_boxes.dtype)

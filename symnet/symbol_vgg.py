@@ -113,7 +113,7 @@ def get_vgg_train(anchor_scales, anchor_ratios, rpn_feature_stride,
     rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_, grad_scale=1.0 / rpn_batch_rois)
 
     # rpn proposal
-    rois = mx.symbol.contrib.Proposal(
+    rois = mx.symbol.contrib.MultiProposal(
         cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
         feature_stride=rpn_feature_stride, scales=anchor_scales, ratios=anchor_ratios,
         rpn_pre_nms_top_n=rpn_pre_topk, rpn_post_nms_top_n=rpn_post_topk,
@@ -186,7 +186,7 @@ def get_vgg_test(anchor_scales, anchor_ratios, rpn_feature_stride,
         data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=4 * num_anchors, name="rpn_bbox_pred")
 
     # rpn proposal
-    rois = mx.symbol.contrib.Proposal(
+    rois = mx.symbol.contrib.MultiProposal(
         cls_prob=rpn_cls_act_reshape, bbox_pred=rpn_bbox_pred, im_info=im_info, name='rois',
         feature_stride=rpn_feature_stride, scales=anchor_scales, ratios=anchor_ratios,
         rpn_pre_nms_top_n=rpn_pre_topk, rpn_post_nms_top_n=rpn_post_topk,
