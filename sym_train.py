@@ -58,7 +58,7 @@ def train_net(sym, roidb, args):
     check_shape(sym, data_shapes + label_shapes, arg_params, aux_params)
 
     # check fixed params
-    fixed_param_names = get_fixed_params(sym, args.net_fixed_param)
+    fixed_param_names = get_fixed_params(sym, args.net_fixed_params)
     logger.info('locking params\n%s' % pprint.pformat(fixed_param_names))
 
     # metric
@@ -124,7 +124,7 @@ def parse_args():
     parser.add_argument('--img-long-side', type=int, default=1000)
     parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
     parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
-    parser.add_argument('--net-fixed-param', type=str, default='["conv0", "stage1", "gamma", "beta"]')
+    parser.add_argument('--net-fixed-params', type=str, default='["conv0", "stage1", "gamma", "beta"]')
     parser.add_argument('--rpn-feat-stride', type=int, default=16)
     parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
     parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
@@ -148,7 +148,7 @@ def parse_args():
     args = parser.parse_args()
     args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
     args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
-    args.net_fixed_param = ast.literal_eval(args.net_fixed_param)
+    args.net_fixed_params = ast.literal_eval(args.net_fixed_params)
     args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
     args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
     args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
@@ -201,7 +201,7 @@ def get_resnet50_train(args):
         args.save_prefix = 'model/resnet50'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
-    args.net_fixed_param = ['conv0', 'stage1', 'gamma', 'beta']
+    args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
     args.rpn_feat_stride = 16
     args.rcnn_feat_stride = 16
     args.rcnn_pooled_size = (14, 14)
