@@ -99,7 +99,7 @@ def get_voc_names(args):
 
 def get_coco_names(args):
     from symimdb.coco import coco
-    args.rcnn_classes = len(coco.classes)
+    args.rcnn_num_classes = len(coco.classes)
     return coco.classes
 
 
@@ -179,8 +179,8 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    sym = get_network(args.network, args)
     class_names = get_class_names(args.dataset, args)
+    sym = get_network(args.network, args)
     demo_net(sym, class_names, args)
 
 

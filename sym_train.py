@@ -160,7 +160,7 @@ def get_voc(args):
     from symimdb.pascal_voc import PascalVOC
     if not args.imageset:
         args.imageset = '2007_trainval'
-    args.rcnn_classes = len(PascalVOC.classes)
+    args.rcnn_num_classes = len(PascalVOC.classes)
 
     isets = args.imageset.split('+')
     roidb = []
@@ -176,7 +176,7 @@ def get_coco(args):
     if not args.imageset:
         args.imageset = 'train2017'
     args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_classes = len(coco.classes)
+    args.rcnn_num_classes = len(coco.classes)
 
     isets = args.imageset.split('+')
     roidb = []
@@ -279,8 +279,8 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    sym = get_network(args.network, args)
     roidb = get_dataset(args.dataset, args)
+    sym = get_network(args.network, args)
     train_net(sym, roidb, args)
 
 
