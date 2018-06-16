@@ -31,9 +31,9 @@ def train_net(net, feat_shape, dataset, args):
     train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
                                                 mean=args.img_pixel_means, std=args.img_pixel_stds,
                                                 ac=feat_shape, rag=rag, rtg=rtg)
-    train_loader = gdata.DetectionDataLoader(dataset.transform(train_transform),
-                                             batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
-                                             last_batch="rollover", num_workers=4)
+    train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
+                                         batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
+                                         last_batch="rollover", num_workers=4)
 
     # load params
     if args.resume.strip():

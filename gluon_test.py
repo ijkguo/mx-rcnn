@@ -3,6 +3,7 @@ import ast
 import pprint
 
 import mxnet as mx
+from mxnet import gluon
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from tqdm import tqdm
@@ -22,8 +23,8 @@ def test_net(net, dataset, args):
     # load testing data
     val_transform = RCNNDefaultValTransform(short=args.img_short_side, max_size=args.img_long_side,
                                             mean=args.img_pixel_means, std=args.img_pixel_stds)
-    val_loader = gdata.DetectionDataLoader(dataset.transform(val_transform),
-                                           batch_size=1, shuffle=False, last_batch="keep", num_workers=4)
+    val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
+                                       batch_size=1, shuffle=False, last_batch="keep", num_workers=4)
 
     # load model
     net.load_params(args.params)
