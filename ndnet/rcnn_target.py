@@ -1,69 +1,68 @@
-import mxnet as mx
-import numpy as np
 from mxnet import gluon
 from gluoncv.nn.bbox import BBoxCornerToCenter
 from gluoncv.utils.nn.matcher import MaximumMatcher
 
 
 class QuotaSampler(gluon.HybridBlock):
-    def __init__(self, num_sample, pos_ratio, pos_thresh, neg_thresh_hi, neg_thresh_lo):
+    def __init__(self, num_sample, pos_ratio, pos_thresh):
         super(QuotaSampler, self).__init__()
         self._num_sample = num_sample
         self._max_pos = int(round(num_sample * pos_ratio))
         self._pos_thresh = pos_thresh
-        self._neg_thresh_hi = neg_thresh_hi
-        self._neg_thresh_lo = neg_thresh_lo
 
-    def hybrid_forward(self, F, matches, ious, **kwargs):
-        # init with 0s, which are ignored
-        result = mx.nd.zeros_like(matches)
-        # negative samples with label -1
+    def hybrid_forward(self, F, ious, **kwargs):
+        # ious (N, M)
+        # return: indices (num_samples,) row index to ious
+        # return: samples (num_samples,) value 1: pos, 0: neg
+        # return: matches (num_samples,) value [0, M)
         ious_max = ious.max(axis=-1)
-        neg_mask = (ious_max < self._neg_thresh_hi) * (ious_max > self._neg_thresh_lo)
-        result = mx.nd.where(neg_mask, mx.nd.ones_like(result) * -1, result)
+        ious_argmax = ious.argmax(axis=-1)
+        # init with 0, which are neg samples
+        mask = F.zeros_like(ious_max)
+        # NOTE: this is to get arange_like, cpu stable_sort may fail
+        index = F.argsort(mask)
         # positive samples
-        result = mx.nd.where(matches >= 0, mx.nd.ones_like(result), result)
-        result = mx.nd.where(ious_max >= self._pos_thresh, mx.nd.ones_like(result), result)
+        pos_mask = ious_max >= self._pos_thresh
+        mask = F.where(pos_mask, F.ones_like(mask), mask)
 
-        # re-balance if number of postive or negative exceed limits
-        result = result.asnumpy()
-        num_pos = int((result > 0).sum())
-        if num_pos > self._max_pos:
-            disable_indices = np.random.choice(
-                np.where(result > 0)[0], size=(num_pos - self._max_pos), replace=False)
-            result[disable_indices] = 0  # use 0 to ignore
-        num_neg = int((result < 0).sum())
-        # if pos_sample is less than quota, we can have negative samples filling the gap
-        max_neg = self._num_sample - min(num_pos, self._max_pos)
-        if num_neg > max_neg:
-            disable_indices = np.random.choice(
-                np.where(result < 0)[0], size=(num_neg - max_neg), replace=False)
-            result[disable_indices] = 0
-        return mx.nd.array(result, ctx=matches.context)
+        # shuffle mask
+        # NOTE: cannot do this, _shuffle does not have FGradient
+        # index = F.random.shuffle(index)
+        # mask = F.take(mask, index)
+        order = F.argsort(mask, is_ascend=False)
+        topk = F.slice_axis(order, axis=0, begin=0, end=self._max_pos)
+        bottomk = F.slice_axis(order, axis=0, begin=-(self._num_sample - self._max_pos), end=None)
+        selected = F.concat(topk, bottomk, dim=0)
+
+        # output
+        indices = F.take(index, selected)
+        samples = F.take(mask, selected)
+        matches = F.take(ious_argmax, selected)
+        return indices, samples, matches
 
 
 class MultiClassEncoder(gluon.HybridBlock):
-    def __init__(self, ignore_label=-1):
+    def __init__(self, num_sample, ignore_label=-1):
         super(MultiClassEncoder, self).__init__()
+        self._num_sample = num_sample
         self._ignore_label = ignore_label
 
     def hybrid_forward(self, F, samples, matches, refs, **kwargs):
         # samples (B, N, M) (+1, -1, 0: ignore), matches (B, N) [0, M), refs (B, M)
         # reshape refs (B, M) -> (B, 1, M) -> (B, N, M)
-        refs = mx.nd.repeat(refs.reshape((0, 1, -1)), axis=1, repeats=matches.shape[1])
+        refs = F.repeat(refs.reshape((0, 1, -1)), axis=1, repeats=self._num_sample)
         # ids (B, N, M) -> (B, M), note no + 1 here (processed in data pipeline)
-        target_ids = mx.nd.pick(refs, matches, axis=2)
-        # mark (-1: neg, 0: ignore) to -1
-        targets = mx.nd.where(samples > 0.5, target_ids, mx.nd.ones_like(target_ids) * self._ignore_label)
-        # mark -1 to 0: bg class
-        targets = mx.nd.where(samples < -0.5, mx.nd.zeros_like(targets), targets)
+        target_ids = F.pick(refs, matches, axis=2)
+        # samples 1/0, mask out neg samples to 0
+        targets = F.where(samples > 0.5, target_ids, F.zeros_like(target_ids))
         return targets
 
 
 class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
-    def __init__(self, num_class, stds=(0.1, 0.1, 0.2, 0.2), means=(0., 0., 0., 0.)):
+    def __init__(self, num_class, num_sample, stds=(0.1, 0.1, 0.2, 0.2), means=(0., 0., 0., 0.)):
         super(NormalizedPerClassBoxCenterEncoder, self).__init__()
         self._num_class = num_class
+        self._num_sample = num_sample
         self._stds = stds
         self._means = means
         with self.name_scope():
@@ -71,15 +70,15 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
 
     def hybrid_forward(self, F, samples, matches, anchors, labels, refs, **kwargs):
         # refs [B, M, 4], anchors [B, N, 4], samples [B, N], matches [B, N]
-        # refs [B, M, 4] -> [B, N, M, 4]
-        ref_boxes = F.repeat(refs.reshape((0, 1, -1, 4)), axis=1, repeats=matches.shape[1])
+        # refs [B, M, 4] -> reshape [B, 1, M, 4] -> repeat [B, N, M, 4]
+        ref_boxes = F.repeat(refs.reshape((0, 1, -1, 4)), axis=1, repeats=self._num_sample)
         # refs [B, N, M, 4] -> 4 * [B, N, M]
         ref_boxes = F.split(ref_boxes, axis=-1, num_outputs=4, squeeze_axis=True)
         # refs 4 * [B, N, M] -> pick from matches [B, N, 1] -> concat to [B, N, 4]
-        ref_boxes = F.concat(*[mx.nd.pick(ref_boxes[i], matches, axis=2).reshape((0, -1, 1)) \
+        ref_boxes = F.concat(*[F.pick(ref_boxes[i], matches, axis=2).reshape((0, -1, 1)) \
                              for i in range(4)], dim=2)
         # labels [B, M] -> [B, N, M]
-        ref_labels = F.repeat(labels.reshape(0, 1, -1), axis=1, repeats=matches.shape[1])
+        ref_labels = F.repeat(labels.reshape((0, 1, -1)), axis=1, repeats=self._num_sample)
         # labels [B, N, M] -> pick from matches [B, N] -> [B, N, 1]
         ref_labels = F.pick(ref_labels, matches, axis=2).reshape((0, -1, 1))
         # transform based on x, y, w, h
@@ -95,8 +94,8 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
         # only the positive samples have targets
         # note that iou with padded 0 box is always 0, thus no targets
         temp = F.tile(samples.reshape((0, -1, 1)), reps=(1, 1, 4)) > 0.5
-        targets = F.where(temp, codecs, mx.nd.zeros_like(codecs))
-        masks = F.where(temp, mx.nd.ones_like(temp), mx.nd.zeros_like(temp))
+        targets = F.where(temp, codecs, F.zeros_like(codecs))
+        masks = F.where(temp, F.ones_like(temp), F.zeros_like(temp))
         # expand class agnostic targets to per class targets
         out_targets = []
         out_masks = []
@@ -124,38 +123,36 @@ class RCNNTargetGenerator(gluon.HybridBlock):
         self._box_stds = box_stds
         with self.name_scope():
             self._sampler = QuotaSampler(
-                num_sample=self._batch_rois, pos_ratio=self._fg_fraction,
-                pos_thresh=self._fg_overlap, neg_thresh_hi=self._fg_overlap, neg_thresh_lo=0.)
+                num_sample=self._batch_rois, pos_ratio=self._fg_fraction, pos_thresh=self._fg_overlap)
             self._maximum_matcher = MaximumMatcher(threshold=fg_overlap)
-            self._cls_encoder = MultiClassEncoder()
+            self._cls_encoder = MultiClassEncoder(num_sample=self._batch_rois)
             self._box_encoder = NormalizedPerClassBoxCenterEncoder(
-                num_class=num_classes, stds=box_stds, means=(0., 0., 0., 0.))
+                num_class=num_classes, num_sample=self._batch_rois, stds=box_stds, means=(0., 0., 0., 0.))
 
     def hybrid_forward(self, F, rois, gt_boxes, **kwargs):
         # slice into labels and box coordinates
-        gt_labels = gt_boxes[:, :, 4:5]
-        gt_boxes = gt_boxes[:, :, :4]
+        gt_labels = F.slice_axis(gt_boxes, axis=-1, begin=4, end=5)
+        gt_boxes = F.slice_axis(gt_boxes, axis=-1, begin=0, end=4)
 
+        # split into many arrays
+        all_rois = F.split(rois, axis=0, num_outputs=self._batch_images, squeeze_axis=True)
+        all_gt_boxes = F.split(gt_boxes, axis=0, num_outputs=self._batch_images, squeeze_axis=True)
+        # and collect results into list
         new_rois = []
         new_samples = []
         new_matches = []
-        for i in range(self._batch_images):
-            gt_box = gt_boxes[i]
+        for roi, gt_box in zip(all_rois, all_gt_boxes):
             # concat rpn roi with ground truth
-            all_roi = F.concat(rois[i], gt_boxes[i], dim=0)
-            # calculate ious between (N, 4) anchors and (M, 4) bbox ground-truths
-            # ious is (N, M), note cannot do batch op, will get (B, N, B, M) ious
+            all_roi = F.concat(roi, gt_box, dim=0)
+            # calculate (N, M) ious between (N, 4) anchors and (M, 4) bbox ground-truths
+            # NOTE cannot do batch op, will get (B, N, B, M) ious
             ious = F.contrib.box_iou(all_roi, gt_box, format='corner')
             # matches (N,) coded to [0, num_classes), padded gt_boxes code to 0
-            matches = self._maximum_matcher(ious)
-            samples = self._sampler(matches, ious)
-            # slice valid samples
-            sf_samples = F.where(samples == 0, F.ones_like(samples) * -999, samples)
-            indices = F.argsort(sf_samples, is_ascend=False).slice_axis(axis=0, begin=0, end=self._batch_rois)
+            indices, samples, matches = self._sampler(ious)
             # stack all samples together
             new_rois.append(all_roi.take(indices))
-            new_samples.append(samples.take(indices))
-            new_matches.append(matches.take(indices))
+            new_samples.append(samples)
+            new_matches.append(matches)
         new_rois = F.stack(*new_rois, axis=0)
         new_samples = F.stack(*new_samples, axis=0)
         new_matches = F.stack(*new_matches, axis=0)
