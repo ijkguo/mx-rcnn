@@ -5,6 +5,43 @@ from gluoncv.nn.bbox import BBoxCornerToCenter
 from gluoncv.utils.nn.matcher import MaximumMatcher
 
 
+class QuotaSampler(gluon.HybridBlock):
+    def __init__(self, num_sample, pos_ratio, pos_thresh, neg_thresh_hi, neg_thresh_lo):
+        super(QuotaSampler, self).__init__()
+        self._num_sample = num_sample
+        self._max_pos = int(round(num_sample * pos_ratio))
+        self._pos_thresh = pos_thresh
+        self._neg_thresh_hi = neg_thresh_hi
+        self._neg_thresh_lo = neg_thresh_lo
+
+    def hybrid_forward(self, F, matches, ious, **kwargs):
+        # init with 0s, which are ignored
+        result = mx.nd.zeros_like(matches)
+        # negative samples with label -1
+        ious_max = ious.max(axis=-1)
+        neg_mask = (ious_max < self._neg_thresh_hi) * (ious_max > self._neg_thresh_lo)
+        result = mx.nd.where(neg_mask, mx.nd.ones_like(result) * -1, result)
+        # positive samples
+        result = mx.nd.where(matches >= 0, mx.nd.ones_like(result), result)
+        result = mx.nd.where(ious_max >= self._pos_thresh, mx.nd.ones_like(result), result)
+
+        # re-balance if number of postive or negative exceed limits
+        result = result.asnumpy()
+        num_pos = int((result > 0).sum())
+        if num_pos > self._max_pos:
+            disable_indices = np.random.choice(
+                np.where(result > 0)[0], size=(num_pos - self._max_pos), replace=False)
+            result[disable_indices] = 0  # use 0 to ignore
+        num_neg = int((result < 0).sum())
+        # if pos_sample is less than quota, we can have negative samples filling the gap
+        max_neg = self._num_sample - min(num_pos, self._max_pos)
+        if num_neg > max_neg:
+            disable_indices = np.random.choice(
+                np.where(result < 0)[0], size=(num_neg - max_neg), replace=False)
+            result[disable_indices] = 0
+        return mx.nd.array(result, ctx=matches.context)
+
+
 class MultiClassEncoder(gluon.HybridBlock):
     def __init__(self, ignore_label=-1):
         super(MultiClassEncoder, self).__init__()
@@ -86,44 +123,13 @@ class RCNNTargetGenerator(gluon.HybridBlock):
         self._fg_overlap = fg_overlap
         self._box_stds = box_stds
         with self.name_scope():
+            self._sampler = QuotaSampler(
+                num_sample=self._batch_rois, pos_ratio=self._fg_fraction,
+                pos_thresh=self._fg_overlap, neg_thresh_hi=self._fg_overlap, neg_thresh_lo=0.)
+            self._maximum_matcher = MaximumMatcher(threshold=fg_overlap)
             self._cls_encoder = MultiClassEncoder()
             self._box_encoder = NormalizedPerClassBoxCenterEncoder(
                 num_class=num_classes, stds=box_stds, means=(0., 0., 0., 0.))
-            self._maximum_matcher = MaximumMatcher(threshold=fg_overlap)
-
-    @staticmethod
-    def _sampler(matches, ious, num_sample, pos_thresh, neg_thresh_high, neg_thresh_low=0.,
-                 pos_ratio=0.5, neg_ratio=0.5, fill_negative=True):
-        max_pos = int(round(pos_ratio * num_sample))
-        max_neg = int(neg_ratio * num_sample)
-
-        # init with 0s, which are ignored
-        result = mx.nd.zeros_like(matches)
-        # negative samples with label -1
-        ious_max = ious.max(axis=-1)
-        neg_mask = ious_max < neg_thresh_high
-        neg_mask = neg_mask * (ious_max > neg_thresh_low)
-        result = mx.nd.where(neg_mask, mx.nd.ones_like(result) * -1, result)
-        # positive samples
-        result = mx.nd.where(matches >= 0, mx.nd.ones_like(result), result)
-        result = mx.nd.where(ious_max >= pos_thresh, mx.nd.ones_like(result), result)
-
-        # re-balance if number of postive or negative exceed limits
-        result = result.asnumpy()
-        num_pos = int((result > 0).sum())
-        if num_pos > max_pos:
-            disable_indices = np.random.choice(
-                np.where(result > 0)[0], size=(num_pos - max_pos), replace=False)
-            result[disable_indices] = 0  # use 0 to ignore
-        num_neg = int((result < 0).sum())
-        if fill_negative:
-            # if pos_sample is less than quota, we can have negative samples filling the gap
-            max_neg = max(num_sample - min(num_pos, max_pos), max_neg)
-        if num_neg > max_neg:
-            disable_indices = np.random.choice(
-                np.where(result < 0)[0], size=(num_neg - max_neg), replace=False)
-            result[disable_indices] = 0
-        return mx.nd.array(result, ctx=matches.context)
 
     def hybrid_forward(self, F, rois, gt_boxes, **kwargs):
         # slice into labels and box coordinates
@@ -142,8 +148,7 @@ class RCNNTargetGenerator(gluon.HybridBlock):
             ious = F.contrib.box_iou(all_roi, gt_box, format='corner')
             # matches (N,) coded to [0, num_classes), padded gt_boxes code to 0
             matches = self._maximum_matcher(ious)
-            samples = self._sampler(matches, ious, num_sample=self._batch_rois, pos_thresh=self._fg_overlap,
-                                    neg_thresh_high=self._fg_overlap, pos_ratio=self._fg_fraction)
+            samples = self._sampler(matches, ious)
             # slice valid samples
             sf_samples = F.where(samples == 0, F.ones_like(samples) * -999, samples)
             indices = F.argsort(sf_samples, is_ascend=False).slice_axis(axis=0, begin=0, end=self._batch_rois)
