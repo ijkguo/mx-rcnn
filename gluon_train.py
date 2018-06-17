@@ -188,7 +188,7 @@ def get_voc(args):
     from symimdb.pascal_voc import PascalVOC
     if not args.imageset:
         args.imageset = '2007_trainval'
-    args.rcnn_classes = len(PascalVOC.classes)
+    args.rcnn_num_classes = len(PascalVOC.classes) + 1
 
     splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
     return gdata.VOCDetection(splits=splits)

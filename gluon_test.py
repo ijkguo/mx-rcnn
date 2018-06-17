@@ -111,7 +111,7 @@ def parse_args():
 def get_voc(args):
     if not args.imageset:
         args.imageset = '2007_test'
-    args.rcnn_classes = len(gdata.VOCDetection.CLASSES)
+    args.rcnn_num_classes = len(gdata.VOCDetection.CLASSES) + 1
 
     splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
     return gdata.VOCDetection(splits=splits)

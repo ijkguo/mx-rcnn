@@ -95,7 +95,7 @@ def parse_args():
 
 
 def get_voc_names(args):
-    args.rcnn_num_classes = len(gdata.VOCDetection.CLASSES)
+    args.rcnn_num_classes = len(gdata.VOCDetection.CLASSES) + 1
     return gdata.VOCDetection.CLASSES
 
 
