@@ -134,14 +134,13 @@ class RCNNTargetGenerator(gluon.HybridBlock):
         gt_labels = F.slice_axis(gt_boxes, axis=-1, begin=4, end=5)
         gt_boxes = F.slice_axis(gt_boxes, axis=-1, begin=0, end=4)
 
-        # split into many arrays
-        all_rois = F.split(rois, axis=0, num_outputs=self._batch_images, squeeze_axis=True)
-        all_gt_boxes = F.split(gt_boxes, axis=0, num_outputs=self._batch_images, squeeze_axis=True)
-        # and collect results into list
+        # collect results into list
         new_rois = []
         new_samples = []
         new_matches = []
-        for roi, gt_box in zip(all_rois, all_gt_boxes):
+        for i in range(self._batch_images):
+            roi = F.squeeze(F.slice_axis(rois, axis=0, begin=i, end=i+1), axis=0)
+            gt_box = F.squeeze(F.slice_axis(gt_boxes, axis=0, begin=i, end=i+1), axis=0)
             # concat rpn roi with ground truth
             all_roi = F.concat(roi, gt_box, dim=0)
             # calculate (N, M) ious between (N, 4) anchors and (M, 4) bbox ground-truths
