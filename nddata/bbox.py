@@ -3,10 +3,10 @@ import mxnet as mx
 
 def bbox_corner2center(x, split=False):
     xmin, ymin, xmax, ymax = x.split(axis=-1, num_outputs=4)
-    width = xmax - xmin + 1
-    height = ymax - ymin + 1
-    x = xmin + (width - 1) / 2
-    y = ymin + (height - 1) / 2
+    width = xmax - xmin
+    height = ymax - ymin
+    x = xmin + width / 2
+    y = ymin + height / 2
     if not split:
         return mx.nd.concat(x, y, width, height, dim=-1)
     else:
@@ -15,8 +15,8 @@ def bbox_corner2center(x, split=False):
 
 def bbox_center2corner(x, split=False):
     x, y, w, h = x.split(axis=-1, num_outputs=4)
-    hw = (w - 1) / 2
-    hh = (h - 1) / 2
+    hw = w / 2
+    hh = h / 2
     xmin = x - hw
     ymin = y - hh
     xmax = x + hw

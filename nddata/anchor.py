@@ -1,17 +1,6 @@
 import mxnet as mx
 import numpy as np
 
-from symdata.anchor import AnchorGenerator
-
-
-# generate and clip anchor
-class RPNAnchorGenerator:
-    def __init__(self, ag: AnchorGenerator, alloc_size=(128, 128)):
-        self._anchors = mx.nd.array(ag.generate(*alloc_size).reshape((1, 1, alloc_size[0], alloc_size[1], -1)))
-
-    def forward(self, feat_height, feat_width):
-        return self._anchors[:, :, :feat_height, :feat_width, :].reshape(-1, 4)
-
 
 class RPNTargetGenerator:
     def __init__(self, num_sample, pos_iou_thresh, neg_iou_thresh, pos_ratio, stds):

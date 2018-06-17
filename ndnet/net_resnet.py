@@ -140,12 +140,11 @@ class FRCNNResNet(HybridBlock):
             self.backbone = ResNet50V2(prefix='')
             self.rcnn = RCNN(2048, num_classes)
             self.rpn = RPN(1024, len(anchor_scales) * len(anchor_ratios))
-            self.proposal = Proposal(anchor_scales, anchor_ratios, rpn_feature_stride, rpn_pre_topk,
-                                     rpn_post_topk, rpn_nms_thresh, rpn_min_size)
+            self.proposal = Proposal(rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
             self.rcnn_target = RCNNTargetGenerator(num_classes, rcnn_batch_size, rcnn_batch_rois,
                                                    rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds)
 
-    def hybrid_forward(self, F, x, im_info, gt_boxes=None):
+    def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
         x = self.backbone.layer1(x)
         x = self.backbone.layer2(x)
@@ -155,7 +154,7 @@ class FRCNNResNet(HybridBlock):
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
         with autograd.pause():
             rpn_cls_prob = F.sigmoid(rpn_cls)
-            rois = self.proposal(rpn_cls_prob, rpn_reg, im_info)
+            rois = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
 
         # generate targets
         if autograd.is_training():

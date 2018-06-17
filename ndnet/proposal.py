@@ -1,49 +1,56 @@
-import mxnet as mx
 from mxnet import gluon
-from nddata.bbox import bbox_center2corner, bbox_corner2center, bbox_decode, bbox_clip
-from symdata.anchor import AnchorGenerator
+from gluoncv.nn.bbox import BBoxCornerToCenter
+from gluoncv.nn.coder import NormalizedBoxCenterDecoder
+
+
+class BBoxClipper(gluon.HybridBlock):
+    def __init__(self, **kwargs):
+        super(BBoxClipper, self).__init__(**kwargs)
+
+    def hybrid_forward(self, F, boxes, window, *args, **kwargs):
+        boxes = F.maximum(boxes, 0.0)
+        # window [B, 2] -> reverse hw -> tile [B, 4] -> [B, 1, 4], boxes [B, N, 4]
+        m = F.tile(F.reverse(window, axis=1), reps=(2,)).reshape((0, -4, 1, -1))
+        boxes = F.broadcast_minimum(boxes, m)
+        return boxes
 
 
 class Proposal(gluon.HybridBlock):
-    def __init__(self, anchor_scales, anchor_ratios, rpn_feature_stride,
-                 rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
-                 alloc_size=(128, 128), output_score=False, **kwargs):
+    def __init__(self, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
+                 output_score=False, **kwargs):
         super(Proposal, self).__init__(**kwargs)
-        ag = AnchorGenerator(rpn_feature_stride, anchor_scales, anchor_ratios)
-        self._anchors = mx.nd.array(
-            ag.generate(*alloc_size).reshape((1, 1, alloc_size[0], alloc_size[1], -1)))
         self._rpn_pre_topk = rpn_pre_topk
         self._rpn_post_topk = rpn_post_topk
         self._rpn_nms_thresh = rpn_nms_thresh
         self._rpn_min_size = rpn_min_size
         self._output_score = output_score
 
-    def _generate_anchor(self, x):
-        return mx.nd.slice_like(self._anchors.as_in_context(x.context), x, axes=(2, 3)).reshape(1, -1, 4)
+        with self.name_scope():
+            self._bbox_corner2center = BBoxCornerToCenter()
+            self._bbox_decode = NormalizedBoxCenterDecoder(stds=(1.0, 1.0, 1.0, 1.0))
+            self._bbox_clip = BBoxClipper()
+            self._bbox_corner2center_split = BBoxCornerToCenter(split=True)
 
-    def hybrid_forward(self, F, cls, reg, im_info, **kwargs):
-        # nd proposal
-        anchors = self._generate_anchor(reg)
+    def hybrid_forward(self, F, cls, reg, anchors, im_info, **kwargs):
+        # anchors [B, H, W, N*4] -> split 1st dim [B, 1, H, W, N*4] -> slice 2, 3 dim -> reshape [B, H * W * N, 4]
+        anchors = F.slice_like(anchors.reshape((-4, -1, 1, -2)), reg, axes=(2, 3)).reshape((0, -1, 4))
 
+        # reshape input [B, N*4, H, W] -> [B, H * W * N, 4]
         score = cls.transpose((0, 2, 3, 1)).reshape((0, -1, 1))
         bbox_reg = reg.transpose((0, 2, 3, 1)).reshape((0, -1, 4))
 
-        boxes = bbox_corner2center(anchors)
-        boxes = bbox_decode(bbox_reg, boxes, stds=(1.0, 1.0, 1.0, 1.0))
-        boxes = bbox_center2corner(boxes)
+        # decode bbox
+        boxes = self._bbox_decode(bbox_reg, self._bbox_corner2center(anchors))
 
         # clip to image boundary
-        for ib, [im_height, im_width, im_scale] in enumerate(im_info.asnumpy()):
-            boxes[ib] = bbox_clip(boxes[ib], im_height, im_width)
+        boxes = self._bbox_clip(boxes, im_info.slice_axis(axis=-1, begin=0, end=2))
 
         # remove min_size
-        for ib, [im_height, im_width, im_scale] in enumerate(im_info.asnumpy()):
-            _, _, width, height = bbox_corner2center(boxes[ib], split=True)
-            min_size = self._rpn_min_size * im_scale
-            invalid = (width < min_size) + (height < min_size)
-            score[ib] = F.where(invalid, F.zeros_like(invalid), score[ib])
-            invalid = F.repeat(invalid, axis=-1, repeats=4)
-            boxes[ib] = F.where(invalid, F.ones_like(invalid) * -1, boxes[ib])
+        _, _, width, height = self._bbox_corner2center_split(boxes)
+        invalid = (width < self._rpn_min_size) + (height < self._rpn_min_size)
+        score = F.where(invalid, F.zeros_like(invalid), score)
+        invalid = F.repeat(invalid, axis=-1, repeats=4)
+        boxes = F.where(invalid, F.ones_like(invalid) * -1, boxes)
 
         # nms
         # Non-maximum suppression

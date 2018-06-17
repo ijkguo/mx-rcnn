@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from nddata.bbox import decode_detect
 from nddata.transform import RCNNDefaultValTransform
+from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
@@ -21,8 +22,11 @@ def test_net(net, dataset, args):
     ctx = mx.gpu(args.gpu)
 
     # load testing data
+    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
+                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
     val_transform = RCNNDefaultValTransform(short=args.img_short_side, max_size=args.img_long_side,
-                                            mean=args.img_pixel_means, std=args.img_pixel_stds)
+                                            mean=args.img_pixel_means, std=args.img_pixel_stds,
+                                            feat_stride=args.rpn_feat_stride, ag=ag)
     val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
                                        batch_size=1, shuffle=False, last_batch="keep", num_workers=4)
 

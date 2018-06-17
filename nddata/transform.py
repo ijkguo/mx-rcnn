@@ -2,8 +2,9 @@ import mxnet as mx
 from mxnet import gluon
 
 from nddata.image import imdecode, random_flip, resize, transform
+from symdata.anchor import AnchorGenerator
 from symdata.bbox import bbox_flip
-from nddata.anchor import RPNAnchorGenerator, RPNTargetGenerator
+from nddata.anchor import RPNTargetGenerator
 
 
 def load_test(filename, short, max_size, mean, std):
@@ -68,11 +69,13 @@ def pad_to_max(tensors_list):
 
 
 class RCNNDefaultValTransform(object):
-    def __init__(self, short, max_size, mean, std):
+    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator):
         self._short = short
         self._max_size = max_size
         self._mean = mean
         self._std = std
+        alloc_size = int(round(max_size * 1.5 / feat_stride))
+        self._anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
 
     def __call__(self, src, label):
         # resize image
@@ -83,17 +86,19 @@ class RCNNDefaultValTransform(object):
         # transform into tensor and normalize
         im_tensor = transform(im, self._mean, self._std)
         label = mx.nd.array(label, ctx=src.context)
-        return im_tensor, im_info, label
+        anchors = self._anchors.as_in_context(src.context)
+        return im_tensor, anchors, im_info, label
 
 
 class RCNNDefaultTrainTransform(object):
-    def __init__(self, short, max_size, mean, std, ac, rag: RPNAnchorGenerator, rtg: RPNTargetGenerator):
+    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator, ac, rtg: RPNTargetGenerator):
         self._short = short
         self._max_size = max_size
         self._mean = mean
         self._std = std
+        alloc_size = int(round(max_size * 1.5 / feat_stride))
+        self._anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
         self._ac = ac
-        self._rag = rag
         self._rtg = rtg
 
     def __call__(self, src, label):
@@ -125,13 +130,13 @@ class RCNNDefaultTrainTransform(object):
         # convert to ndarray
         gt_bboxes = mx.nd.array(gt_bboxes, ctx=im_tensor.context)
 
-        # compute anchor shape and generate anchors
+        # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._ac(im_height), self._ac(im_width)
-        anchors = self._rag.forward(feat_height, feat_width).as_in_context(im_tensor.context)
+        anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(im_tensor.context)
 
         # assign anchors
         boxes = gt_bboxes[:, :4].expand_dims(axis=0)
-        cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors, im_width, im_height)
+        cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors.reshape(-1, 4), im_width, im_height)
 
         cls_target = cls_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
         box_target = box_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
@@ -142,4 +147,4 @@ class RCNNDefaultTrainTransform(object):
         cls_mask = mx.nd.where(cls_target >= 0, mx.nd.ones_like(cls_target), mx.nd.zeros_like(cls_target))
         cls_target = mx.nd.where(cls_target >= 0, cls_target, mx.nd.zeros_like(cls_target))
 
-        return im_tensor, im_info, gt_bboxes, cls_target, cls_mask, box_target, box_mask
+        return im_tensor, anchors, im_info, gt_bboxes, cls_target, cls_mask, box_target, box_mask
