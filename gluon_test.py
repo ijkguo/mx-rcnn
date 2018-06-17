@@ -39,15 +39,16 @@ def test_net(net, dataset, args):
     with tqdm(total=len(dataset)) as pbar:
         for ib, batch in enumerate(val_loader):
             im_tensor = batch[0].as_in_context(ctx)
-            im_info = batch[1].as_in_context(ctx)
-            label = batch[2].as_in_context(ctx)
+            anchors = batch[1].as_in_context(ctx)
+            im_info = batch[2].as_in_context(ctx)
+            label = batch[3].as_in_context(ctx)
 
             gt_ids = label.slice_axis(axis=-1, begin=4, end=5)
             gt_bboxes = label.slice_axis(axis=-1, begin=0, end=4)
             gt_difficults = label.slice_axis(axis=-1, begin=5, end=6) if label.shape[-1] > 5 else None
 
             # forward
-            rois, scores, bbox_deltas = net(im_tensor, im_info)
+            rois, scores, bbox_deltas = net(im_tensor, anchors, im_info)
             rois = rois[:, 1:]
             scores = mx.nd.softmax(scores)
             im_info = im_info[0]

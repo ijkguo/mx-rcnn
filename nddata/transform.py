@@ -7,7 +7,7 @@ from symdata.bbox import bbox_flip
 from nddata.anchor import RPNTargetGenerator
 
 
-def load_test(filename, short, max_size, mean, std):
+def load_test(filename, short, max_size, mean, std, feat_stride, ag: AnchorGenerator):
     # read and transform image
     im_orig = imdecode(filename)
     im, im_scale = resize(im_orig, short, max_size)
@@ -17,11 +17,16 @@ def load_test(filename, short, max_size, mean, std):
     # transform into tensor and normalize
     im_tensor = transform(im, mean, std)
 
+    # generate and reshape anchors
+    alloc_size = int(round(max_size * 1.5 / feat_stride))
+    anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
+
     # for 1-batch inference purpose, cannot use batchify (or nd.stack) to expand dims
     im_tensor = im_tensor.expand_dims(0)
+    anchors = anchors.expand_dims(0)
     im_info = im_info.expand_dims(0)
 
-    return im_tensor, im_info, im_orig
+    return im_tensor, anchors, im_info, im_orig
 
 
 def split_and_load(batch, ctx_list):

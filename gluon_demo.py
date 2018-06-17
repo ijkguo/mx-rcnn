@@ -8,6 +8,7 @@ from gluoncv import data as gdata
 from nddata.bbox import decode_detect
 from nddata.transform import load_test
 from nddata.vis import vis_detection
+from symdata.anchor import AnchorGenerator
 
 
 def demo_net(net, class_names, args):
@@ -25,14 +26,18 @@ def demo_net(net, class_names, args):
     net.collect_params().reset_ctx(ctx)
 
     # load single test
-    im_tensor, im_info, im_orig = load_test(args.image, short=args.img_short_side, max_size=args.img_long_side,
-                                            mean=args.img_pixel_means, std=args.img_pixel_stds)
+    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
+                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
+    im_tensor, anchors, im_info, im_orig = load_test(args.image, short=args.img_short_side, max_size=args.img_long_side,
+                                                     mean=args.img_pixel_means, std=args.img_pixel_stds,
+                                                     feat_stride=args.rpn_feat_stride, ag=ag)
 
     # forward
     im_tensor = im_tensor.as_in_context(ctx)
+    anchors = anchors.as_in_context(anchors)
     im_info = im_info.as_in_context(ctx)
 
-    rois, scores, bbox_deltas = net(im_tensor, im_info)
+    rois, scores, bbox_deltas = net(im_tensor, anchors, im_info)
     rois = rois[:, 1:]
     scores = mx.nd.softmax(scores)
     im_info = im_info[0]
