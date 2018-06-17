@@ -158,11 +158,12 @@ class FRCNNResNet(HybridBlock):
 
         # generate targets
         if autograd.is_training():
-            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
-                self.rcnn_target(rois, gt_boxes)
-            rcnn_label = rcnn_label.reshape(-3)
-            rcnn_bbox_target = rcnn_bbox_target.reshape((-3, -3))
-            rcnn_bbox_weight = rcnn_bbox_weight.reshape((-3, -3))
+            with autograd.pause():
+                rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
+                    self.rcnn_target(rois, gt_boxes)
+                rcnn_label = rcnn_label.reshape(-3)
+                rcnn_bbox_target = rcnn_bbox_target.reshape((-3, -3))
+                rcnn_bbox_weight = rcnn_bbox_weight.reshape((-3, -3))
 
         # create batch id and reshape for roi pooling
         with autograd.pause():
