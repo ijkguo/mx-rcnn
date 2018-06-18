@@ -152,24 +152,22 @@ class FRCNNResNet(HybridBlock):
 
         # generate proposals
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
-        with autograd.pause():
-            rpn_cls_prob = F.sigmoid(rpn_cls)
-            rois = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
+        rpn_cls_prob = F.sigmoid(rpn_cls)
+        rois = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
 
         # generate targets
         if autograd.is_training():
-            with autograd.pause():
-                rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
-                    self.rcnn_target(rois, gt_boxes)
-                rcnn_label = rcnn_label.reshape(-3)
-                rcnn_bbox_target = rcnn_bbox_target.reshape((-3, -3))
-                rcnn_bbox_weight = rcnn_bbox_weight.reshape((-3, -3))
+            rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
+                self.rcnn_target(rois, gt_boxes)
+            rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
+            rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
+            rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
 
         # create batch id and reshape for roi pooling
-        with autograd.pause():
-            rois = rois.reshape((-3, 0))
-            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
-            rois = F.concat(roi_batch_id, rois, dim=-1)
+        rois = rois.reshape((-3, 0))
+        roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
+        rois = F.concat(roi_batch_id, rois, dim=-1)
+        rois = F.stop_gradient(rois)
 
         # pool to roi features
         if self._rcnn_roi_mode == 'pool':
