@@ -112,26 +112,20 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
         return all_targets, all_masks
 
 
-class RCNNTargetGenerator(gluon.HybridBlock):
-    def __init__(self, num_classes, batch_images, batch_rois, fg_fraction, fg_overlap, box_stds, **kwargs):
-        super(RCNNTargetGenerator, self).__init__(**kwargs)
-        self._num_classes = num_classes
+class RCNNTargetSampler(gluon.HybridBlock):
+    def __init__(self, batch_images, batch_rois, fg_fraction, fg_overlap, **kwargs):
+        super(RCNNTargetSampler, self).__init__(**kwargs)
         self._batch_images = batch_images
         self._batch_rois = batch_rois
         self._fg_fraction = fg_fraction
         self._fg_overlap = fg_overlap
-        self._box_stds = box_stds
         with self.name_scope():
             self._sampler = QuotaSampler(
                 num_sample=self._batch_rois, pos_ratio=self._fg_fraction, pos_thresh=self._fg_overlap)
-            self._maximum_matcher = MaximumMatcher(threshold=fg_overlap)
-            self._cls_encoder = MultiClassEncoder(num_sample=self._batch_rois)
-            self._box_encoder = NormalizedPerClassBoxCenterEncoder(
-                num_class=num_classes, num_sample=self._batch_rois, stds=box_stds, means=(0., 0., 0., 0.))
+            self._maximum_matcher = MaximumMatcher(threshold=self._fg_overlap)
 
     def hybrid_forward(self, F, rois, gt_boxes, **kwargs):
-        # slice into labels and box coordinates
-        gt_labels = F.slice_axis(gt_boxes, axis=-1, begin=4, end=5)
+        # slice into box coordinates
         gt_boxes = F.slice_axis(gt_boxes, axis=-1, begin=0, end=4)
 
         # collect results into list
@@ -155,7 +149,26 @@ class RCNNTargetGenerator(gluon.HybridBlock):
         new_rois = F.stack(*new_rois, axis=0)
         new_samples = F.stack(*new_samples, axis=0)
         new_matches = F.stack(*new_matches, axis=0)
+        return new_rois, new_samples, new_matches
 
-        cls_target = self._cls_encoder(new_samples, new_matches, gt_labels)
-        box_target, box_mask = self._box_encoder(new_samples, new_matches, new_rois, gt_labels, gt_boxes)
-        return new_rois, cls_target, box_target, box_mask
+
+class RCNNTargetGenerator(gluon.HybridBlock):
+    def __init__(self, batch_images, batch_rois, num_classes, box_stds, **kwargs):
+        super(RCNNTargetGenerator, self).__init__(**kwargs)
+        self._batch_images = batch_images
+        self._batch_rois = batch_rois
+        self._num_classes = num_classes
+        self._box_stds = box_stds
+        with self.name_scope():
+            self._cls_encoder = MultiClassEncoder(num_sample=self._batch_rois)
+            self._box_encoder = NormalizedPerClassBoxCenterEncoder(
+                num_class=self._num_classes, num_sample=self._batch_rois, stds=self._box_stds, means=(0., 0., 0., 0.))
+
+    def hybrid_forward(self, F, rois, gt_boxes, samples, matches, **kwargs):
+        # slice into labels and box coordinates
+        gt_labels = F.slice_axis(gt_boxes, axis=-1, begin=4, end=5)
+        gt_boxes = F.slice_axis(gt_boxes, axis=-1, begin=0, end=4)
+
+        cls_target = self._cls_encoder(samples, matches, gt_labels)
+        box_target, box_mask = self._box_encoder(samples, matches, rois, gt_labels, gt_boxes)
+        return cls_target, box_target, box_mask

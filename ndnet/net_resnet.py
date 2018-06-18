@@ -3,7 +3,7 @@ from mxnet import autograd
 from mxnet.gluon import nn, HybridBlock
 
 from .proposal import Proposal
-from .rcnn_target import RCNNTargetGenerator
+from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator
 
 
 def get_feat_size(sz):
@@ -141,8 +141,8 @@ class FRCNNResNet(HybridBlock):
             self.rcnn = RCNN(2048, num_classes)
             self.rpn = RPN(1024, len(anchor_scales) * len(anchor_ratios))
             self.proposal = Proposal(rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
-            self.rcnn_target = RCNNTargetGenerator(num_classes, rcnn_batch_size, rcnn_batch_rois,
-                                                   rcnn_fg_fraction, rcnn_fg_overlap, rcnn_bbox_stds)
+            self.rcnn_sampler = RCNNTargetSampler(rcnn_batch_size, rcnn_batch_rois, rcnn_fg_fraction, rcnn_fg_overlap)
+            self.rcnn_target = RCNNTargetGenerator(rcnn_batch_size, rcnn_batch_rois, num_classes, rcnn_bbox_stds)
 
     def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
@@ -159,8 +159,8 @@ class FRCNNResNet(HybridBlock):
         # generate targets
         if autograd.is_training():
             with autograd.pause():
-                rois, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = \
-                    self.rcnn_target(rois, gt_boxes)
+                rois, samples, matches = self.rcnn_sampler(rois, gt_boxes)
+                rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
                 rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
                 rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
                 rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
