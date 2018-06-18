@@ -33,6 +33,7 @@ def test_net(net, dataset, args):
     # load model
     net.load_params(args.params)
     net.collect_params().reset_ctx(ctx)
+    net.hybridize()
 
     # start detection
     metric = VOC07MApMetric(iou_thresh=0.5, class_names=dataset.classes)

@@ -43,6 +43,7 @@ def train_net(net, feat_shape, dataset, args):
         net.load_params(args.pretrained, allow_missing=True, ignore_extra=True)
         net.collect_params('.*rpn|.*dense').initialize()
     net.collect_params().reset_ctx(ctx)
+    net.hybridize()
 
     # loss
     rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / args.rpn_batch_rois)
