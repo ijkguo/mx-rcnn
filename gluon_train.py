@@ -8,7 +8,7 @@ from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
 from nddata.anchor import RPNTargetGenerator
-from nddata.transform import RCNNDefaultTrainTransform, split_and_load, pad_to_max
+from nddata.transform import RCNNDefaultTrainTransform, pad_to_max
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
@@ -88,7 +88,7 @@ def train_net(net, feat_shape, dataset, args):
         tic = time.time()
         btic = time.time()
         for i, batch in enumerate(train_loader):
-            batch = split_and_load(batch, ctx_list=ctx)
+            batch = [gluon.utils.split_and_load(b, ctx_list=ctx) for b in batch]
             batch_size = len(batch[0])
             losses = []
             metric_losses = [[] for _ in metrics]
