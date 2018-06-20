@@ -1,6 +1,5 @@
 from mxnet import gluon
 from gluoncv.nn.bbox import BBoxCornerToCenter
-from gluoncv.utils.nn.matcher import MaximumMatcher
 
 
 class QuotaSampler(gluon.HybridBlock):
@@ -122,7 +121,6 @@ class RCNNTargetSampler(gluon.HybridBlock):
         with self.name_scope():
             self._sampler = QuotaSampler(
                 num_sample=self._batch_rois, pos_ratio=self._fg_fraction, pos_thresh=self._fg_overlap)
-            self._maximum_matcher = MaximumMatcher(threshold=self._fg_overlap)
 
     def hybrid_forward(self, F, rois, gt_boxes, **kwargs):
         # slice into box coordinates
