@@ -31,9 +31,9 @@ def test_net(net, dataset, args):
                                        batch_size=1, shuffle=False, last_batch="keep", num_workers=4)
 
     # load model
-    net.load_params(args.params)
+    net.load_parameters(args.params)
     net.collect_params().reset_ctx(ctx)
-    net.hybridize()
+    net.hybridize(static_alloc=True)
 
     # start detection
     metric = VOC07MApMetric(iou_thresh=0.5, class_names=dataset.classes)

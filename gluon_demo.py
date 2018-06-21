@@ -22,7 +22,7 @@ def demo_net(net, class_names, args):
         ctx = mx.cpu(0)
 
     # load model
-    net.load_params(args.params)
+    net.load_parameters(args.params)
     net.collect_params().reset_ctx(ctx)
 
     # load single test

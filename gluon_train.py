@@ -14,7 +14,7 @@ from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
-def train_net(net, feat_shape, dataset, args):
+def train_net(net: gluon.Block, feat_shape, dataset, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
@@ -42,12 +42,12 @@ def train_net(net, feat_shape, dataset, args):
 
     # load params
     if args.resume.strip():
-        net.load_params(args.resume.strip())
+        net.load_parameters(args.resume.strip())
     else:
-        net.load_params(args.pretrained, allow_missing=True, ignore_extra=True)
+        net.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
         net.collect_params('.*rpn|.*dense').initialize()
     net.collect_params().reset_ctx(ctx)
-    net.hybridize()
+    net.hybridize(static_alloc=True)
 
     # loss
     rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / args.rpn_batch_rois)
@@ -135,7 +135,7 @@ def train_net(net, feat_shape, dataset, args):
         msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
         logger.info('[Epoch {}] Training cost: {:.3f}, {}'.format(
             epoch, (time.time() - tic), msg))
-        net.save_params('{:s}_{:04d}.params'.format(args.save_prefix, epoch + 1))
+        net.save_parameters('{:s}_{:04d}.params'.format(args.save_prefix, epoch + 1))
 
 
 def parse_args():
