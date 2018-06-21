@@ -29,16 +29,7 @@ def load_test(filename, short, max_size, mean, std, feat_stride, ag: AnchorGener
     return im_tensor, anchors, im_info, im_orig
 
 
-def split_and_load(batch, ctx_list):
-    """Split data to 1 batch each device."""
-    new_batch = []
-    for i, data in enumerate(batch):
-        new_data = gluon.utils.split_and_load(data, ctx_list=ctx_list)
-        new_batch.append(new_data)
-    return new_batch
-
-
-def pad_to_max(tensors_list):
+def batchify_pad(tensors_list):
     batch_size = len(tensors_list)
     num_tensor = len(tensors_list[0])
     all_tensor_list = []
@@ -71,6 +62,32 @@ def pad_to_max(tensors_list):
 
         all_tensor_list.append(all_tensor)
     return all_tensor_list
+
+
+def split_pad(batch, ctx_list):
+    return [gluon.utils.split_and_load(data, ctx_list) for data in batch]
+
+
+def batchify_append(tensors_list):
+    batch_size = len(tensors_list)
+    num_tensor = len(tensors_list[0])
+    all_tensor_list = []
+
+    if batch_size == 1:
+        for i in range(num_tensor):
+            all_tensor_list.append([tensors_list[0][i].expand_dims(0)])
+        return all_tensor_list
+
+    for i in range(num_tensor):
+        batches = []
+        for tensor_list in tensors_list:
+            batches.append(tensor_list[i])
+        all_tensor_list.append(batches)
+    return all_tensor_list
+
+
+def split_append(batch, ctx_list):
+    return [[x.as_in_context(c) for x, c in zip(data, ctx_list)] for data in batch]
 
 
 class RCNNDefaultValTransform(object):

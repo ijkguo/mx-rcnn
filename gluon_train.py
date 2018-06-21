@@ -8,7 +8,7 @@ from mxnet import autograd, gluon
 from gluoncv import data as gdata
 
 from nddata.anchor import RPNTargetGenerator
-from nddata.transform import RCNNDefaultTrainTransform, pad_to_max
+from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
@@ -20,7 +20,11 @@ def train_net(net, feat_shape, dataset, args):
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    batch_size = len(ctx)
+    batch_size = args.rcnn_batch_size * len(ctx)
+    if args.rcnn_batch_size == 1:
+        batchify_fn, split_fn = batchify_append, split_append
+    else:
+        batchify_fn, split_fn = batchify_pad, split_pad
 
     # load training data
     ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
@@ -33,7 +37,7 @@ def train_net(net, feat_shape, dataset, args):
                                                 feat_stride=args.rpn_feat_stride, ag=ag,
                                                 ac=feat_shape, rtg=rtg)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
-                                         batch_size=batch_size, shuffle=True, batchify_fn=pad_to_max,
+                                         batch_size=batch_size, shuffle=True, batchify_fn=batchify_fn,
                                          last_batch="rollover", num_workers=4)
 
     # load params
@@ -88,7 +92,7 @@ def train_net(net, feat_shape, dataset, args):
         tic = time.time()
         btic = time.time()
         for i, batch in enumerate(train_loader):
-            batch = [gluon.utils.split_and_load(b, ctx_list=ctx) for b in batch]
+            batch = split_fn(batch, ctx)
             batch_size = len(batch[0])
             losses = []
             metric_losses = [[] for _ in metrics]
