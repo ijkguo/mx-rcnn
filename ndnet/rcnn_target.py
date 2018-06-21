@@ -3,9 +3,10 @@ from gluoncv.nn.bbox import BBoxCornerToCenter
 
 
 class QuotaSampler(gluon.HybridBlock):
-    def __init__(self, num_sample, pos_ratio, pos_thresh):
+    def __init__(self, num_sample, num_input, pos_ratio, pos_thresh):
         super(QuotaSampler, self).__init__()
         self._num_sample = num_sample
+        self._num_input = num_input
         self._max_pos = int(round(num_sample * pos_ratio))
         self._pos_thresh = pos_thresh
 
@@ -18,16 +19,17 @@ class QuotaSampler(gluon.HybridBlock):
         ious_argmax = ious.argmax(axis=-1)
         # init with 0, which are neg samples
         mask = F.zeros_like(ious_max)
-        # NOTE: this is to get arange_like, cpu stable_sort may fail
-        index = F.argsort(mask)
         # positive samples
         pos_mask = ious_max >= self._pos_thresh
         mask = F.where(pos_mask, F.ones_like(mask), mask)
 
         # shuffle mask
-        # NOTE: cannot do this, _shuffle does not have FGradient
-        # index = F.random.shuffle(index)
-        # mask = F.take(mask, index)
+        rand = F.random.uniform(0, 1, shape=(self._num_input,))
+        index = F.argsort(rand)
+        mask = F.take(mask, index)
+        ious_argmax = F.take(ious_argmax, index)
+
+        # sample pos and neg samples
         order = F.argsort(mask, is_ascend=False)
         topk = F.slice_axis(order, axis=0, begin=0, end=self._max_pos)
         bottomk = F.slice_axis(order, axis=0, begin=-(self._num_sample - self._max_pos), end=None)
@@ -112,15 +114,12 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
 
 
 class RCNNTargetSampler(gluon.HybridBlock):
-    def __init__(self, batch_images, batch_rois, fg_fraction, fg_overlap, **kwargs):
+    def __init__(self, batch_images, batch_rois, batch_proposals, fg_fraction, fg_overlap, **kwargs):
         super(RCNNTargetSampler, self).__init__(**kwargs)
         self._batch_images = batch_images
-        self._batch_rois = batch_rois
-        self._fg_fraction = fg_fraction
-        self._fg_overlap = fg_overlap
         with self.name_scope():
             self._sampler = QuotaSampler(
-                num_sample=self._batch_rois, pos_ratio=self._fg_fraction, pos_thresh=self._fg_overlap)
+                num_sample=batch_rois, num_input=batch_proposals, pos_ratio=fg_fraction, pos_thresh=fg_overlap)
 
     def hybrid_forward(self, F, rois, gt_boxes, **kwargs):
         # slice into box coordinates
@@ -151,16 +150,12 @@ class RCNNTargetSampler(gluon.HybridBlock):
 
 
 class RCNNTargetGenerator(gluon.HybridBlock):
-    def __init__(self, batch_images, batch_rois, num_classes, box_stds, **kwargs):
+    def __init__(self, batch_rois, num_classes, box_stds, **kwargs):
         super(RCNNTargetGenerator, self).__init__(**kwargs)
-        self._batch_images = batch_images
-        self._batch_rois = batch_rois
-        self._num_classes = num_classes
-        self._box_stds = box_stds
         with self.name_scope():
-            self._cls_encoder = MultiClassEncoder(num_sample=self._batch_rois)
+            self._cls_encoder = MultiClassEncoder(num_sample=batch_rois)
             self._box_encoder = NormalizedPerClassBoxCenterEncoder(
-                num_class=self._num_classes, num_sample=self._batch_rois, stds=self._box_stds, means=(0., 0., 0., 0.))
+                num_class=num_classes, num_sample=batch_rois, stds=box_stds, means=(0., 0., 0., 0.))
 
     def hybrid_forward(self, F, rois, gt_boxes, samples, matches, **kwargs):
         # slice into labels and box coordinates
