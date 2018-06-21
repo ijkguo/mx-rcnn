@@ -80,8 +80,8 @@ def batchify_append(tensors_list):
 
     for i in range(num_tensor):
         batches = []
-        for tensor_list in tensors_list:
-            batches.append(tensor_list[i])
+        for j in range(batch_size):
+            batches.append(tensors_list[j][i].expand_dims(0))
         all_tensor_list.append(batches)
     return all_tensor_list
 
