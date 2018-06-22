@@ -1,5 +1,5 @@
 import numpy as np
-from symdata.bbox import bbox_overlaps, bbox_transform
+from data.bbox import bbox_overlaps, bbox_transform
 
 
 class AnchorGenerator:

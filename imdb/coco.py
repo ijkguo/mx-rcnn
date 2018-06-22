@@ -3,7 +3,7 @@ import json
 import numpy as np
 from builtins import range
 
-from symnet.logger import logger
+from net.logger import logger
 from .imdb import IMDB
 
 # coco api

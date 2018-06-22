@@ -1,6 +1,6 @@
 import mxnet as mx
 
-from symnet.module import MutableModule
+from net.module import MutableModule
 
 
 def load_param(params, ctx=None):

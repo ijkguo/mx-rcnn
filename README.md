@@ -7,7 +7,7 @@
 * Install Python package `mxnet` or `mxnet-cu90`, `cython` and `opencv-python matplotlib pycocotools tqdm`.
 
 ### Out-of-box inference models
-Download any of the following models and run `python3 sym_demo.py --params $MODEL_FILE$ --network $Network$ --dataset $Dataset$` to get single image inference.
+Download any of the following models and run `python3 demo.py --params $MODEL_FILE$ --network $Network$ --dataset $Dataset$` to get single image inference.
 Different dataset has different object class names.
 
 | Network | Dataset | Imageset | Reference | Result | Link  |
@@ -28,8 +28,8 @@ Follow `py-faster-rcnn` for data preparation instructions.
 * [ResNet](https://github.com/tornadomeet/ResNet) should be at `model/resnet-101-0000.params` from [MXNet model zoo](http://data.dmlc.ml/models/imagenet/resnet/).
 
 ### Training and evaluation
-Use `python3 sym_train.py --pretrained $IMAGENET_MODEL_FILE$ --network $Network$ --dataset $Dataset$` to train,
-`python3 sym_test.py --params $MODEL_FILE$ --network $Network --dataset $Dataset$` to evaluate.
+Use `python3 train.py --pretrained $IMAGENET_MODEL_FILE$ --network $Network$ --dataset $Dataset$` to train,
+`python3 test.py --params $MODEL_FILE$ --network $Network --dataset $Dataset$` to evaluate.
 
 ### History
 * May 25, 2016: We released Fast R-CNN implementation.

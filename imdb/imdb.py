@@ -12,7 +12,7 @@ roidb is a list of roi_rec
 roi_rec is a dict of keys ["index", "image", "height", "width", "boxes", "gt_classes", "flipped"]
 """
 
-from symnet.logger import logger
+from net.logger import logger
 import os
 try:
     import cPickle as pickle

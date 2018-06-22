@@ -4,11 +4,11 @@ import pprint
 
 import mxnet as mx
 
-from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
-from symnet.logger import logger
-from symnet.module import MutableModule
-from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
-from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
+from data.loader import AnchorGenerator, AnchorSampler, AnchorLoader
+from net.logger import logger
+from net.module import MutableModule
+from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
+from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
 
 def train_net(sym, roidb, args):
@@ -157,7 +157,7 @@ def parse_args():
 
 
 def get_voc(args):
-    from symimdb.pascal_voc import PascalVOC
+    from imdb.pascal_voc import PascalVOC
     if not args.imageset:
         args.imageset = '2007_trainval'
     args.rcnn_num_classes = len(PascalVOC.classes)
@@ -172,7 +172,7 @@ def get_voc(args):
 
 
 def get_coco(args):
-    from symimdb.coco import coco
+    from imdb.coco import coco
     if not args.imageset:
         args.imageset = 'train2017'
     args.rpn_anchor_scales = (2, 4, 8, 16, 32)
@@ -189,7 +189,7 @@ def get_coco(args):
 
 
 def get_vgg16_train(args):
-    from symnet.symbol_vgg import get_vgg_train
+    from net.symbol_vgg import get_vgg_train
     if not args.pretrained:
         args.pretrained = 'model/vgg16-0000.params'
     if not args.save_prefix:
@@ -211,7 +211,7 @@ def get_vgg16_train(args):
 
 
 def get_resnet50_train(args):
-    from symnet.symbol_resnet import get_resnet_train
+    from net.symbol_resnet import get_resnet_train
     if not args.pretrained:
         args.pretrained = 'model/resnet-50-0000.params'
     if not args.save_prefix:
@@ -234,7 +234,7 @@ def get_resnet50_train(args):
 
 
 def get_resnet101_train(args):
-    from symnet.symbol_resnet import get_resnet_train
+    from net.symbol_resnet import get_resnet_train
     if not args.pretrained:
         args.pretrained = 'model/resnet-101-0000.params'
     if not args.save_prefix:

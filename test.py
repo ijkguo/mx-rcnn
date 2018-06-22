@@ -3,65 +3,65 @@ import ast
 import pprint
 
 import mxnet as mx
+import numpy as np
+from tqdm import tqdm
 
-from symdata.bbox import im_detect
-from symdata.loader import load_test, generate_batch
-from symdata.vis import vis_detection
-from symnet.model import get_net
+from data.bbox import im_detect
+from data.loader import TestLoader
+from net.logger import logger
+from net.model import get_net
 
 
-def demo_net(sym, class_names, args):
+def test_net(sym, imdb, args):
     # print config
-    print('called with args\n{}'.format(pprint.pformat(vars(args))))
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # setup context
-    if args.gpu:
-        ctx = mx.gpu(int(args.gpu))
-    else:
-        ctx = mx.cpu(0)
+    ctx = mx.gpu(args.gpu)
 
-    # load single test
-    im_tensor, im_info, im_orig = load_test(args.image, short=args.img_short_side, max_size=args.img_long_side,
-                                            mean=args.img_pixel_means, std=args.img_pixel_stds)
+    # load testing data
+    test_data = TestLoader(imdb.roidb, batch_size=1, short=args.img_short_side, max_size=args.img_long_side,
+                           mean=args.img_pixel_means, std=args.img_pixel_stds)
 
-    # generate data batch
-    data_batch = generate_batch(im_tensor, im_info)
-
-    # assemble executor
+    # load params
     predictor = get_net(sym, args.params, ctx, short=args.img_short_side, max_size=args.img_long_side)
 
-    # forward
-    output = predictor.predict(data_batch)
-    rois = output['rois_output'][:, 1:]
-    scores = output['cls_prob_reshape_output'][0]
-    bbox_deltas = output['bbox_pred_reshape_output'][0]
-    im_info = im_info[0]
+    # all detections are collected into:
+    #    all_boxes[cls][image] = N x 5 array of detections in
+    #    (x1, y1, x2, y2, score)
+    all_boxes = [[[] for _ in range(imdb.num_images)]
+                 for _ in range(imdb.num_classes)]
 
-    # decode detection
-    det = im_detect(rois, scores, bbox_deltas, im_info,
-                    bbox_stds=args.rcnn_bbox_stds, nms_thresh=args.rcnn_nms_thresh,
-                    conf_thresh=args.rcnn_conf_thresh)
+    # start detection
+    with tqdm(total=imdb.num_images) as pbar:
+        for i, data_batch in enumerate(test_data):
+            # forward
+            im_info = data_batch.data[1][0]
+            output = predictor.predict(data_batch)
+            rois = output['rois_output'][:, 1:]
+            scores = output['cls_prob_reshape_output'][0]
+            bbox_deltas = output['bbox_pred_reshape_output'][0]
 
-    # print out
-    for [cls, conf, x1, y1, x2, y2] in det:
-        if cls > 0 and conf > args.vis_thresh:
-            print(class_names[int(cls)], conf, [x1, y1, x2, y2])
+            det = im_detect(rois, scores, bbox_deltas, im_info,
+                            bbox_stds=args.rcnn_bbox_stds, nms_thresh=args.rcnn_nms_thresh,
+                            conf_thresh=args.rcnn_conf_thresh)
+            for j in range(1, imdb.num_classes):
+                indexes = np.where(det[:, 0] == j)[0]
+                all_boxes[j][i] = np.concatenate((det[:, -4:], det[:, [1]]), axis=-1)[indexes, :]
+            pbar.update(data_batch.data[0].shape[0])
 
-    # if vis
-    if args.vis:
-        vis_detection(im_orig, det, class_names, thresh=args.vis_thresh)
+    # evaluate model
+    imdb.evaluate_detections(all_boxes)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network',
+    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--network', type=str, default='resnet50', help='base network')
     parser.add_argument('--params', type=str, default='', help='path to trained model')
     parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
-    parser.add_argument('--image', type=str, default='', help='path to test image')
-    parser.add_argument('--gpu', type=str, default='', help='gpu device eg. 0')
-    parser.add_argument('--vis', action='store_true', help='display results')
-    parser.add_argument('--vis-thresh', type=float, default=0.7, help='threshold display boxes')
+    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
+    parser.add_argument('--gpu', type=int, default=0, help='gpu device eg. 0')
     # faster rcnn params
     parser.add_argument('--img-short-side', type=int, default=600)
     parser.add_argument('--img-long-side', type=int, default=1000)
@@ -91,21 +91,25 @@ def parse_args():
     return args
 
 
-def get_voc_names(args):
-    from symimdb.pascal_voc import PascalVOC
+def get_voc(args):
+    from imdb.pascal_voc import PascalVOC
+    if not args.imageset:
+        args.imageset = '2007_test'
     args.rcnn_num_classes = len(PascalVOC.classes)
-    return PascalVOC.classes
+    return PascalVOC(args.imageset, 'data', 'data/VOCdevkit')
 
 
-def get_coco_names(args):
-    from symimdb.coco import coco
+def get_coco(args):
+    from imdb.coco import coco
+    if not args.imageset:
+        args.imageset = 'val2017'
     args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_num_classes = len(coco.classes)
-    return coco.classes
+    return coco(args.imageset, 'data', 'data/coco')
 
 
 def get_vgg16_test(args):
-    from symnet.symbol_vgg import get_vgg_test
+    from net.symbol_vgg import get_vgg_test
     if not args.params:
         args.params = 'model/vgg16-0010.params'
     args.img_pixel_means = (123.68, 116.779, 103.939)
@@ -123,7 +127,7 @@ def get_vgg16_test(args):
 
 
 def get_resnet50_test(args):
-    from symnet.symbol_resnet import get_resnet_test
+    from net.symbol_resnet import get_resnet_test
     if not args.params:
         args.params = 'model/resnet50-0010.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
@@ -141,7 +145,7 @@ def get_resnet50_test(args):
 
 
 def get_resnet101_test(args):
-    from symnet.symbol_resnet import get_resnet_test
+    from net.symbol_resnet import get_resnet_test
     if not args.params:
         args.params = 'model/resnet101-0010.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
@@ -157,10 +161,11 @@ def get_resnet101_test(args):
                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
                            units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
 
-def get_class_names(dataset, args):
+
+def get_dataset(dataset, args):
     datasets = {
-        'voc': get_voc_names,
-        'coco': get_coco_names
+        'voc': get_voc,
+        'coco': get_coco
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))
@@ -180,9 +185,9 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    class_names = get_class_names(args.dataset, args)
+    imdb = get_dataset(args.dataset, args)
     sym = get_network(args.network, args)
-    demo_net(sym, class_names, args)
+    test_net(sym, imdb, args)
 
 
 if __name__ == '__main__':
