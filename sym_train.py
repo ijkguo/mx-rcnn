@@ -7,7 +7,7 @@ import mxnet as mx
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symnet.logger import logger
 from symnet.module import MutableModule
-from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
+from symnet.model import load_param, infer_data_shape, check_shape, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
 
@@ -30,17 +30,9 @@ def train_net(sym, roidb, args):
                               args.img_pixel_means, args.img_pixel_stds, feat_sym, ag, asp, shuffle=True)
 
     # produce shape max possible
-    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, args.img_long_side, args.img_long_side))
-    feat_height, feat_width = out_shape[0][-2:]
     rpn_num_anchors = len(args.rpn_anchor_scales) * len(args.rpn_anchor_ratios)
-    data_names = ['data', 'im_info', 'gt_boxes']
-    label_names = ['label', 'bbox_target', 'bbox_weight']
-    data_shapes = [('data', (batch_size, 3, args.img_long_side, args.img_long_side)),
-                   ('im_info', (batch_size, 3)),
-                   ('gt_boxes', (batch_size, 100, 5))]
-    label_shapes = [('label', (batch_size, 1, rpn_num_anchors * feat_height, feat_width)),
-                    ('bbox_target', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width)),
-                    ('bbox_weight', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width))]
+    data_names, label_names, data_shapes, label_shapes = get_max_shape_train(
+        args.img_short_side, args.img_long_side, args.rcnn_batch_size, feat_sym, rpn_num_anchors)
 
     # print shapes
     data_shape_dict, out_shape_dict = infer_data_shape(sym, data_shapes + label_shapes)
@@ -94,6 +86,8 @@ def train_net(sym, roidb, args):
                         'clip_gradient': 5}
 
     # train
+    data_names, label_names, data_shapes, label_shapes = get_max_shape_train(
+        args.img_short_side, args.img_long_side, batch_size, feat_sym, rpn_num_anchors)
     mod = MutableModule(sym, data_names=data_names, label_names=label_names,
                         logger=logger, context=ctx, work_load_list=None,
                         max_data_shapes=data_shapes, max_label_shapes=label_shapes,

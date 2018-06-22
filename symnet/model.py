@@ -63,14 +63,20 @@ def check_shape(symbol, data_shapes, arg_params, aux_params):
             'shape inconsistent for %s inferred %s provided %s' % (k, aux_shape_dict[k], aux_params[k].shape)
 
 
-def get_net(symbol, params, ctx, short, max_size):
-    arg_params, aux_params = load_param(params, ctx=ctx)
-
+def get_max_shape_test(short, max_size, batch_size=1):
     # produce shape max possible
     data_names = ['data', 'im_info']
     label_names = None
-    data_shapes = [('data', (1, 3, short, max_size)), ('im_info', (1, 3))]
+    data_shapes = [('data', (batch_size, 3, short, max_size)),
+                   ('im_info', (batch_size, 3))]
     label_shapes = None
+    return data_names, label_names, data_shapes, label_shapes
+
+
+def get_net(symbol, params, ctx, short, max_size):
+    arg_params, aux_params = load_param(params, ctx=ctx)
+
+    data_names, label_names, data_shapes, label_shapes = get_max_shape_test(short, max_size)
 
     # check shapes
     check_shape(symbol, data_shapes, arg_params, aux_params)
@@ -79,6 +85,20 @@ def get_net(symbol, params, ctx, short, max_size):
                           provide_data=data_shapes, provide_label=label_shapes,
                           arg_params=arg_params, aux_params=aux_params)
     return predictor
+
+
+def get_max_shape_train(short, max_size, batch_size, feat_sym, rpn_num_anchors):
+    _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, max_size, max_size))
+    feat_height, feat_width = out_shape[0][-2:]
+    data_names = ['data', 'im_info', 'gt_boxes']
+    label_names = ['label', 'bbox_target', 'bbox_weight']
+    data_shapes = [('data', (batch_size, 3, max_size, max_size)),
+                   ('im_info', (batch_size, 3)),
+                   ('gt_boxes', (batch_size, 100, 5))]
+    label_shapes = [('label', (batch_size, 1, rpn_num_anchors * feat_height, feat_width)),
+                    ('bbox_target', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width)),
+                    ('bbox_weight', (batch_size, 4 * rpn_num_anchors, feat_height, feat_width))]
+    return data_names, label_names, data_shapes, label_shapes
 
 
 def initialize_frcnn(symbol, data_shapes, arg_params, aux_params):
