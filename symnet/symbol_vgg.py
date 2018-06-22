@@ -1,5 +1,5 @@
 import mxnet as mx
-from . import proposal_target
+from .rcnn_target import rcnn_target_sampler, rcnn_target_generator
 
 
 def get_vgg_feature(data):
@@ -120,14 +120,23 @@ def get_vgg_train(anchor_scales, anchor_ratios, rpn_feature_stride,
         threshold=rpn_nms_thresh, rpn_min_size=rpn_min_size)
 
     # rcnn roi proposal target
-    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes, name='proposal_target', op_type='proposal_target',
-                             num_classes=num_classes, batch_images=rcnn_batch_size,
-                             batch_rois=rcnn_batch_rois, fg_fraction=rcnn_fg_fraction,
-                             fg_overlap=rcnn_fg_overlap, box_stds=rcnn_bbox_stds)
-    rois = group[0]
-    label = group[1]
-    bbox_target = group[2]
-    bbox_weight = group[3]
+    # remove batch
+    rois = rois.reshape((rcnn_batch_size, rpn_post_topk, 5))
+    rois = mx.sym.slice_axis(rois, axis=-1, begin=1, end=5)
+    rois, samples, matches = rcnn_target_sampler(rois, gt_boxes,
+                                                 batch_images=rcnn_batch_size, batch_rois=rcnn_batch_rois,
+                                                 batch_proposals=rpn_post_topk,
+                                                 fg_fraction=rcnn_fg_fraction, fg_overlap=rcnn_fg_overlap)
+    label, bbox_target, bbox_weight = rcnn_target_generator(rois, gt_boxes, samples, matches,
+                                                            batch_rois=rcnn_batch_rois, num_classes=num_classes,
+                                                            box_stds=rcnn_bbox_stds)
+    rois = rois.reshape((-3, 0))
+    roi_batch_id = mx.sym.arange(0, rcnn_batch_size, repeat=rcnn_batch_rois).reshape((-1, 1))
+    rois = mx.sym.concat(roi_batch_id, rois, dim=-1)
+    rois = mx.sym.stop_gradient(rois)
+    label = mx.sym.stop_gradient(label.reshape(-3))
+    bbox_target = mx.sym.stop_gradient(bbox_target.reshape((-3, -3)))
+    bbox_weight = mx.sym.stop_gradient(bbox_weight.reshape((-3, -3)))
 
     # rcnn roi pool
     roi_pool = mx.symbol.ROIPooling(
