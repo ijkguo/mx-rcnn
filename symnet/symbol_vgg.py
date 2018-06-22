@@ -110,7 +110,7 @@ def get_vgg_train(anchor_scales, anchor_ratios, rpn_feature_stride,
     rpn_bbox_pred = mx.symbol.Convolution(
         data=rpn_relu, kernel=(1, 1), pad=(0, 0), num_filter=4 * num_anchors, name="rpn_bbox_pred")
     rpn_bbox_loss_ = rpn_bbox_weight * mx.symbol.smooth_l1(name='rpn_bbox_loss_', scalar=3.0, data=(rpn_bbox_pred - rpn_bbox_target))
-    rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_, grad_scale=1.0 / rpn_batch_rois)
+    rpn_bbox_loss = mx.sym.MakeLoss(name='rpn_bbox_loss', data=rpn_bbox_loss_, grad_scale=1.0 / rpn_batch_rois / rcnn_batch_size)
 
     # rpn proposal
     rois = mx.symbol.contrib.MultiProposal(
@@ -143,7 +143,7 @@ def get_vgg_train(anchor_scales, anchor_ratios, rpn_feature_stride,
     # rcnn bbox regression
     bbox_pred = mx.symbol.FullyConnected(name='bbox_pred', data=top_feat, num_hidden=num_classes * 4)
     bbox_loss_ = bbox_weight * mx.symbol.smooth_l1(name='bbox_loss_', scalar=1.0, data=(bbox_pred - bbox_target))
-    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / rcnn_batch_rois)
+    bbox_loss = mx.sym.MakeLoss(name='bbox_loss', data=bbox_loss_, grad_scale=1.0 / rcnn_batch_rois / rcnn_batch_size)
 
     # reshape output
     label = mx.symbol.Reshape(data=label, shape=(rcnn_batch_size, -1), name='label_reshape')

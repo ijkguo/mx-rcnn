@@ -74,7 +74,7 @@ class ProposalTargetOperator(mx.operator.CustomOp):
         self._num_classes = num_classes
         self._batch_images = batch_images
         self._batch_rois = batch_rois
-        self._rois_per_image = int(batch_rois / batch_images)
+        self._rois_per_image = batch_rois
         self._fg_rois_per_image = int(round(fg_fraction * self._rois_per_image))
         self._fg_overlap = fg_overlap
         self._box_stds = box_stds
@@ -142,10 +142,10 @@ class ProposalTargetProp(mx.operator.CustomOpProp):
         rpn_rois_shape = in_shape[0]
         gt_boxes_shape = in_shape[1]
 
-        output_rois_shape = (self._batch_rois, 5)
-        label_shape = (self._batch_rois, )
-        bbox_target_shape = (self._batch_rois, self._num_classes * 4)
-        bbox_weight_shape = (self._batch_rois, self._num_classes * 4)
+        output_rois_shape = (self._batch_images * self._batch_rois, 5)
+        label_shape = (self._batch_images * self._batch_rois, )
+        bbox_target_shape = (self._batch_images * self._batch_rois, self._num_classes * 4)
+        bbox_weight_shape = (self._batch_images * self._batch_rois, self._num_classes * 4)
 
         return [rpn_rois_shape, gt_boxes_shape], \
                [output_rois_shape, label_shape, bbox_target_shape, bbox_weight_shape]
