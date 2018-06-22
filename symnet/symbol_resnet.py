@@ -112,7 +112,7 @@ def get_resnet_train(anchor_scales, anchor_ratios, rpn_feature_stride,
         threshold=rpn_nms_thresh, rpn_min_size=rpn_min_size)
 
     # rcnn roi proposal target
-    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes, op_type='proposal_target',
+    group = mx.symbol.Custom(rois=rois, gt_boxes=gt_boxes, name='proposal_target', op_type='proposal_target',
                              num_classes=num_classes, batch_images=rcnn_batch_size,
                              batch_rois=rcnn_batch_rois, fg_fraction=rcnn_fg_fraction,
                              fg_overlap=rcnn_fg_overlap, box_stds=rcnn_bbox_stds)
