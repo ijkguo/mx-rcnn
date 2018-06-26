@@ -77,7 +77,7 @@ class PascalVOC(IMDB):
             gt_classes[ix] = cls
 
         roi_rec = {'index': index,
-                   'objs': objs,
+                   'objs': orig_objs,
                    'image': self._image_file_tmpl.format(index),
                    'height': height,
                    'width': width,
