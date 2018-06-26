@@ -3,10 +3,10 @@ import ast
 import pprint
 
 import mxnet as mx
+from mxnet.module import Module
 
 from data.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from net.logger import logger
-from net.module import MutableModule
 from net.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from net.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
@@ -94,10 +94,9 @@ def train_net(sym, roidb, args):
                         'clip_gradient': 5}
 
     # train
-    mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=None,
-                        max_data_shapes=data_shapes, max_label_shapes=label_shapes,
-                        fixed_param_names=fixed_param_names)
+    mod = Module(sym, data_names=data_names, label_names=label_names,
+                 logger=logger, context=ctx, work_load_list=None,
+                 fixed_param_names=fixed_param_names)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore='device',
             optimizer='sgd', optimizer_params=optimizer_params,

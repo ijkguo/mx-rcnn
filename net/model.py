@@ -1,7 +1,5 @@
 import mxnet as mx
 
-from net.module import MutableModule
-
 
 def load_param(params, ctx=None):
     """same as mx.model.load_checkpoint, but do not load symnet and will convert context"""
@@ -17,21 +15,6 @@ def load_param(params, ctx=None):
         if tp == 'aux':
             aux_params[name] = v.as_in_context(ctx)
     return arg_params, aux_params
-
-
-class Predictor(object):
-    def __init__(self, symbol, data_names, label_names,
-                 context=mx.cpu(), max_data_shapes=None,
-                 provide_data=None, provide_label=None,
-                 arg_params=None, aux_params=None):
-        self._mod = MutableModule(symbol, data_names, label_names,
-                                  context=context, max_data_shapes=max_data_shapes)
-        self._mod.bind(provide_data, provide_label, for_training=False)
-        self._mod.init_params(arg_params=arg_params, aux_params=aux_params)
-
-    def predict(self, data_batch):
-        self._mod.forward(data_batch)
-        return dict(zip(self._mod.output_names, self._mod.get_outputs()))
 
 
 def infer_param_shape(symbol, data_shapes):
@@ -61,24 +44,6 @@ def check_shape(symbol, data_shapes, arg_params, aux_params):
         assert k in aux_params, '%s not initialized' % k
         assert aux_params[k].shape == aux_shape_dict[k], \
             'shape inconsistent for %s inferred %s provided %s' % (k, aux_shape_dict[k], aux_params[k].shape)
-
-
-def get_net(symbol, params, ctx, short, max_size):
-    arg_params, aux_params = load_param(params, ctx=ctx)
-
-    # produce shape max possible
-    data_names = ['data', 'im_info']
-    label_names = None
-    data_shapes = [('data', (1, 3, short, max_size)), ('im_info', (1, 3))]
-    label_shapes = None
-
-    # check shapes
-    check_shape(symbol, data_shapes, arg_params, aux_params)
-
-    predictor = Predictor(symbol, data_names, label_names, context=ctx,
-                          provide_data=data_shapes, provide_label=label_shapes,
-                          arg_params=arg_params, aux_params=aux_params)
-    return predictor
 
 
 def initialize_frcnn(symbol, data_shapes, arg_params, aux_params):
