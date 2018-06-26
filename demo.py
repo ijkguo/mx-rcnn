@@ -115,7 +115,6 @@ def get_voc_names(args):
 
 def get_coco_names(args):
     from imdb.coco import coco
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_num_classes = len(coco.classes)
     return coco.classes
 

@@ -119,7 +119,6 @@ def get_coco(args):
     from imdb.coco import coco
     if not args.imageset:
         args.imageset = 'val2017'
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_num_classes = len(coco.classes)
     return coco(args.imageset, 'data', 'data/coco')
 
