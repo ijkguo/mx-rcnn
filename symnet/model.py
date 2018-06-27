@@ -1,5 +1,7 @@
 import mxnet as mx
 
+from symnet.module import MutableModule
+
 
 def load_param(params, ctx=None):
     """same as mx.model.load_checkpoint, but do not load symnet and will convert context"""

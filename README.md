@@ -7,8 +7,8 @@
 * Install Python package `mxnet` or `mxnet-cu90`, `cython` then `opencv-python matplotlib pycocotools tqdm`.
 
 ### Out-of-box inference models
-Download any of the following models and run `python3 demo.py  --image $YOUR_IMAGE$ --params $MODEL_FILE$ --network $Network$ --dataset $Dataset$` to get single image inference.
-For example `python3 demo.py --image myimage.jpg --params vgg16_voc0712.params --network vgg16 --dataset voc`, add `--gpu 0` to use GPU optionally.
+Download any of the following models and run `python3 sym_demo.py  --image $YOUR_IMAGE$ --params $MODEL_FILE$ --network $Network$ --dataset $Dataset$` to get single image inference.
+For example `python3 sym_demo.py --image myimage.jpg --params vgg16_voc0712.params --network vgg16 --dataset voc`, add `--gpu 0` to use GPU optionally.
 Different network has different configuration. Different dataset has different object class names. You must pass them explicitly as command line arguments.
 
 | Network | Dataset | Imageset | Reference | Result | Link  |
@@ -29,10 +29,10 @@ Follow `py-faster-rcnn` for data preparation instructions.
 * [ResNet](https://github.com/tornadomeet/ResNet) should be at `model/resnet-101-0000.params` from [MXNet model zoo](http://data.dmlc.ml/models/imagenet/resnet/).
 
 ### Training and evaluation
-Use `python3 train.py --pretrained $IMAGENET_MODEL_FILE$ --network $Network$ --dataset $Dataset$ --gpus $GPUS$` to train,
-for example, `python3 train.py --pretrained model/vgg16-0000.params --network vgg16 --dataset voc --gpus 0,1$`.
-Use `python3 test.py --params $MODEL_FILE$ --network $Network --dataset $Dataset$ --gpu $GPU$` to evaluate,
-for example, `python3 test.py --params model/vgg16-0010.params --network vgg16 --dataset voc --gpu 0$`.
+Use `python3 sym_train.py --pretrained $IMAGENET_MODEL_FILE$ --network $Network$ --dataset $Dataset$ --gpus $GPUS$` to train,
+for example, `python3 sym_train.py --pretrained model/vgg16-0000.params --network vgg16 --dataset voc --gpus 0,1$`.
+Use `python3 sym_test.py --params $MODEL_FILE$ --network $Network --dataset $Dataset$ --gpu $GPU$` to evaluate,
+for example, `python3 sym_test.py --params model/vgg16-0010.params --network vgg16 --dataset voc --gpu 0$`.
 
 ### History
 * May 25, 2016: We released Fast R-CNN implementation.

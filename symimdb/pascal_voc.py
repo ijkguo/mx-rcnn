@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from net.logger import logger
+from symnet.logger import logger
 from .imdb import IMDB
 
 

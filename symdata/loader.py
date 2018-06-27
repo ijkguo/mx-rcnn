@@ -1,8 +1,8 @@
 import mxnet as mx
 import numpy as np
 
-from data.anchor import AnchorGenerator, AnchorSampler
-from data.image import imdecode, resize, transform, get_image, tensor_vstack
+from symdata.anchor import AnchorGenerator, AnchorSampler
+from symdata.image import imdecode, resize, transform, get_image, tensor_vstack
 
 
 def load_test(filename, short, max_size, mean, std):

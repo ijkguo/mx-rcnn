@@ -5,7 +5,7 @@ Proposal Target Operator selects foreground and background roi and assigns label
 import mxnet as mx
 import numpy as np
 
-from data.bbox import bbox_overlaps, bbox_transform
+from symdata.bbox import bbox_overlaps, bbox_transform
 
 
 def sample_rois(rois, gt_boxes, num_classes, rois_per_image, fg_rois_per_image, fg_overlap, box_stds):
