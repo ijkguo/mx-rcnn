@@ -3,7 +3,6 @@ import ast
 import pprint
 
 import mxnet as mx
-from gluoncv import data as gdata
 
 from nddata.bbox import decode_detect
 from nddata.transform import load_test
@@ -100,8 +99,20 @@ def parse_args():
 
 
 def get_voc_names(args):
-    args.rcnn_num_classes = len(gdata.VOCDetection.CLASSES) + 1
-    return gdata.VOCDetection.CLASSES
+    from gluoncv.data import VOCDetection
+
+    args.rcnn_num_classes = len(VOCDetection.CLASSES) + 1
+    return VOCDetection.CLASSES
+
+
+def get_coco_names(args):
+    from gluoncv.data import COCODetection
+
+    args.img_short_side = 800
+    args.img_long_side = 1333
+    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
+    args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
+    return COCODetection.CLASSES
 
 
 def get_resnet50(args):
@@ -128,7 +139,8 @@ def get_resnet50(args):
 
 def get_class_names(dataset, args):
     datasets = {
-        'voc': get_voc_names
+        'voc': get_voc_names,
+        'coco': get_coco_names
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))

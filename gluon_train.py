@@ -5,7 +5,6 @@ import time
 
 import mxnet as mx
 from mxnet import autograd, gluon
-from gluoncv import data as gdata
 
 from nddata.anchor import RPNTargetGenerator
 from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
@@ -190,13 +189,28 @@ def parse_args():
 
 
 def get_voc(args):
-    from symimdb.pascal_voc import PascalVOC
+    from gluoncv.data import VOCDetection
+
     if not args.imageset:
         args.imageset = '2007_trainval'
-    args.rcnn_num_classes = len(PascalVOC.classes) + 1
+    args.rcnn_num_classes = len(VOCDetection.CLASSES) + 1
 
     splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
-    return gdata.VOCDetection(splits=splits)
+    return VOCDetection(splits=splits)
+
+
+def get_coco(args):
+    from gluoncv.data import COCODetection
+
+    if not args.imageset:
+        args.imageset = 'train2017'
+    args.img_short_side = 800
+    args.img_long_side = 1333
+    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
+    args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
+
+    splits = args.imageset.split('+')
+    return COCODetection(splits=splits)
 
 
 def get_resnet50(args):
@@ -225,7 +239,8 @@ def get_resnet50(args):
 
 def get_dataset(dataset, args):
     datasets = {
-        'voc': get_voc
+        'voc': get_voc,
+        'coco': get_coco
     }
     if dataset not in datasets:
         raise ValueError("dataset {} not supported".format(dataset))
