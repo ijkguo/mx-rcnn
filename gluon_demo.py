@@ -158,8 +158,8 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    net, _ = get_network(args.network, args)
     class_names = get_class_names(args.dataset, args)
+    net, _ = get_network(args.network, args)
     demo_net(net, class_names, args)
 
 

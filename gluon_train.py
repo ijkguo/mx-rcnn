@@ -258,8 +258,8 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    net, feat_shape = get_network(args.network, args)
     dataset = get_dataset(args.dataset, args)
+    net, feat_shape = get_network(args.network, args)
     train_net(net, feat_shape, dataset, args)
 
 

@@ -199,8 +199,8 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    net, _ = get_network(args.network, args)
     dataset, metric = get_dataset(args.dataset, args)
+    net, _ = get_network(args.network, args)
     test_net(net, dataset, metric, args)
 
 
