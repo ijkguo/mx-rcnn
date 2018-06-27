@@ -145,14 +145,14 @@ def get_coco(args):
     from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
 
     if not args.imageset:
-        args.imageset = 'val2017'
+        args.imageset = 'instances_val2017'
     args.img_short_side = 800
     args.img_long_side = 1333
     args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
 
     splits = args.imageset.split('+')
-    dataset = COCODetection(splits=splits)
+    dataset = COCODetection(splits=splits, skip_empty=False)
     metric = COCODetectionMetric(dataset, save_prefix='coco', cleanup=True)
     return dataset, metric
 

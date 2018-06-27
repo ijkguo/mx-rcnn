@@ -203,7 +203,7 @@ def get_coco(args):
     from gluoncv.data import COCODetection
 
     if not args.imageset:
-        args.imageset = 'train2017'
+        args.imageset = 'instances_train2017'
     args.img_short_side = 800
     args.img_long_side = 1333
     args.rpn_anchor_scales = (2, 4, 8, 16, 32)
