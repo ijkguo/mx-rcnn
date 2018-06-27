@@ -3,10 +3,10 @@ import ast
 import pprint
 
 import mxnet as mx
+from mxnet.module import Module
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symnet.logger import logger
-from symnet.module import MutableModule
 from symnet.model import load_param, infer_data_shape, check_shape, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
@@ -87,11 +87,11 @@ def train_net(sym, roidb, args):
 
     # train
     data_names, label_names, data_shapes, label_shapes = get_max_shape_train(
-        args.img_short_side, args.img_long_side, batch_size, feat_sym, rpn_num_anchors)
-    mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=None,
-                        max_data_shapes=data_shapes, max_label_shapes=label_shapes,
-                        fixed_param_names=fixed_param_names)
+        args.img_long_side, args.img_long_side, batch_size, feat_sym, rpn_num_anchors)
+    mod = Module(sym, data_names=data_names, label_names=label_names,
+                 logger=logger, context=ctx, work_load_list=None,
+                 fixed_param_names=fixed_param_names)
+    mod.bind(data_shapes, label_shapes)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore='device',
             optimizer='sgd', optimizer_params=optimizer_params,
