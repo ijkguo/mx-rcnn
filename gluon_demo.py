@@ -95,6 +95,8 @@ def parse_args():
     args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
     args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
     args.rcnn_batch_rois = args.rpn_post_nms_topk
+    if not args.params:
+        args.params = 'model/{}_{}_0020.params'.format(args.network, args.dataset)
     return args
 
 
@@ -117,8 +119,6 @@ def get_coco_names(args):
 
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
-    if not args.params:
-        args.params = 'model/res50_0020.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])

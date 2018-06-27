@@ -185,6 +185,8 @@ def parse_args():
     args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
     args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
     args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
+    if not args.save_prefix:
+        args.save_prefix = 'model/{}_{}'.format(args.network, args.dataset)
     return args
 
 
@@ -216,9 +218,7 @@ def get_coco(args):
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
     if not args.pretrained:
-        args.pretrained = 'model/res50-converted-0000.params'
-    if not args.save_prefix:
-        args.save_prefix = 'model/res50'
+        args.pretrained = 'model/resnet50_0000.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])

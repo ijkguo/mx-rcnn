@@ -102,6 +102,8 @@ def parse_args():
     args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
     args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
     args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
+    if not args.params:
+        args.params = '{}_{}-0010.params'.format(args.network, args.dataset)
     return args
 
 
@@ -124,8 +126,6 @@ def get_coco(args):
 
 def get_vgg16_test(args):
     from symnet.symbol_vgg import get_vgg_test
-    if not args.params:
-        args.params = 'model/vgg16-0010.params'
     args.img_pixel_means = (123.68, 116.779, 103.939)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_fixed_params = ['conv1', 'conv2']
@@ -142,8 +142,6 @@ def get_vgg16_test(args):
 
 def get_resnet50_test(args):
     from symnet.symbol_resnet import get_resnet_test
-    if not args.params:
-        args.params = 'model/resnet50-0010.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.rpn_feat_stride = 16
@@ -160,8 +158,6 @@ def get_resnet50_test(args):
 
 def get_resnet101_test(args):
     from symnet.symbol_resnet import get_resnet_test
-    if not args.params:
-        args.params = 'model/resnet101-0010.params'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.rpn_feat_stride = 16

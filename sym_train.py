@@ -147,6 +147,8 @@ def parse_args():
     args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
     args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
     args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
+    if not args.save_prefix:
+        args.save_prefix = 'model/{}_{}'.format(args.network, args.dataset)
     return args
 
 
@@ -186,8 +188,6 @@ def get_vgg16_train(args):
     from symnet.symbol_vgg import get_vgg_train
     if not args.pretrained:
         args.pretrained = 'model/vgg16-0000.params'
-    if not args.save_prefix:
-        args.save_prefix = 'model/vgg16'
     args.img_pixel_means = (123.68, 116.779, 103.939)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_fixed_params = ['conv1', 'conv2']
@@ -208,8 +208,6 @@ def get_resnet50_train(args):
     from symnet.symbol_resnet import get_resnet_train
     if not args.pretrained:
         args.pretrained = 'model/resnet-50-0000.params'
-    if not args.save_prefix:
-        args.save_prefix = 'model/resnet50'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
@@ -231,8 +229,6 @@ def get_resnet101_train(args):
     from symnet.symbol_resnet import get_resnet_train
     if not args.pretrained:
         args.pretrained = 'model/resnet-101-0000.params'
-    if not args.save_prefix:
-        args.save_prefix = 'model/resnet101'
     args.img_pixel_means = (0.0, 0.0, 0.0)
     args.img_pixel_stds = (1.0, 1.0, 1.0)
     args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
