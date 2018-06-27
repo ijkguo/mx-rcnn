@@ -10,7 +10,7 @@ from tqdm import tqdm
 from symdata.bbox import im_detect
 from symdata.loader import TestLoader
 from symnet.logger import logger
-from symnet.model import load_param, check_shape
+from symnet.model import load_param, check_shape, get_max_shape_test
 
 
 def test_net(sym, imdb, args):
@@ -28,10 +28,8 @@ def test_net(sym, imdb, args):
     arg_params, aux_params = load_param(args.params, ctx=ctx)
 
     # produce shape max possible
-    data_names = ['data', 'im_info']
-    label_names = None
-    data_shapes = [('data', (1, 3, args.img_long_side, args.img_long_side)), ('im_info', (1, 3))]
-    label_shapes = None
+    data_names, label_names, data_shapes, label_shapes = get_max_shape_test(
+        args.img_short_side, args.img_long_side, 1)
 
     # check shapes
     check_shape(sym, data_shapes, arg_params, aux_params)
