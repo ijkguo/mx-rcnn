@@ -21,7 +21,7 @@ class COCO:
         from symimdb.coco import coco
         self._is_train = is_train
         self._ds_cls = coco
-        self.default_imageset = 'instances_train2017' if is_train else 'instances_val2017'
+        self.default_imageset = 'train2017' if is_train else 'val2017'
 
     def set_args(self, args):
         args.img_short_side = 800
