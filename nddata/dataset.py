@@ -4,13 +4,12 @@ class VOC:
         from gluoncv.utils.metrics import VOC07MApMetric
         self._ds_cls = VOCDetection
         self._mt_cls = VOC07MApMetric
-        self._imageset = '2007_trainval' if is_train else '2007_test'
+        self.default_imageset = '2007_trainval' if is_train else '2007_test'
 
     def set_args(self, args):
         args.rcnn_num_classes = len(self._ds_cls.CLASSES) + 1
 
     def get_dataset(self, imageset):
-        imageset = imageset if imageset else self._imageset
         splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in imageset.split('+')]
         return self._ds_cls(splits=splits)
 
@@ -28,7 +27,7 @@ class COCO:
         self._is_train = is_train
         self._ds_cls = COCODetection
         self._mt_cls = COCODetectionMetric
-        self._imageset = 'instances_train2017' if is_train else 'instances_val2017'
+        self.default_imageset = 'instances_train2017' if is_train else 'instances_val2017'
 
     def set_args(self, args):
         args.img_short_side = 800
@@ -37,7 +36,6 @@ class COCO:
         args.rcnn_num_classes = len(self._ds_cls.CLASSES) + 1
 
     def get_dataset(self, imageset):
-        imageset = imageset if imageset else self._imageset
         splits = imageset.split('+')
         return self._ds_cls(splits=splits, skip_empty=self._is_train)
 
@@ -59,7 +57,8 @@ def get_dataset_train(ds_name, args):
         raise ValueError("dataset {} not supported".format(ds_name))
     ds = DATASETS[ds_name](is_train=True)
     ds.set_args(args)
-    dataset = ds.get_dataset(args.imageset)
+    imageset = args.imageset if args.imageset else ds.default_imageset
+    dataset = ds.get_dataset(imageset)
     return dataset
 
 
@@ -68,7 +67,8 @@ def get_dataset_test(ds_name, args):
         raise ValueError("dataset {} not supported".format(ds_name))
     ds = DATASETS[ds_name](is_train=False)
     ds.set_args(args)
-    dataset = ds.get_dataset(args.imageset)
+    imageset = args.imageset if args.imageset else ds.default_imageset
+    dataset = ds.get_dataset(imageset)
     metric = ds.get_metric(dataset)
     return dataset, metric
 
