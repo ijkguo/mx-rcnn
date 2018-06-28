@@ -22,20 +22,19 @@ def main():
     batch_size = args.rcnn_batch_size * len(ctx)
 
     # load trainining data
-    train_data = get_dataloader(sym, roidb, batch_size, args)
+    train_data = get_dataloader(feat_shape_fn, roidb, batch_size, args)
 
     train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args)
 
 
-def get_dataloader(sym, roidb, batch_size, args):
-    feat_sym = sym.get_internals()['rpn_cls_score_output']
+def get_dataloader(feat_shape_fn, roidb, batch_size, args):
     ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
                          anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
     asp = AnchorSampler(allowed_border=args.rpn_allowed_border, batch_rois=args.rpn_batch_rois,
                         fg_fraction=args.rpn_fg_fraction, fg_overlap=args.rpn_fg_overlap,
                         bg_overlap=args.rpn_bg_overlap)
     train_data = AnchorLoader(roidb, batch_size, args.img_short_side, args.img_long_side,
-                              args.img_pixel_means, args.img_pixel_stds, feat_sym, ag, asp, shuffle=True)
+                              args.img_pixel_means, args.img_pixel_stds, ag, feat_shape_fn, asp, shuffle=True)
     return train_data
 
 
@@ -88,7 +87,7 @@ def train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args):
     lr_epoch = [int(epoch) for epoch in args.lr_decay_epoch.split(',')]
     lr_epoch_diff = [epoch - args.start_epoch for epoch in lr_epoch if epoch > args.start_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
-    lr_iters = [int(epoch * len(train_data.size) / batch_size) for epoch in lr_epoch_diff]
+    lr_iters = [int(epoch * train_data.size / batch_size) for epoch in lr_epoch_diff]
     logger.info('lr %f lr_epoch_diff %s lr_iters %s' % (lr, lr_epoch_diff, lr_iters))
     lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer

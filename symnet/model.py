@@ -60,7 +60,7 @@ def get_feat_shape_fn(sym):
     feat_sym = sym.get_internals()['rpn_cls_score_output']
     def _feat_shape(im_height, im_width):
         _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, im_height, im_width))
-        return out_shape[0][-2]
+        return out_shape[0][-2:]
     return _feat_shape
 
 
