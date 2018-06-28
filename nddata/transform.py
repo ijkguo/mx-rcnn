@@ -113,14 +113,14 @@ class RCNNDefaultValTransform(object):
 
 
 class RCNNDefaultTrainTransform(object):
-    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator, ac, rtg: RPNTargetGenerator):
+    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator, asf, rtg: RPNTargetGenerator):
         self._short = short
         self._max_size = max_size
         self._mean = mean
         self._std = std
         alloc_size = int(round(max_size * 1.5 / feat_stride))
         self._anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
-        self._ac = ac
+        self._asf = asf
         self._rtg = rtg
 
     def __call__(self, src, label):
@@ -153,7 +153,7 @@ class RCNNDefaultTrainTransform(object):
         gt_bboxes = mx.nd.array(gt_bboxes, ctx=im_tensor.context)
 
         # compute real anchor shape and slice anchors to this shape
-        feat_height, feat_width = self._ac(im_height), self._ac(im_width)
+        feat_height, feat_width = self._asf(im_height, im_width)
         anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(im_tensor.context)
 
         # assign anchors

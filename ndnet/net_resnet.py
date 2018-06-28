@@ -6,12 +6,15 @@ from .proposal import Proposal
 from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator
 
 
-def get_feat_size(sz):
-    sz = (sz + 2 * 3 - 7) // 2 + 1  # conv0 7*7 stride 2 pad 3
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # pool0 3*3 stride 2 pad 1
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # stage2 3*3 stride 2 pad 1
-    sz = (sz + 2 * 1 - 3) // 2 + 1  # stage3 3*3 stride 2 pad 1
-    return sz
+def get_feat_size(im_height, im_width):
+    feat_shape = []
+    for sz in [im_height, im_width]:
+        sz = (sz + 2 * 3 - 7) // 2 + 1  # conv0 7*7 stride 2 pad 3
+        sz = (sz + 2 * 1 - 3) // 2 + 1  # pool0 3*3 stride 2 pad 1
+        sz = (sz + 2 * 1 - 3) // 2 + 1  # stage2 3*3 stride 2 pad 1
+        sz = (sz + 2 * 1 - 3) // 2 + 1  # stage3 3*3 stride 2 pad 1
+        feat_shape.append(sz)
+    return feat_shape
 
 
 def _conv3x3(channels, stride, in_channels):
