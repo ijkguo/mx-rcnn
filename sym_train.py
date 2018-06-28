@@ -39,6 +39,45 @@ def get_dataloader(feat_shape_fn, roidb, batch_size, args):
     return train_data
 
 
+def main2():
+    from nddata.dataset import get_dataset_train
+    args = parse_args()
+    dataset = get_dataset_train(args.dataset, args)
+    sym, feat_shape_fn = get_network_train(args.network, args)
+
+    # setup multi-gpu
+    ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
+    batch_size = args.rcnn_batch_size * len(ctx)
+
+    # load trainining data
+    train_data = get_dataloader2(feat_shape_fn, dataset, batch_size, args)
+
+    train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args)
+
+
+def get_dataloader2(feat_shape_fn, dataset, batch_size, args):
+    from mxnet import gluon
+    from nddata.anchor import RPNTargetGenerator
+    from nddata.transform import RCNNDefaultTrainTransform, batchify_pad
+    from symdata.adapter import AnchorIter
+
+    # load training data
+    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
+                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
+    rtg = RPNTargetGenerator(num_sample=args.rpn_batch_rois, pos_iou_thresh=args.rpn_fg_overlap,
+                             neg_iou_thresh=args.rpn_fg_overlap, pos_ratio=args.rpn_fg_fraction,
+                             stds=(1.0, 1.0, 1.0, 1.0))
+    train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
+                                                mean=args.img_pixel_means, std=args.img_pixel_stds,
+                                                feat_stride=args.rpn_feat_stride, ag=ag,
+                                                asf=feat_shape_fn, rtg=rtg)
+    train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
+                                         batch_size=batch_size, shuffle=True, batchify_fn=batchify_pad,
+                                         last_batch="rollover", num_workers=4)
+    train_iter = AnchorIter(batch_size=batch_size, loader=train_loader)
+    return train_iter
+
+
 def train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
