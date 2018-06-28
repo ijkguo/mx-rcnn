@@ -10,6 +10,7 @@ from nddata.anchor import RPNTargetGenerator
 from nddata.dataset import get_dataset_train
 from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
+from ndnet.network import get_network_train
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
@@ -17,7 +18,7 @@ from symnet.logger import logger
 def main():
     args = parse_args()
     dataset = get_dataset_train(args.dataset, args)
-    net, feat_shape_fn = get_network(args.network, args)
+    net, feat_shape_fn = get_network_train(args.network, args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
@@ -204,37 +205,6 @@ def parse_args():
     if not args.save_prefix:
         args.save_prefix = 'model/{}_{}'.format(args.network, args.dataset)
     return args
-
-
-def get_resnet50(args):
-    from ndnet.net_resnet import FRCNNResNet, get_feat_size
-    if not args.pretrained:
-        args.pretrained = 'model/resnet50_0000.params'
-    args.img_pixel_means = (0.0, 0.0, 0.0)
-    args.img_pixel_stds = (1.0, 1.0, 1.0)
-    args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
-    args.rpn_feat_stride = 16
-    args.rcnn_feat_stride = 16
-    args.rcnn_pooled_size = (14, 14)
-    return FRCNNResNet(
-        anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-        rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-        rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-        rpn_min_size=args.rpn_min_size,
-        num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-        rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-        rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
-        rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
-        rcnn_roi_mode='align'), get_feat_size
-
-
-def get_network(network, args):
-    networks = {
-        'resnet50': get_resnet50
-    }
-    if network not in networks:
-        raise ValueError("network {} not supported".format(network))
-    return networks[network](args)
 
 
 if __name__ == '__main__':
