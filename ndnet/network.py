@@ -6,11 +6,11 @@ class ResNet50:
         self._as_fn = get_feat_size
 
     def set_args(self, args):
-        if not args.pretrained:
-            args.pretrained = 'model/resnet50_0000.params'
+        if self._is_train:
+            args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
+            args.pretrained = args.pretrained if args.pretrained else 'model/resnet50_0000.params'
         args.img_pixel_means = (0.0, 0.0, 0.0)
         args.img_pixel_stds = (1.0, 1.0, 1.0)
-        args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
         args.rpn_feat_stride = 16
         args.rcnn_feat_stride = 16
         args.rcnn_pooled_size = (14, 14)

@@ -23,6 +23,11 @@ def main():
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.rcnn_batch_size * len(ctx)
+    if args.dataset == 'coco' and len(ctx) > 1:
+        args.lr *= len(ctx)
+        args.lr_warmup /= len(ctx)
+    else:
+        args.lr_warmup = -1
 
     # load training data
     train_loader, split_fn = get_dataloader(feat_shape_fn, dataset, batch_size, args)
@@ -50,6 +55,10 @@ def get_dataloader(feat_shape_fn, dataset, batch_size, args):
                                          batch_size=batch_size, shuffle=True, batchify_fn=batchify_fn,
                                          last_batch="rollover", num_workers=4)
     return train_loader, split_fn
+
+
+def get_lr_at_iter(alpha):
+    return 1. / 3. * (1 - alpha) + alpha
 
 
 def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
@@ -81,18 +90,18 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
     metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric]
 
     # learning rate
-    lr = args.lr
     lr_decay = 0.1
     lr_steps = [int(epoch) for epoch in args.lr_decay_epoch.split(',')]
+    lr_warmup = float(args.lr_warmup)  # avoid int division
 
     # optimizer
     logger.info('training params\n{}'.format(pprint.pformat(list(net.collect_params(args.net_train_patterns).keys()))))
-    logger.info('lr {} lr_decay {}'.format(lr, lr_steps))
+    logger.info('lr {} lr_decay {}'.format(args.lr, lr_steps))
     trainer = gluon.Trainer(
         net.collect_params(args.net_train_patterns),
         'sgd',
-        {'learning_rate': lr,
-         'wd': 0.0005,
+        {'learning_rate': args.lr,
+         'wd': args.wd,
          'momentum': 0.9,
          'clip_gradient': 5})
 
@@ -107,7 +116,15 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
             metric.reset()
         tic = time.time()
         btic = time.time()
+        base_lr = trainer.learning_rate
         for i, batch in enumerate(train_loader):
+            if epoch == 0 and i <= lr_warmup:
+                # adjust based on real percentage
+                new_lr = base_lr * get_lr_at_iter(i / lr_warmup)
+                if new_lr != trainer.learning_rate:
+                    if i % args.log_interval == 0:
+                        logger.info('[Epoch 0 Iteration {}] Set learning rate to {}'.format(i, new_lr))
+                    trainer.set_learning_rate(new_lr)
             batch = split_fn(batch, ctx)
             batch_size = len(batch[0])
             losses = []
@@ -164,7 +181,9 @@ def parse_args():
     parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
     parser.add_argument('--epochs', type=int, default=20, help='training epochs')
     parser.add_argument('--lr', type=float, default=0.001, help='base learning rate')
+    parser.add_argument('--wd', type=float, default=5e-4, help='weight decay')
     parser.add_argument('--lr-decay-epoch', type=str, default='14', help='epoch to decay lr')
+    parser.add_argument('--lr-warmup', type=str, default='', help='warmup iterations')
     parser.add_argument('--resume', type=str, default='', help='path to last saved model')
     parser.add_argument('--start-epoch', type=int, default=0, help='start epoch for resuming')
     parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
