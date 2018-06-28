@@ -7,19 +7,27 @@ from mxnet.module import Module
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symnet.logger import logger
-from symnet.model import load_param, infer_data_shape, check_shape, get_max_shape_train, initialize_frcnn, get_fixed_params
+from symnet.model import load_param, infer_data_shape, check_shape, get_feat_shape_fn, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
 
-def train_net(sym, roidb, args):
-    # print config
-    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
+def main():
+    args = parse_args()
+    roidb = get_dataset(args.dataset, args)
+    sym = get_network(args.network, args)
+    feat_shape_fn = get_feat_shape_fn(sym)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.rcnn_batch_size * len(ctx)
 
-    # load training data
+    # load trainining data
+    train_data = get_dataloader(sym, roidb, batch_size, args)
+
+    train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args)
+
+
+def get_dataloader(sym, roidb, batch_size, args):
     feat_sym = sym.get_internals()['rpn_cls_score_output']
     ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
                          anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
@@ -28,11 +36,17 @@ def train_net(sym, roidb, args):
                         bg_overlap=args.rpn_bg_overlap)
     train_data = AnchorLoader(roidb, batch_size, args.img_short_side, args.img_long_side,
                               args.img_pixel_means, args.img_pixel_stds, feat_sym, ag, asp, shuffle=True)
+    return train_data
+
+
+def train_net(sym, feat_shape_fn, train_data, batch_size, ctx, args):
+    # print config
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # produce shape max possible
     rpn_num_anchors = len(args.rpn_anchor_scales) * len(args.rpn_anchor_ratios)
     data_names, label_names, data_shapes, label_shapes = get_max_shape_train(
-        args.img_short_side, args.img_long_side, args.rcnn_batch_size, feat_sym, rpn_num_anchors)
+        args.img_short_side, args.img_long_side, args.rcnn_batch_size, feat_shape_fn, rpn_num_anchors)
 
     # print shapes
     data_shape_dict, out_shape_dict = infer_data_shape(sym, data_shapes + label_shapes)
@@ -74,7 +88,7 @@ def train_net(sym, roidb, args):
     lr_epoch = [int(epoch) for epoch in args.lr_decay_epoch.split(',')]
     lr_epoch_diff = [epoch - args.start_epoch for epoch in lr_epoch if epoch > args.start_epoch]
     lr = base_lr * (lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
-    lr_iters = [int(epoch * len(roidb) / batch_size) for epoch in lr_epoch_diff]
+    lr_iters = [int(epoch * len(train_data.size) / batch_size) for epoch in lr_epoch_diff]
     logger.info('lr %f lr_epoch_diff %s lr_iters %s' % (lr, lr_epoch_diff, lr_iters))
     lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(lr_iters, lr_factor)
     # optimizer
@@ -87,7 +101,7 @@ def train_net(sym, roidb, args):
 
     # train
     data_names, label_names, data_shapes, label_shapes = get_max_shape_train(
-        args.img_long_side, args.img_long_side, batch_size, feat_sym, rpn_num_anchors)
+        args.img_long_side, args.img_long_side, batch_size, feat_shape_fn, rpn_num_anchors)
     mod = Module(sym, data_names=data_names, label_names=label_names,
                  logger=logger, context=ctx, work_load_list=None,
                  fixed_param_names=fixed_param_names)
@@ -265,13 +279,6 @@ def get_network(network, args):
     if network not in networks:
         raise ValueError("network {} not supported".format(network))
     return networks[network](args)
-
-
-def main():
-    args = parse_args()
-    roidb = get_dataset(args.dataset, args)
-    sym = get_network(args.network, args)
-    train_net(sym, roidb, args)
 
 
 if __name__ == '__main__':

@@ -62,6 +62,10 @@ class TestLoader(mx.io.DataIter):
         self.reset()
 
     @property
+    def size(self):
+        return self._size
+
+    @property
     def provide_data(self):
         return [(k, v.shape) for k, v in zip(self._data_name, self._data)]
 
@@ -112,7 +116,7 @@ class TestLoader(mx.io.DataIter):
 
 class AnchorLoader(mx.io.DataIter):
     def __init__(self, roidb, batch_size, short, max_size, mean, std,
-                 feat_sym, anchor_generator: AnchorGenerator, anchor_sampler: AnchorSampler,
+                 anchor_generator: AnchorGenerator, anchor_shape_fn, anchor_sampler: AnchorSampler,
                  shuffle=False):
         super(AnchorLoader, self).__init__()
 
@@ -123,8 +127,8 @@ class AnchorLoader(mx.io.DataIter):
         self._max_size = max_size
         self._mean = mean
         self._std = std
-        self._feat_sym = feat_sym
         self._ag = anchor_generator
+        self._asf = anchor_shape_fn
         self._as = anchor_sampler
         self._shuffle = shuffle
 
@@ -144,6 +148,10 @@ class AnchorLoader(mx.io.DataIter):
         # get first batch to fill in provide_data and provide_label
         self.next()
         self.reset()
+
+    @property
+    def size(self):
+        return self._size
 
     @property
     def provide_data(self):
@@ -190,8 +198,7 @@ class AnchorLoader(mx.io.DataIter):
         im_tensor, im_info, gt_boxes = self._data
 
         # all stacked image share same anchors
-        _, out_shape, _ = self._feat_sym.infer_shape(data=im_tensor.shape)
-        feat_height, feat_width = out_shape[0][-2:]
+        feat_height, feat_width = self._asf(im_tensor.shape[2], im_tensor.shape[3])
         anchors = self._ag.generate(feat_height, feat_width)
 
         # assign anchor according to their real size encoded in im_info
