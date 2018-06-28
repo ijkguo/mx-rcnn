@@ -7,6 +7,7 @@ import mxnet as mx
 from mxnet import autograd, gluon
 
 from nddata.anchor import RPNTargetGenerator
+from nddata.dataset import get_dataset_train
 from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
 from symdata.anchor import AnchorGenerator
@@ -15,7 +16,7 @@ from symnet.logger import logger
 
 def main():
     args = parse_args()
-    dataset = get_dataset(args.dataset, args)
+    dataset = get_dataset_train(args.dataset, args)
     net, feat_shape_fn = get_network(args.network, args)
 
     # setup multi-gpu
@@ -205,31 +206,6 @@ def parse_args():
     return args
 
 
-def get_voc(args):
-    from gluoncv.data import VOCDetection
-
-    if not args.imageset:
-        args.imageset = '2007_trainval'
-    args.rcnn_num_classes = len(VOCDetection.CLASSES) + 1
-
-    splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
-    return VOCDetection(splits=splits)
-
-
-def get_coco(args):
-    from gluoncv.data import COCODetection
-
-    if not args.imageset:
-        args.imageset = 'instances_train2017'
-    args.img_short_side = 800
-    args.img_long_side = 1333
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
-
-    splits = args.imageset.split('+')
-    return COCODetection(splits=splits)
-
-
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
     if not args.pretrained:
@@ -250,16 +226,6 @@ def get_resnet50(args):
         rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
         rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
         rcnn_roi_mode='align'), get_feat_size
-
-
-def get_dataset(dataset, args):
-    datasets = {
-        'voc': get_voc,
-        'coco': get_coco
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
 
 
 def get_network(network, args):

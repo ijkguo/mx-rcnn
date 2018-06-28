@@ -5,6 +5,7 @@ import pprint
 import mxnet as mx
 
 from nddata.bbox import decode_detect
+from nddata.dataset import get_dataset_demo
 from nddata.transform import load_test
 from nddata.vis import vis_detection
 from symdata.anchor import AnchorGenerator
@@ -100,23 +101,6 @@ def parse_args():
     return args
 
 
-def get_voc_names(args):
-    from gluoncv.data import VOCDetection
-
-    args.rcnn_num_classes = len(VOCDetection.CLASSES) + 1
-    return VOCDetection.CLASSES
-
-
-def get_coco_names(args):
-    from gluoncv.data import COCODetection
-
-    args.img_short_side = 800
-    args.img_long_side = 1333
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
-    return COCODetection.CLASSES
-
-
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
     args.img_pixel_means = (0.0, 0.0, 0.0)
@@ -137,16 +121,6 @@ def get_resnet50(args):
         rcnn_roi_mode='align'), get_feat_size
 
 
-def get_class_names(dataset, args):
-    datasets = {
-        'voc': get_voc_names,
-        'coco': get_coco_names
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
-
-
 def get_network(network, args):
     networks = {
         'resnet50': get_resnet50
@@ -158,7 +132,7 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    class_names = get_class_names(args.dataset, args)
+    class_names = get_dataset_demo(args.dataset, args)
     net, _ = get_network(args.network, args)
     demo_net(net, class_names, args)
 

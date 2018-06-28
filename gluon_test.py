@@ -7,6 +7,7 @@ from mxnet import gluon
 from tqdm import tqdm
 
 from nddata.bbox import decode_detect
+from nddata.dataset import get_dataset_test
 from nddata.transform import RCNNDefaultValTransform, batchify_append, batchify_pad, split_append, split_pad
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
@@ -128,37 +129,6 @@ def parse_args():
     return args
 
 
-def get_voc(args):
-    from gluoncv.data import VOCDetection
-    from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
-
-    if not args.imageset:
-        args.imageset = '2007_test'
-    args.rcnn_num_classes = len(VOCDetection.CLASSES) + 1
-
-    splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in args.imageset.split('+')]
-    dataset = VOCDetection(splits=splits)
-    metric = VOC07MApMetric(iou_thresh=0.5, class_names=dataset.classes)
-    return dataset, metric
-
-
-def get_coco(args):
-    from gluoncv.data import COCODetection
-    from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
-
-    if not args.imageset:
-        args.imageset = 'instances_val2017'
-    args.img_short_side = 800
-    args.img_long_side = 1333
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(COCODetection.CLASSES) + 1
-
-    splits = args.imageset.split('+')
-    dataset = COCODetection(splits=splits, skip_empty=False)
-    metric = COCODetectionMetric(dataset, save_prefix='coco', cleanup=True)
-    return dataset, metric
-
-
 def get_resnet50(args):
     from ndnet.net_resnet import FRCNNResNet, get_feat_size
     args.img_pixel_means = (0.0, 0.0, 0.0)
@@ -178,16 +148,6 @@ def get_resnet50(args):
         rcnn_roi_mode='align'), get_feat_size
 
 
-def get_dataset(dataset, args):
-    datasets = {
-        'voc': get_voc,
-        'coco': get_coco
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
-
-
 def get_network(network, args):
     networks = {
         'resnet50': get_resnet50
@@ -199,7 +159,7 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    dataset, metric = get_dataset(args.dataset, args)
+    dataset, metric = get_dataset_test(args.dataset, args)
     net, _ = get_network(args.network, args)
     test_net(net, dataset, metric, args)
 
