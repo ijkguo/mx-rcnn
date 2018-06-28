@@ -8,15 +8,15 @@ from mxnet.module import Module
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symimdb.dataset import get_dataset_train
 from symnet.logger import logger
-from symnet.model import load_param, infer_data_shape, check_shape, get_feat_shape_fn, get_max_shape_train, initialize_frcnn, get_fixed_params
+from symnet.model import load_param, infer_data_shape, check_shape, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
+from symnet.network import get_network_train
 
 
 def main():
     args = parse_args()
     roidb = get_dataset_train(args.dataset, args)
-    sym = get_network(args.network, args)
-    feat_shape_fn = get_feat_shape_fn(sym)
+    sym, feat_shape_fn = get_network_train(args.network, args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
@@ -164,79 +164,6 @@ def parse_args():
     if not args.save_prefix:
         args.save_prefix = 'model/{}_{}'.format(args.network, args.dataset)
     return args
-
-
-def get_vgg16_train(args):
-    from symnet.symbol_vgg import get_vgg_train
-    if not args.pretrained:
-        args.pretrained = 'model/vgg16-0000.params'
-    args.img_pixel_means = (123.68, 116.779, 103.939)
-    args.img_pixel_stds = (1.0, 1.0, 1.0)
-    args.net_fixed_params = ['conv1', 'conv2']
-    args.rpn_feat_stride = 16
-    args.rcnn_feat_stride = 16
-    args.rcnn_pooled_size = (7, 7)
-    return get_vgg_train(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-                         rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-                         rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-                         rpn_min_size=args.rpn_min_size, rpn_batch_rois=args.rpn_batch_rois,
-                         num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                         rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                         rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
-                         rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds)
-
-
-def get_resnet50_train(args):
-    from symnet.symbol_resnet import get_resnet_train
-    if not args.pretrained:
-        args.pretrained = 'model/resnet-50-0000.params'
-    args.img_pixel_means = (0.0, 0.0, 0.0)
-    args.img_pixel_stds = (1.0, 1.0, 1.0)
-    args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
-    args.rpn_feat_stride = 16
-    args.rcnn_feat_stride = 16
-    args.rcnn_pooled_size = (14, 14)
-    return get_resnet_train(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-                            rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-                            rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-                            rpn_min_size=args.rpn_min_size, rpn_batch_rois=args.rpn_batch_rois,
-                            num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                            rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
-                            rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
-                            units=(3, 4, 6, 3), filter_list=(256, 512, 1024, 2048))
-
-
-def get_resnet101_train(args):
-    from symnet.symbol_resnet import get_resnet_train
-    if not args.pretrained:
-        args.pretrained = 'model/resnet-101-0000.params'
-    args.img_pixel_means = (0.0, 0.0, 0.0)
-    args.img_pixel_stds = (1.0, 1.0, 1.0)
-    args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
-    args.rpn_feat_stride = 16
-    args.rcnn_feat_stride = 16
-    args.rcnn_pooled_size = (14, 14)
-    return get_resnet_train(anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-                            rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-                            rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-                            rpn_min_size=args.rpn_min_size, rpn_batch_rois=args.rpn_batch_rois,
-                            num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                            rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
-                            rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
-                            units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
-
-
-def get_network(network, args):
-    networks = {
-        'vgg16': get_vgg16_train,
-        'resnet50': get_resnet50_train,
-        'resnet101': get_resnet101_train
-    }
-    if network not in networks:
-        raise ValueError("network {} not supported".format(network))
-    return networks[network](args)
 
 
 if __name__ == '__main__':

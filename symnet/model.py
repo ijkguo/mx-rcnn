@@ -56,14 +56,6 @@ def get_max_shape_test(short, max_size, batch_size=1):
     return data_names, label_names, data_shapes, label_shapes
 
 
-def get_feat_shape_fn(sym):
-    feat_sym = sym.get_internals()['rpn_cls_score_output']
-    def _feat_shape(im_height, im_width):
-        _, out_shape, _ = feat_sym.infer_shape(data=(1, 3, im_height, im_width))
-        return out_shape[0][-2:]
-    return _feat_shape
-
-
 def get_max_shape_train(short, max_size, batch_size, anchor_shape, rpn_num_anchors):
     feat_height, feat_width = anchor_shape(max_size, max_size)
     data_names = ['data', 'im_info', 'gt_boxes']
