@@ -6,6 +6,7 @@ import mxnet as mx
 from mxnet.module import Module
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
+from symimdb.dataset import get_dataset_train
 from symnet.logger import logger
 from symnet.model import load_param, infer_data_shape, check_shape, get_feat_shape_fn, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
@@ -13,7 +14,7 @@ from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNA
 
 def main():
     args = parse_args()
-    roidb = get_dataset(args.dataset, args)
+    roidb = get_dataset_train(args.dataset, args)
     sym = get_network(args.network, args)
     feat_shape_fn = get_feat_shape_fn(sym)
 
@@ -165,38 +166,6 @@ def parse_args():
     return args
 
 
-def get_voc(args):
-    from symimdb.pascal_voc import PascalVOC
-    if not args.imageset:
-        args.imageset = '2007_trainval'
-    args.rcnn_num_classes = len(PascalVOC.classes)
-
-    isets = args.imageset.split('+')
-    roidb = []
-    for iset in isets:
-        imdb = PascalVOC(iset, 'data', 'data/VOCdevkit')
-        imdb.append_flipped_images()
-        roidb.extend(imdb.roidb)
-    return roidb
-
-
-def get_coco(args):
-    from symimdb.coco import coco
-    if not args.imageset:
-        args.imageset = 'train2017'
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(coco.classes)
-
-    isets = args.imageset.split('+')
-    roidb = []
-    for iset in isets:
-        imdb = coco(iset, 'data', 'data/coco')
-        imdb.filter_roidb()
-        imdb.append_flipped_images()
-        roidb.extend(imdb.roidb)
-    return roidb
-
-
 def get_vgg16_train(args):
     from symnet.symbol_vgg import get_vgg_train
     if not args.pretrained:
@@ -257,16 +226,6 @@ def get_resnet101_train(args):
                             rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
                             rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
                             units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
-
-
-def get_dataset(dataset, args):
-    datasets = {
-        'voc': get_voc,
-        'coco': get_coco
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
 
 
 def get_network(network, args):

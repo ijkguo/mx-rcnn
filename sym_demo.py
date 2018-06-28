@@ -8,6 +8,7 @@ from mxnet.module import Module
 from symdata.bbox import im_detect
 from symdata.loader import load_test, generate_batch
 from symdata.vis import vis_detection
+from symimdb.dataset import get_dataset_demo
 from symnet.model import load_param, check_shape, get_max_shape_test
 
 
@@ -107,19 +108,6 @@ def parse_args():
     return args
 
 
-def get_voc_names(args):
-    from symimdb.pascal_voc import PascalVOC
-    args.rcnn_num_classes = len(PascalVOC.classes)
-    return PascalVOC.classes
-
-
-def get_coco_names(args):
-    from symimdb.coco import coco
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(coco.classes)
-    return coco.classes
-
-
 def get_vgg16_test(args):
     from symnet.symbol_vgg import get_vgg_test
     args.img_pixel_means = (123.68, 116.779, 103.939)
@@ -167,16 +155,6 @@ def get_resnet101_test(args):
                            rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
                            units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
 
-def get_class_names(dataset, args):
-    datasets = {
-        'voc': get_voc_names,
-        'coco': get_coco_names
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
-
-
 def get_network(network, args):
     networks = {
         'vgg16': get_vgg16_test,
@@ -190,7 +168,7 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    class_names = get_class_names(args.dataset, args)
+    class_names = get_dataset_demo(args.dataset, args)
     sym = get_network(args.network, args)
     demo_net(sym, class_names, args)
 

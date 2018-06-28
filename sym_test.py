@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from symdata.bbox import im_detect
 from symdata.loader import TestLoader
+from symimdb.dataset import get_dataset_test
 from symnet.logger import logger
 from symnet.model import load_param, check_shape, get_max_shape_test
 
@@ -107,23 +108,6 @@ def parse_args():
     return args
 
 
-def get_voc(args):
-    from symimdb.pascal_voc import PascalVOC
-    if not args.imageset:
-        args.imageset = '2007_test'
-    args.rcnn_num_classes = len(PascalVOC.classes)
-    return PascalVOC(args.imageset, 'data', 'data/VOCdevkit')
-
-
-def get_coco(args):
-    from symimdb.coco import coco
-    if not args.imageset:
-        args.imageset = 'val2017'
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-    args.rcnn_num_classes = len(coco.classes)
-    return coco(args.imageset, 'data', 'data/coco')
-
-
 def get_vgg16_test(args):
     from symnet.symbol_vgg import get_vgg_test
     args.img_pixel_means = (123.68, 116.779, 103.939)
@@ -172,16 +156,6 @@ def get_resnet101_test(args):
                            units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
 
 
-def get_dataset(dataset, args):
-    datasets = {
-        'voc': get_voc,
-        'coco': get_coco
-    }
-    if dataset not in datasets:
-        raise ValueError("dataset {} not supported".format(dataset))
-    return datasets[dataset](args)
-
-
 def get_network(network, args):
     networks = {
         'vgg16': get_vgg16_test,
@@ -195,7 +169,7 @@ def get_network(network, args):
 
 def main():
     args = parse_args()
-    imdb = get_dataset(args.dataset, args)
+    imdb = get_dataset_test(args.dataset, args)
     sym = get_network(args.network, args)
     test_net(sym, imdb, args)
 
