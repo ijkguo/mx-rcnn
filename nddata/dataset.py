@@ -1,9 +1,7 @@
-from gluoncv.data import VOCDetection, COCODetection
-from gluoncv.utils.metrics import VOC07MApMetric, COCODetectionMetric
-
-
 class VOC:
     def __init__(self, is_train):
+        from gluoncv.data import VOCDetection
+        from gluoncv.utils.metrics import VOC07MApMetric
         self._ds_cls = VOCDetection
         self._mt_cls = VOC07MApMetric
         self._imageset = '2007_trainval' if is_train else '2007_test'
@@ -25,6 +23,8 @@ class VOC:
 
 class COCO:
     def __init__(self, is_train):
+        from gluoncv.data import COCODetection
+        from gluoncv.utils.metrics import COCODetectionMetric
         self._is_train = is_train
         self._ds_cls = COCODetection
         self._mt_cls = COCODetectionMetric
