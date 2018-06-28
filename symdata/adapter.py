@@ -33,6 +33,8 @@ class AnchorIter(mx.io.DataIter):
 
     def next(self):
         data, anchors, im_info, gt_boxes, label, label_weight, bbox_target, bbox_weight = next(self._iter)
+        label = mx.nd.where(label_weight, label, mx.nd.ones_like(label) * -1)
+        label = label.reshape((0, -1))
         self._data = [data, im_info, gt_boxes]
         self._label = [label, bbox_target, bbox_weight]
         return mx.io.DataBatch(data=self._data, label=self._label, pad=0, index=None,
