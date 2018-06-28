@@ -32,7 +32,7 @@ class AnchorIter(mx.io.DataIter):
         self._iter = iter(self._loader)
 
     def next(self):
-        data, anchors, im_info, gt_boxes, label, bbox_target, bbox_weight = next(self._iter)
+        data, anchors, im_info, gt_boxes, label, label_weight, bbox_target, bbox_weight = next(self._iter)
         self._data = [data, im_info, gt_boxes]
         self._label = [label, bbox_target, bbox_weight]
         return mx.io.DataBatch(data=self._data, label=self._label, pad=0, index=None,
