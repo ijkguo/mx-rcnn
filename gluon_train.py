@@ -13,13 +13,22 @@ from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
-def train_net(net: gluon.Block, feat_shape, dataset, args):
-    # print config
-    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
+def main():
+    args = parse_args()
+    dataset = get_dataset(args.dataset, args)
+    net, feat_shape_fn = get_network(args.network, args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.rcnn_batch_size * len(ctx)
+
+    # load training data
+    train_loader, split_fn = get_dataloader(feat_shape_fn, dataset, batch_size, args)
+
+    train_net(net, train_loader, split_fn, ctx, args)
+
+
+def get_dataloader(feat_shape_fn, dataset, batch_size, args):
     if args.rcnn_batch_size == 1:
         batchify_fn, split_fn = batchify_append, split_append
     else:
@@ -34,10 +43,16 @@ def train_net(net: gluon.Block, feat_shape, dataset, args):
     train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
                                                 mean=args.img_pixel_means, std=args.img_pixel_stds,
                                                 feat_stride=args.rpn_feat_stride, ag=ag,
-                                                asf=feat_shape, rtg=rtg)
+                                                asf=feat_shape_fn, rtg=rtg)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
                                          batch_size=batch_size, shuffle=True, batchify_fn=batchify_fn,
                                          last_batch="rollover", num_workers=4)
+    return train_loader, split_fn
+
+
+def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
+    # print config
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # load params
     if args.resume.strip():
@@ -254,13 +269,6 @@ def get_network(network, args):
     if network not in networks:
         raise ValueError("network {} not supported".format(network))
     return networks[network](args)
-
-
-def main():
-    args = parse_args()
-    dataset = get_dataset(args.dataset, args)
-    net, feat_shape = get_network(args.network, args)
-    train_net(net, feat_shape, dataset, args)
 
 
 if __name__ == '__main__':
