@@ -23,9 +23,9 @@ def main():
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.rcnn_batch_size * len(ctx)
-    if args.dataset == 'coco' and len(ctx) > 1:
-        args.lr *= len(ctx)
-        args.lr_warmup /= len(ctx)
+    if args.dataset == 'coco' and batch_size > 1:
+        args.lr *= batch_size
+        args.lr_warmup /= batch_size
     else:
         args.lr_warmup = -1
 
