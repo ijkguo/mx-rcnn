@@ -1,6 +1,7 @@
 class VOC:
     def __init__(self, is_train):
         from symimdb.pascal_voc import PascalVOC
+        self._is_train = is_train
         self._ds_cls = PascalVOC
         self.default_imageset = '2007_trainval' if is_train else '2007_test'
 
@@ -9,7 +10,9 @@ class VOC:
 
     def get_dataset(self, imageset):
         imdb = self._ds_cls(imageset, 'data', 'data/VOCdevkit')
-        imdb.append_flipped_images()
+        if self._is_train:
+            imdb.filter_roidb()
+            imdb.append_flipped_images()
         return imdb
 
     def get_names(self):
