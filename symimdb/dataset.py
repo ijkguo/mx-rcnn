@@ -5,7 +5,7 @@ class VOC:
         self.default_imageset = '2007_trainval' if is_train else '2007_test'
 
     def set_args(self, args):
-        args.rcnn_num_classes = len(self._ds_cls.classes) + 1
+        args.rcnn_num_classes = len(self._ds_cls.classes)
 
     def get_dataset(self, imageset):
         imdb = self._ds_cls(imageset, 'data', 'data/VOCdevkit')
@@ -27,7 +27,7 @@ class COCO:
         args.img_short_side = 800
         args.img_long_side = 1333
         args.rpn_anchor_scales = (2, 4, 8, 16, 32)
-        args.rcnn_num_classes = len(self._ds_cls.classes) + 1
+        args.rcnn_num_classes = len(self._ds_cls.classes)
 
     def get_dataset(self, imageset):
         imdb = self._ds_cls(imageset, 'data', 'data/coco')
