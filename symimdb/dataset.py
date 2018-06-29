@@ -24,8 +24,6 @@ class COCO:
         self.default_imageset = 'train2017' if is_train else 'val2017'
 
     def set_args(self, args):
-        args.img_short_side = 800
-        args.img_long_side = 1333
         args.rpn_anchor_scales = (2, 4, 8, 16, 32)
         args.rcnn_num_classes = len(self._ds_cls.classes)
 
