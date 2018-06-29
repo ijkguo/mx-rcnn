@@ -5,11 +5,11 @@ class VGG16:
         self._sym_fn = get_vgg_train if is_train else get_vgg_test
 
     def set_args(self, args):
-        if not args.pretrained:
-            args.pretrained = 'model/vgg16-0000.params'
+        if self._is_train:
+            args.pretrained = args.pretrained if args.pretrained else 'model/vgg16-0000.params'
+            args.net_fixed_params = ['conv1', 'conv2']
         args.img_pixel_means = (123.68, 116.779, 103.939)
         args.img_pixel_stds = (1.0, 1.0, 1.0)
-        args.net_fixed_params = ['conv1', 'conv2']
         args.rpn_feat_stride = 16
         args.rcnn_feat_stride = 16
         args.rcnn_pooled_size = (7, 7)
@@ -40,11 +40,11 @@ class ResNet50:
         self._sym_fn = get_resnet_train if is_train else get_resnet_test
 
     def set_args(self, args):
-        if not args.pretrained:
-            args.pretrained = 'model/resnet-50-0000.params'
+        if self._is_train:
+            args.pretrained = args.pretrained if args.pretrained else 'model/resnet-50-0000.params'
+            args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
         args.img_pixel_means = (0.0, 0.0, 0.0)
         args.img_pixel_stds = (1.0, 1.0, 1.0)
-        args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
         args.rpn_feat_stride = 16
         args.rcnn_feat_stride = 16
         args.rcnn_pooled_size = (14, 14)
@@ -77,11 +77,11 @@ class ResNet101:
         self._sym_fn = get_resnet_train if is_train else get_resnet_test
 
     def set_args(self, args):
-        if self._is_train and not args.pretrained:
-            args.pretrained = 'model/resnet-101-0000.params'
+        if self._is_train:
+            args.pretrained = args.pretrained if args.pretrained else 'model/resnet-101-0000.params'
+            args.net_fixed_params = ['conv0', 'stage1', 'gamma', 'beta']
         args.img_pixel_means = (0.0, 0.0, 0.0)
         args.img_pixel_stds = (1.0, 1.0, 1.0)
-        args.net_train_patterns = '|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv'])
         args.rpn_feat_stride = 16
         args.rcnn_feat_stride = 16
         args.rcnn_pooled_size = (14, 14)
