@@ -36,6 +36,9 @@ class COCO:
             args.lr_warmup = 8000
             args.epochs = 24
             args.lr_decay_epoch = '16,21'
+            args.rcnn_batch_rois = 512
+        else:
+            args.rpn_post_nms_topk = 1000
         args.img_short_side = 800
         args.img_long_side = 1333
         args.rpn_anchor_scales = (2, 4, 8, 16, 32)
