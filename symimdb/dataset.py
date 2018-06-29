@@ -31,8 +31,9 @@ class COCO:
 
     def get_dataset(self, imageset):
         imdb = self._ds_cls(imageset, 'data', 'data/coco')
-        imdb.filter_roidb()
-        imdb.append_flipped_images()
+        if self._is_train:
+            imdb.filter_roidb()
+            imdb.append_flipped_images()
         return imdb
 
     def get_names(self):
