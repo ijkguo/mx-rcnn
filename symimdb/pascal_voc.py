@@ -23,9 +23,6 @@ class PascalVOC(IMDB):
         super(PascalVOC, self).__init__('voc_' + image_set, root_path)
 
         year, image_set = image_set.split('_')
-        self._config = {'comp_id': 'comp4',
-                        'use_diff': False,
-                        'min_size': 2}
         self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._image_index_file = os.path.join(devkit_path, 'VOC' + year, 'ImageSets', 'Main', image_set + '.txt')
         self._image_file_tmpl = os.path.join(devkit_path, 'VOC' + year, 'JPEGImages', '{}.jpg')
@@ -53,17 +50,10 @@ class PascalVOC(IMDB):
 
     def _load_annotation(self, index):
         # store original annotation as orig_objs
-        height, width, orig_objs = self._parse_voc_anno(self._image_anno_tmpl.format(index))
-
-        # filter difficult objects
-        if not self._config['use_diff']:
-            non_diff_objs = [obj for obj in orig_objs if obj['difficult'] == 0]
-            objs = non_diff_objs
-        else:
-            objs = orig_objs
+        height, width, objs = self._parse_voc_anno(self._image_anno_tmpl.format(index))
         num_objs = len(objs)
 
-        boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+        boxes = np.zeros((num_objs, 4), dtype=np.float32)
         gt_classes = np.zeros((num_objs,), dtype=np.int32)
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
@@ -77,7 +67,7 @@ class PascalVOC(IMDB):
             gt_classes[ix] = cls
 
         roi_rec = {'index': index,
-                   'objs': orig_objs,
+                   'objs': objs,
                    'image': self._image_file_tmpl.format(index),
                    'height': height,
                    'width': width,
@@ -98,10 +88,10 @@ class PascalVOC(IMDB):
             obj_dict['name'] = obj.find('name').text
             obj_dict['difficult'] = int(obj.find('difficult').text)
             bbox = obj.find('bndbox')
-            obj_dict['bbox'] = [int(float(bbox.find('xmin').text)),
-                                int(float(bbox.find('ymin').text)),
-                                int(float(bbox.find('xmax').text)),
-                                int(float(bbox.find('ymax').text))]
+            obj_dict['bbox'] = [float(bbox.find('xmin').text),
+                                float(bbox.find('ymin').text),
+                                float(bbox.find('xmax').text),
+                                float(bbox.find('ymax').text)]
             objects.append(obj_dict)
         return height, width, objects
 
