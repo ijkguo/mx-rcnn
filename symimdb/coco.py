@@ -81,22 +81,26 @@ class coco(IMDB):
         valid_objs = []
         for obj in objs:
             x, y, w, h = obj['bbox']
-            x1 = np.max((0, x))
-            y1 = np.max((0, y))
-            x2 = np.min((width - 1, x1 + np.max((0, w - 1))))
-            y2 = np.min((height - 1, y1 + np.max((0, h - 1))))
-            if obj['area'] > 0 and x2 >= x1 and y2 >= y1:
+            # xywh to xyxy
+            x1, y1 = x, y
+            x2, y2 = x1 + np.maximum(0, w - 1), y1 + np.maximum(0, h - 1)
+            # clip to [0, w/h - 1]
+            x1 = np.minimum(width - 1, np.maximum(0, x1))
+            y1 = np.minimum(height - 1, np.maximum(0, y1))
+            x2 = np.minimum(width - 1, np.maximum(0, x2))
+            y2 = np.minimum(height - 1, np.maximum(0, y2))
+            # require non crowd objects, non-zero seg area and moe than 1x1 box size
+            if obj['iscrowd'] == 0 and obj['area'] > 0 and x2 > x1 and y2 > y1:
                 obj['clean_bbox'] = [x1, y1, x2, y2]
                 valid_objs.append(obj)
         objs = valid_objs
         num_objs = len(objs)
 
-        boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+        boxes = np.zeros((num_objs, 4), dtype=np.float32)
         gt_classes = np.zeros((num_objs,), dtype=np.int32)
         for ix, obj in enumerate(objs):
-            cls = coco_ind_to_class_ind[obj['category_id']]
             boxes[ix, :] = obj['clean_bbox']
-            gt_classes[ix] = cls
+            gt_classes[ix] = coco_ind_to_class_ind[obj['category_id']]
 
         roi_rec = {'index': index,
                    'image': filename,
