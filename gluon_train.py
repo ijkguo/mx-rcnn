@@ -161,8 +161,8 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
             if args.log_interval and not (i + 1) % args.log_interval:
                 msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics + metrics2])
                 logger.info('[Epoch {}][Batch {}], Speed: {:.3f} samples/sec, {}'.format(
-                    epoch, i + 1, batch_size / (time.time() - btic), msg))
-            btic = time.time()
+                    epoch, i + 1, args.log_interval * batch_size / (time.time() - btic), msg))
+                btic = time.time()
 
         # (epoch_end_callback) save model
         msg = ','.join(['{}={:.3f}'.format(*metric.get()) for metric in metrics])
