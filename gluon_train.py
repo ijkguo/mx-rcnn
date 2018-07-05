@@ -97,6 +97,8 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
     # optimizer
     logger.info('training params\n{}'.format(pprint.pformat(list(net.collect_params(args.net_train_patterns).keys()))))
     logger.info('lr {} lr_decay {}'.format(args.lr, lr_steps))
+    net.collect_params().setattr('grad_req', 'null')
+    net.collect_params(args.net_train_patterns).setattr('grad_req', 'write')
     trainer = gluon.Trainer(
         net.collect_params(args.net_train_patterns),
         'sgd',
