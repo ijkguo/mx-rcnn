@@ -4,7 +4,6 @@ import pprint
 
 import mxnet as mx
 
-from nddata.bbox import decode_detect
 from nddata.dataset import get_dataset_demo
 from nddata.transform import load_test
 from nddata.vis import vis_detection
@@ -38,17 +37,13 @@ def demo_net(net, class_names, args):
     anchors = anchors.as_in_context(anchors)
     im_info = im_info.as_in_context(ctx)
 
-    rois, scores, bbox_deltas = net(im_tensor, anchors, im_info)
-    rois = rois[:, 1:]
-    scores = mx.nd.softmax(scores)
-    im_info = im_info[0]
-
-    # decode detection
-    det = decode_detect(rois, scores, bbox_deltas, im_info,
-                        bbox_stds=args.rcnn_bbox_stds, nms_thresh=args.rcnn_nms_thresh)
+    ids, scores, bboxes = net(im_tensor, anchors, im_info)
+    det = mx.nd.concat(ids, scores, bboxes, dim=-1)[0]
 
     # remove background class
     det[:, 0] -= 1
+    # scale back images
+    det[:, 2:6] /= im_info[:, 2]
 
     # print out
     for [cls, conf, x1, y1, x2, y2] in det.asnumpy():

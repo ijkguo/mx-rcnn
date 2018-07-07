@@ -4,6 +4,7 @@ from mxnet.gluon import nn, HybridBlock
 
 from .proposal import Proposal
 from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator
+from .rcnn_inference import RCNNDetector
 
 
 def get_feat_size(im_height, im_width):
@@ -130,7 +131,7 @@ class FRCNNResNet(HybridBlock):
                  rpn_feature_stride=16, rpn_pre_topk=6000, rpn_post_topk=300, rpn_nms_thresh=0.7, rpn_min_size=16,
                  num_classes=21, rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_batch_size=1,
                  rcnn_batch_rois=128, rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
-                 rcnn_roi_mode='align', **kwargs):
+                 rcnn_roi_mode='align', rcnn_nms_thresh=0.3, rcnn_nms_topk=-1, **kwargs):
         super(FRCNNResNet, self).__init__(**kwargs)
         self._num_classes = num_classes
         self._rcnn_feature_stride = rcnn_feature_stride
@@ -146,6 +147,7 @@ class FRCNNResNet(HybridBlock):
             self.proposal = Proposal(rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
             self.rcnn_sampler = RCNNTargetSampler(rcnn_batch_size, rcnn_batch_rois, rpn_post_topk, rcnn_fg_fraction, rcnn_fg_overlap)
             self.rcnn_target = RCNNTargetGenerator(rcnn_batch_rois, num_classes, rcnn_bbox_stds)
+            self.rcnn_detect = RCNNDetector(rcnn_bbox_stds, num_classes, rcnn_nms_thresh, rcnn_nms_topk)
 
     def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
         x = self.backbone.layer0(x)
@@ -189,4 +191,43 @@ class FRCNNResNet(HybridBlock):
 
         if autograd.is_training():
             return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
-        return rois, rcnn_cls, rcnn_reg
+
+        # rois [B, N, 4]
+        rois = F.slice_axis(rois, axis=-1, begin=1, end=None)
+        rois = F.reshape(rois, (self._rcnn_batch_size, self._rcnn_batch_rois, 4))
+
+        # class id [C, N, 1]
+        ids = F.arange(1, self._num_classes, repeat=self._rcnn_batch_rois)
+        ids = F.reshape(ids, (self._num_classes - 1, self._rcnn_batch_rois, 1))
+
+        # window [height, width] for clipping
+        im_info = F.slice_axis(im_info, axis=-1, begin=0, end=2)
+
+        # cls [B, C, N, 1]
+        rcnn_cls = F.softmax(rcnn_cls, axis=-1)
+        rcnn_cls = F.slice_axis(rcnn_cls, axis=-1, begin=1, end=None)
+        rcnn_cls = F.reshape(rcnn_cls, (self._rcnn_batch_size, self._rcnn_batch_rois, self._num_classes - 1, 1))
+        rcnn_cls = F.transpose(rcnn_cls, (0, 2, 1, 3))
+
+        # reg [B, C, N, 4]
+        rcnn_reg = F.slice_axis(rcnn_reg, axis=-1, begin=4, end=None)
+        rcnn_reg = F.reshape(rcnn_reg, (self._rcnn_batch_size, self._rcnn_batch_rois, self._num_classes - 1, 4))
+        rcnn_reg = F.transpose(rcnn_reg, (0, 2, 1, 3))
+
+        ret_ids = []
+        ret_scores = []
+        ret_bboxes = []
+        for i in range(self._rcnn_batch_size):
+            b_rois = F.squeeze(F.slice_axis(rois, axis=0, begin=i, end=i+1), axis=0)
+            b_cls = F.squeeze(F.slice_axis(rcnn_cls, axis=0, begin=i, end=i+1), axis=0)
+            b_reg = F.squeeze(F.slice_axis(rcnn_reg, axis=0, begin=i, end=i+1), axis=0)
+            b_im_info = F.squeeze(F.slice_axis(im_info, axis=0, begin=i, end=i+1), axis=0)
+            scores, bboxes = self.rcnn_detect(b_rois, b_cls, b_reg, b_im_info)
+            b_ids = F.where(scores < 0, F.ones_like(ids) * -1, ids)
+            ret_ids.append(b_ids.reshape((-1, 1)))
+            ret_scores.append(scores.reshape((-1, 1)))
+            ret_bboxes.append(bboxes.reshape((-1, 4)))
+        ret_ids = F.stack(*ret_ids, axis=0)
+        ret_scores = F.stack(*ret_scores, axis=0)
+        ret_bboxes = F.stack(*ret_bboxes, axis=0)
+        return ret_ids, ret_scores, ret_bboxes

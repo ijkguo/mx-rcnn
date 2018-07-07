@@ -6,7 +6,6 @@ import mxnet as mx
 from mxnet import gluon
 from tqdm import tqdm
 
-from nddata.bbox import decode_detect
 from nddata.dataset import get_dataset_test
 from nddata.transform import RCNNDefaultValTransform, batchify_append, batchify_pad, split_append, split_pad
 from ndnet.network import get_network_test
@@ -61,23 +60,16 @@ def test_net(net, dataset, metric, args):
                 gt_difficults.append(label.slice_axis(axis=-1, begin=5, end=6) if label.shape[-1] > 5 else None)
 
                 # forward
-                rois, scores, bbox_deltas = net(data, anchors, im_info)
-                rois = rois[:, 1:]
-                scores = mx.nd.softmax(scores)
-                im_info = im_info[0]
-
-                # post processing
-                det = decode_detect(rois, scores, bbox_deltas, im_info,
-                                    bbox_stds=args.rcnn_bbox_stds, nms_thresh=args.rcnn_nms_thresh)
-                cls = det.slice_axis(axis=-1, begin=0, end=1)
-                conf = det.slice_axis(axis=-1, begin=1, end=2)
-                boxes = det.slice_axis(axis=-1, begin=2, end=6)
-                cls -= 1
+                ids, scores, bboxes = net(data, anchors, im_info)
+                # remove background class
+                ids -= 1
+                # scale back images
+                bboxes /= im_info[:, 2]
 
                 # append all results
-                det_bboxes.append(boxes.expand_dims(0))
-                det_ids.append(cls.expand_dims(0))
-                det_scores.append(conf.expand_dims(0))
+                det_bboxes.append(bboxes)
+                det_ids.append(ids)
+                det_scores.append(scores)
 
             for det_bbox, det_id, det_score, gt_bbox, gt_id, gt_diffcult in zip(
                     det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults):
