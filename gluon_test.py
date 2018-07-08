@@ -13,13 +13,24 @@ from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
-def test_net(net, dataset, metric, args):
-    # print config
-    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
+def main():
+    args = parse_args()
+    dataset, metric = DatasetFactory(args.dataset).get_test(args)
+    net = NetworkFactory(args.network).get_test(args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.rcnn_batch_size * len(ctx)
+
+    # load model
+    net.load_parameters(args.params)
+
+    # load testing data
+    val_loader, split_fn = get_dataloader(dataset, batch_size, args)
+    test_net(net, val_loader, split_fn, metric, ctx, args)
+
+
+def get_dataloader(dataset, batch_size, args):
     if args.rcnn_batch_size == 1:
         batchify_fn, split_fn = batchify_append, split_append
     else:
@@ -34,16 +45,22 @@ def test_net(net, dataset, metric, args):
     val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
                                        batch_size=batch_size, shuffle=False, batchify_fn=batchify_fn,
                                        last_batch="keep", num_workers=4)
+    return val_loader, split_fn
 
-    # load model
-    net.load_parameters(args.params)
+
+def test_net(net: gluon.Block, val_loader, split_fn, metric, ctx, args):
+    # print config
+    logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
+
+    # prepare network
     net.collect_params().reset_ctx(ctx)
     net.hybridize(static_alloc=True)
 
     # start detection
-    with tqdm(total=len(dataset)) as pbar:
+    with tqdm(total=len(val_loader)) as pbar:
         for ib, batch in enumerate(val_loader):
             batch = split_fn(batch, ctx)
+            batch_size = len(batch[0])
 
             # lazy eval
             det_bboxes = []
@@ -121,13 +138,6 @@ def parse_args():
     if not args.params:
         args.params = 'model/{}_{}_0020.params'.format(args.network, args.dataset)
     return args
-
-
-def main():
-    args = parse_args()
-    dataset, metric = DatasetFactory(args.dataset).get_test(args)
-    net = NetworkFactory(args.network).get_test(args)
-    test_net(net, dataset, metric, args)
 
 
 if __name__ == '__main__':
