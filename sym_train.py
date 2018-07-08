@@ -5,18 +5,18 @@ import pprint
 import mxnet as mx
 from mxnet.module import Module
 
+from sym_dataset import DatasetFactory
+from sym_network import NetworkFactory
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
-from symimdb.dataset import get_dataset_train
 from symnet.logger import logger
 from symnet.model import load_param, infer_data_shape, check_shape, get_max_shape_train, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
-from symnet.network import get_network_train
 
 
 def main():
     args = parse_args()
-    roidb = get_dataset_train(args.dataset, args)
-    sym, feat_shape_fn = get_network_train(args.network, args)
+    roidb = DatasetFactory(args.dataset).get_train(args)
+    sym, feat_shape_fn = NetworkFactory(args.network).get_train(args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
@@ -40,10 +40,10 @@ def get_dataloader(feat_shape_fn, roidb, batch_size, args):
 
 
 def main2():
-    from nddata.dataset import get_dataset_train
+    from gluon_dataset import DatasetFactory
     args = parse_args()
-    dataset = get_dataset_train(args.dataset, args)
-    sym, feat_shape_fn = get_network_train(args.network, args)
+    dataset = DatasetFactory(args.dataset).get_train(args)
+    sym, feat_shape_fn = NetworkFactory(args.network).get_train(args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]

@@ -6,9 +6,9 @@ import mxnet as mx
 from mxnet import gluon
 from tqdm import tqdm
 
-from nddata.dataset import get_dataset_test
+from gluon_dataset import DatasetFactory
+from gluon_network import NetworkFactory
 from nddata.transform import RCNNDefaultValTransform, batchify_append, batchify_pad, split_append, split_pad
-from ndnet.network import get_network_test
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
@@ -124,8 +124,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dataset, metric = get_dataset_test(args.dataset, args)
-    net = get_network_test(args.network, args)
+    dataset, metric = DatasetFactory(args.dataset).get_test(args)
+    net = NetworkFactory(args.network).get_test(args)
     test_net(net, dataset, metric, args)
 
 

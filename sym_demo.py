@@ -5,12 +5,12 @@ import pprint
 import mxnet as mx
 from mxnet.module import Module
 
+from sym_dataset import DatasetFactory
+from sym_network import NetworkFactory
 from symdata.bbox import im_detect
 from symdata.loader import load_test, generate_batch
 from symdata.vis import vis_detection
-from symimdb.dataset import get_dataset_demo
 from symnet.model import load_param, check_shape, get_max_shape_test
-from symnet.network import get_network_test
 
 
 def demo_net(sym, class_names, args):
@@ -111,8 +111,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    class_names = get_dataset_demo(args.dataset, args)
-    sym = get_network_test(args.network, args)
+    class_names = DatasetFactory(args.dataset).get_demo(args)
+    sym = NetworkFactory(args.network).get_test(args)
     demo_net(sym, class_names, args)
 
 

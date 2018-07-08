@@ -6,19 +6,19 @@ import time
 import mxnet as mx
 from mxnet import autograd, gluon
 
+from gluon_dataset import DatasetFactory
+from gluon_network import NetworkFactory
 from nddata.anchor import RPNTargetGenerator
-from nddata.dataset import get_dataset_train
 from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
-from ndnet.network import get_network_train
 from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
 def main():
     args = parse_args()
-    dataset = get_dataset_train(args.dataset, args)
-    net, feat_shape_fn = get_network_train(args.network, args)
+    dataset = DatasetFactory(args.dataset).get_train(args)
+    net, feat_shape_fn = NetworkFactory(args.network).get_train(args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]

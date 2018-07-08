@@ -7,12 +7,12 @@ from mxnet.module import Module
 import numpy as np
 from tqdm import tqdm
 
+from sym_dataset import DatasetFactory
+from sym_network import NetworkFactory
 from symdata.bbox import im_detect
 from symdata.loader import TestLoader
-from symimdb.dataset import get_dataset_test
 from symnet.logger import logger
 from symnet.model import load_param, check_shape, get_max_shape_test
-from symnet.network import get_network_test
 
 
 def test_net(sym, imdb, args):
@@ -111,8 +111,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    imdb = get_dataset_test(args.dataset, args)
-    sym = get_network_test(args.network, args)
+    imdb = DatasetFactory(args.dataset).get_test(args)
+    sym = NetworkFactory(args.network).get_test(args)
     test_net(sym, imdb, args)
 
 

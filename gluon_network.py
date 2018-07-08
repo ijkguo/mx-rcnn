@@ -1,6 +1,6 @@
 class ResNet50:
     def __init__(self, is_train):
-        from .net_resnet import FRCNNResNet, get_feat_size
+        from ndnet.net_resnet import FRCNNResNet, get_feat_size
         self._is_train = is_train
         self._net_cls = FRCNNResNet
         self._as_fn = get_feat_size
@@ -43,25 +43,24 @@ class ResNet50:
         return self._as_fn
 
 
-NETWORKS = {
-    'resnet50': ResNet50
-}
+class NetworkFactory:
+    NETWORKS = {
+        'resnet50': ResNet50
+    }
+    def __init__(self, network):
+        if network not in self.NETWORKS:
+            raise ValueError("network {} not supported".format(network))
+        self._nt_cls = self.NETWORKS[network]
 
+    def get_train(self, args):
+        nt = self._nt_cls(is_train=True)
+        nt.set_args(args)
+        net = nt.get_net(args)
+        as_fn = nt.get_as_fn()
+        return net, as_fn
 
-def get_network_train(network, args):
-    if network not in NETWORKS:
-        raise ValueError("network {} not supported".format(network))
-    nt_cls = NETWORKS[network](is_train=True)
-    nt_cls.set_args(args)
-    net = nt_cls.get_net(args)
-    as_fn = nt_cls.get_as_fn()
-    return net, as_fn
-
-
-def get_network_test(network, args):
-    if network not in NETWORKS:
-        raise ValueError("network {} not supported".format(network))
-    nt_cls = NETWORKS[network](is_train=False)
-    nt_cls.set_args(args)
-    net = nt_cls.get_net(args)
-    return net
+    def get_test(self, args):
+        nt = self._nt_cls(is_train=False)
+        nt.set_args(args)
+        net = nt.get_net(args)
+        return net

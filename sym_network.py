@@ -1,6 +1,6 @@
 class VGG16:
     def __init__(self, is_train):
-        from .symbol_vgg import get_vgg_train, get_vgg_test
+        from symnet.symbol_vgg import get_vgg_train, get_vgg_test
         self._is_train = is_train
         self._sym_fn = get_vgg_train if is_train else get_vgg_test
 
@@ -35,7 +35,7 @@ class VGG16:
 
 class ResNet50:
     def __init__(self, is_train):
-        from .symbol_resnet import get_resnet_train, get_resnet_test
+        from symnet.symbol_resnet import get_resnet_train, get_resnet_test
         self._is_train = is_train
         self._sym_fn = get_resnet_train if is_train else get_resnet_test
 
@@ -72,7 +72,7 @@ class ResNet50:
 
 class ResNet101:
     def __init__(self, is_train):
-        from .symbol_resnet import get_resnet_train, get_resnet_test
+        from symnet.symbol_resnet import get_resnet_train, get_resnet_test
         self._is_train = is_train
         self._sym_fn = get_resnet_train if is_train else get_resnet_test
 
@@ -107,13 +107,6 @@ class ResNet101:
                                 units=(3, 4, 23, 3), filter_list=(256, 512, 1024, 2048))
 
 
-NETWORKS = {
-    'vgg16': VGG16,
-    'resnet50': ResNet50,
-    'resnet101': ResNet101
-}
-
-
 def get_feat_shape_fn(sym):
     feat_sym = sym.get_internals()['rpn_cls_score_output']
     def _feat_shape(im_height, im_width):
@@ -122,20 +115,26 @@ def get_feat_shape_fn(sym):
     return _feat_shape
 
 
-def get_network_train(network, args):
-    if network not in NETWORKS:
-        raise ValueError("network {} not supported".format(network))
-    nt_cls = NETWORKS[network](is_train=True)
-    nt_cls.set_args(args)
-    sym = nt_cls.get_net(args)
-    as_fn = get_feat_shape_fn(sym)
-    return sym, as_fn
+class NetworkFactory:
+    NETWORKS = {
+        'vgg16': VGG16,
+        'resnet50': ResNet50,
+        'resnet101': ResNet101
+    }
+    def __init__(self, network):
+        if network not in self.NETWORKS:
+            raise ValueError("network {} not supported".format(network))
+        self._nt_cls = self.NETWORKS[network]
 
+    def get_train(self, args):
+        nt = self._nt_cls(is_train=True)
+        nt.set_args(args)
+        sym = nt.get_net(args)
+        as_fn = get_feat_shape_fn(sym)
+        return sym, as_fn
 
-def get_network_test(network, args):
-    if network not in NETWORKS:
-        raise ValueError("network {} not supported".format(network))
-    nt_cls = NETWORKS[network](is_train=False)
-    nt_cls.set_args(args)
-    sym = nt_cls.get_net(args)
-    return sym
+    def get_test(self, args):
+        nt = self._nt_cls(is_train=False)
+        nt.set_args(args)
+        sym = nt.get_net(args)
+        return sym

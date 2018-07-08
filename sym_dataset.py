@@ -41,40 +41,36 @@ class COCO:
         return self._ds_cls.classes
 
 
-DATASETS = {
-    'voc': VOC,
-    'coco': COCO
-}
+class DatasetFactory:
+    DATASETS = {
+        'voc': VOC,
+        'coco': COCO
+    }
+    def __init__(self, name):
+        if name not in self.DATASETS:
+            raise ValueError("dataset {} not supported".format(name))
+        self._ds_cls = self.DATASETS[name]
 
+    def get_train(self, args):
+        ds = self._ds_cls(is_train=True)
+        ds.set_args(args)
+        imageset = args.imageset if args.imageset else ds.default_imageset
+        isets = imageset.split('+')
+        roidb = []
+        for iset in isets:
+            imdb = ds.get_dataset(iset)
+            roidb.extend(imdb.roidb)
+        return roidb
 
-def get_dataset_train(ds_name, args):
-    if ds_name not in DATASETS:
-        raise ValueError("dataset {} not supported".format(ds_name))
-    ds = DATASETS[ds_name](is_train=True)
-    ds.set_args(args)
-    imageset = args.imageset if args.imageset else ds.default_imageset
-    isets = imageset.split('+')
-    roidb = []
-    for iset in isets:
-        imdb = ds.get_dataset(iset)
-        roidb.extend(imdb.roidb)
-    return roidb
+    def get_test(self, args):
+        ds = self._ds_cls(is_train=False)
+        ds.set_args(args)
+        imageset = args.imageset if args.imageset else ds.default_imageset
+        imdb = ds.get_dataset(imageset)
+        return imdb
 
-
-def get_dataset_test(ds_name, args):
-    if ds_name not in DATASETS:
-        raise ValueError("dataset {} not supported".format(ds_name))
-    ds = DATASETS[ds_name](is_train=False)
-    ds.set_args(args)
-    imageset = args.imageset if args.imageset else ds.default_imageset
-    imdb = ds.get_dataset(imageset)
-    return imdb
-
-
-def get_dataset_demo(ds_name, args):
-    if ds_name not in DATASETS:
-        raise ValueError("dataset {} not supported".format(ds_name))
-    ds = DATASETS[ds_name](is_train=False)
-    ds.set_args(args)
-    names = ds.get_names()
-    return names
+    def get_demo(self, args):
+        ds = self._ds_cls(is_train=False)
+        ds.set_args(args)
+        names = ds.get_names()
+        return names

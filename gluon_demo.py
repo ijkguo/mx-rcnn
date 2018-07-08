@@ -4,10 +4,10 @@ import pprint
 
 import mxnet as mx
 
-from nddata.dataset import get_dataset_demo
+from gluon_dataset import DatasetFactory
+from gluon_network import NetworkFactory
 from nddata.transform import load_test
 from nddata.vis import vis_detection
-from ndnet.network import get_network_test
 from symdata.anchor import AnchorGenerator
 
 
@@ -99,8 +99,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    class_names = get_dataset_demo(args.dataset, args)
-    net = get_network_test(args.network, args)
+    class_names = DatasetFactory(args.dataset).get_demo(args)
+    net = DatasetFactory(args.network).get_demo(args)
     demo_net(net, class_names, args)
 
 
