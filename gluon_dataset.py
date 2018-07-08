@@ -40,6 +40,7 @@ class COCO:
         else:
             args.rpn_post_nms_topk = 1000
             args.rcnn_batch_rois = 1000
+            args.rcnn_nms_thresh = 0.5
         args.img_short_side = 800
         args.img_long_side = 1333
         args.rpn_anchor_scales = (2, 4, 8, 16, 32)
