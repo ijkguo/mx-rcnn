@@ -100,7 +100,7 @@ def parse_args():
 def main():
     args = parse_args()
     class_names = DatasetFactory(args.dataset).get_demo(args)
-    net = DatasetFactory(args.network).get_demo(args)
+    net = NetworkFactory(args.network).get_test(args)
     demo_net(net, class_names, args)
 
 
