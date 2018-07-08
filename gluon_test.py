@@ -28,7 +28,7 @@ def main():
 
     # load testing data
     val_loader, split_fn = get_dataloader(dataset, batch_size, args)
-    test_net(net, val_loader, split_fn, metric, ctx, args)
+    test_net(net, val_loader, split_fn, metric, len(dataset), ctx, args)
 
 
 def get_dataloader(dataset, batch_size, args):
@@ -49,7 +49,7 @@ def get_dataloader(dataset, batch_size, args):
     return val_loader, split_fn
 
 
-def test_net(net: gluon.Block, val_loader, split_fn, metric, ctx, args):
+def test_net(net: gluon.Block, val_loader, split_fn, metric, size, ctx, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
@@ -57,7 +57,7 @@ def test_net(net: gluon.Block, val_loader, split_fn, metric, ctx, args):
     net.hybridize(static_alloc=True)
 
     # start detection
-    with tqdm(total=len(val_loader)) as pbar:
+    with tqdm(total=size) as pbar:
         for ib, batch in enumerate(val_loader):
             batch = split_fn(batch, ctx)
             batch_size = len(batch[0])
