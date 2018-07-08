@@ -84,6 +84,7 @@ def parse_args():
     parser.add_argument('--rcnn-batch-rois', type=int, default=300)
     parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
     parser.add_argument('--rcnn-nms-thresh', type=float, default=0.3)
+    parser.add_argument('--rcnn-nms-topk', type=int, default=-1)
     args = parser.parse_args()
     args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
     args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)

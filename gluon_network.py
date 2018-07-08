@@ -35,7 +35,8 @@ class ResNet50:
                 rpn_min_size=args.rpn_min_size,
                 num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
                 rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                rcnn_batch_rois=args.rcnn_batch_rois,
+                rcnn_batch_rois=args.rcnn_batch_rois, rcnn_bbox_stds=args.rcnn_bbox_stds,
+                rcnn_nms_thresh=args.rcnn_nms_thresh, rcnn_nms_topk=args.rcnn_nms_topk,
                 rcnn_roi_mode='align')
         return net
 
