@@ -24,6 +24,7 @@ def main():
 
     # load model
     net.load_parameters(args.params)
+    net.collect_params().reset_ctx(ctx)
 
     # load testing data
     val_loader, split_fn = get_dataloader(dataset, batch_size, args)
@@ -53,7 +54,6 @@ def test_net(net: gluon.Block, val_loader, split_fn, metric, ctx, args):
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # prepare network
-    net.collect_params().reset_ctx(ctx)
     net.hybridize(static_alloc=True)
 
     # start detection

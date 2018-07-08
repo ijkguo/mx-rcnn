@@ -29,6 +29,14 @@ def main():
     else:
         args.lr_warmup = -1
 
+    # load params
+    if args.resume.strip():
+        net.load_parameters(args.resume.strip())
+    else:
+        net.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
+        net.collect_params('.*rpn|.*dense').initialize()
+    net.collect_params().reset_ctx(ctx)
+
     # load training data
     train_loader, split_fn = get_dataloader(feat_shape_fn, dataset, batch_size, args)
 
@@ -64,15 +72,6 @@ def get_lr_at_iter(alpha):
 def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
-
-    # load params
-    if args.resume.strip():
-        net.load_parameters(args.resume.strip())
-    else:
-        net.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
-        net.collect_params('.*rpn|.*dense').initialize()
-    net.collect_params().reset_ctx(ctx)
-    net.hybridize(static_alloc=True)
 
     # loss
     rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / args.rpn_batch_rois)
@@ -118,6 +117,7 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
             metric.reset()
         tic = time.time()
         btic = time.time()
+        net.hybridize(static_alloc=True)
         base_lr = trainer.learning_rate
         for i, batch in enumerate(train_loader):
             if epoch == 0 and i <= lr_warmup:
