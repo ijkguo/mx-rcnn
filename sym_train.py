@@ -65,7 +65,7 @@ def get_dataloader2(feat_shape_fn, dataset, batch_size, args):
     ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
                          anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
     rtg = RPNTargetGenerator(num_sample=args.rpn_batch_rois, pos_iou_thresh=args.rpn_fg_overlap,
-                             neg_iou_thresh=args.rpn_fg_overlap, pos_ratio=args.rpn_fg_fraction,
+                             neg_iou_thresh=args.rpn_bg_overlap, pos_ratio=args.rpn_fg_fraction,
                              stds=(1.0, 1.0, 1.0, 1.0))
     train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
                                                 mean=args.img_pixel_means, std=args.img_pixel_stds,
