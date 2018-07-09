@@ -16,32 +16,14 @@ class ResNet50:
         args.rcnn_pooled_size = (14, 14)
 
     def get_net(self, args):
-        if self._is_train:
-            net = self._net_cls(
-                anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-                rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-                rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-                rpn_min_size=args.rpn_min_size,
-                num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                rcnn_batch_rois=args.rcnn_batch_rois, rcnn_fg_fraction=args.rcnn_fg_fraction,
-                rcnn_fg_overlap=args.rcnn_fg_overlap, rcnn_bbox_stds=args.rcnn_bbox_stds,
-                rcnn_roi_mode='align')
-        else:
-            net = self._net_cls(
-                anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios,
-                rpn_feature_stride=args.rpn_feat_stride, rpn_pre_topk=args.rpn_pre_nms_topk,
-                rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh,
-                rpn_min_size=args.rpn_min_size,
-                num_classes=args.rcnn_num_classes, rcnn_feature_stride=args.rcnn_feat_stride,
-                rcnn_pooled_size=args.rcnn_pooled_size, rcnn_batch_size=args.rcnn_batch_size,
-                rcnn_batch_rois=args.rcnn_batch_rois, rcnn_bbox_stds=args.rcnn_bbox_stds,
-                rcnn_nms_thresh=args.rcnn_nms_thresh, rcnn_nms_topk=args.rcnn_nms_topk,
-                rcnn_roi_mode='align')
+        net = self._net_cls(
+            rpn_feature_stride=args.rpn_feat_stride, rpn_anchor_scales=args.rpn_anchor_scales, rpn_anchor_ratios=args.rpn_anchor_ratios,
+            rpn_pre_topk=args.rpn_pre_nms_topk, rpn_post_topk=args.rpn_post_nms_topk, rpn_nms_thresh=args.rpn_nms_thresh, rpn_min_size=args.rpn_min_size,
+            rcnn_feature_stride=args.rcnn_feat_stride, rcnn_pooled_size=args.rcnn_pooled_size, rcnn_roi_mode='align',
+            rcnn_num_classes=args.rcnn_num_classes, rcnn_batch_size=args.rcnn_batch_size, rcnn_batch_rois=args.rcnn_batch_rois, rcnn_bbox_stds=args.rcnn_bbox_stds,
+            rcnn_fg_fraction=args.rcnn_fg_fraction, rcnn_fg_overlap=args.rcnn_fg_overlap,
+            rcnn_nms_thresh=args.rcnn_nms_thresh, rcnn_nms_topk=args.rcnn_nms_topk)
         return net
-
-    def get_as_fn(self):
-        return self._as_fn
 
 
 class NetworkFactory:
@@ -57,8 +39,7 @@ class NetworkFactory:
         nt = self._nt_cls(is_train=True)
         nt.set_args(args)
         net = nt.get_net(args)
-        as_fn = nt.get_as_fn()
-        return net, as_fn
+        return net
 
     def get_test(self, args):
         nt = self._nt_cls(is_train=False)

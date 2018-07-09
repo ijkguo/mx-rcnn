@@ -8,8 +8,7 @@ from tqdm import tqdm
 
 from gluon_dataset import DatasetFactory
 from gluon_network import NetworkFactory
-from nddata.transform import RCNNDefaultValTransform, batchify_append, batchify_pad, split_append, split_pad
-from symdata.anchor import AnchorGenerator
+from nddata.transform import RCNNDefaultValTransform
 from symnet.logger import logger
 
 
@@ -27,29 +26,22 @@ def main():
     net.collect_params().reset_ctx(ctx)
 
     # load testing data
-    val_loader, split_fn = get_dataloader(dataset, batch_size, args)
-    test_net(net, val_loader, split_fn, metric, len(dataset), ctx, args)
+    val_loader = get_dataloader(net, dataset, batch_size, args)
+    test_net(net, val_loader, metric, len(dataset), ctx, args)
 
 
-def get_dataloader(dataset, batch_size, args):
-    if args.rcnn_batch_size == 1:
-        batchify_fn, split_fn = batchify_append, split_append
-    else:
-        batchify_fn, split_fn = batchify_pad, split_pad
-
+def get_dataloader(net, dataset, batch_size, args):
     # load testing data
-    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
-                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
     val_transform = RCNNDefaultValTransform(short=args.img_short_side, max_size=args.img_long_side,
                                             mean=args.img_pixel_means, std=args.img_pixel_stds,
-                                            feat_stride=args.rpn_feat_stride, ag=ag)
+                                            feat_stride=args.rpn_feat_stride, ag=net.anchor_generator)
     val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
-                                       batch_size=batch_size, shuffle=False, batchify_fn=batchify_fn,
+                                       batch_size=batch_size, shuffle=False, batchify_fn=net.batchify_fn,
                                        last_batch="keep", num_workers=4)
-    return val_loader, split_fn
+    return val_loader
 
 
-def test_net(net: gluon.Block, val_loader, split_fn, metric, size, ctx, args):
+def test_net(net, val_loader, metric, size, ctx, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
@@ -57,6 +49,7 @@ def test_net(net: gluon.Block, val_loader, split_fn, metric, size, ctx, args):
     net.hybridize(static_alloc=True)
 
     # start detection
+    split_fn = net.split_fn
     with tqdm(total=size) as pbar:
         for ib, batch in enumerate(val_loader):
             batch = split_fn(batch, ctx)

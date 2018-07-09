@@ -8,10 +8,8 @@ from mxnet import autograd, gluon
 
 from gluon_dataset import DatasetFactory
 from gluon_network import NetworkFactory
-from nddata.anchor import RPNTargetGenerator
-from nddata.transform import RCNNDefaultTrainTransform, batchify_append, batchify_pad, split_append, split_pad
+from nddata.transform import RCNNDefaultTrainTransform
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
-from symdata.anchor import AnchorGenerator
 from symnet.logger import logger
 
 
@@ -38,38 +36,28 @@ def main():
     net.collect_params().reset_ctx(ctx)
 
     # load training data
-    train_loader, split_fn = get_dataloader(feat_shape_fn, dataset, batch_size, args)
+    train_loader = get_dataloader(net, dataset, batch_size, args)
 
-    train_net(net, train_loader, split_fn, ctx, args)
+    train_net(net, train_loader, ctx, args)
 
 
-def get_dataloader(feat_shape_fn, dataset, batch_size, args):
-    if args.rcnn_batch_size == 1:
-        batchify_fn, split_fn = batchify_append, split_append
-    else:
-        batchify_fn, split_fn = batchify_pad, split_pad
-
+def get_dataloader(net, dataset, batch_size, args):
     # load training data
-    ag = AnchorGenerator(feat_stride=args.rpn_feat_stride,
-                         anchor_scales=args.rpn_anchor_scales, anchor_ratios=args.rpn_anchor_ratios)
-    rtg = RPNTargetGenerator(num_sample=args.rpn_batch_rois, pos_iou_thresh=args.rpn_fg_overlap,
-                             neg_iou_thresh=args.rpn_bg_overlap, pos_ratio=args.rpn_fg_fraction,
-                             stds=(1.0, 1.0, 1.0, 1.0))
     train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
                                                 mean=args.img_pixel_means, std=args.img_pixel_stds,
-                                                feat_stride=args.rpn_feat_stride, ag=ag,
-                                                asf=feat_shape_fn, rtg=rtg)
+                                                feat_stride=args.rpn_feat_stride, ag=net.anchor_generator,
+                                                asf=net.anchor_shape_fn, rtg=net.anchor_target)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
-                                         batch_size=batch_size, shuffle=True, batchify_fn=batchify_fn,
+                                         batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn,
                                          last_batch="rollover", num_workers=4)
-    return train_loader, split_fn
+    return train_loader
 
 
 def get_lr_at_iter(alpha):
     return 1. / 3. * (1 - alpha) + alpha
 
 
-def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
+def train_net(net, train_loader, ctx, args):
     # print config
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
@@ -107,6 +95,7 @@ def train_net(net: gluon.Block, train_loader, split_fn, ctx, args):
          'clip_gradient': 5})
 
     # training loop
+    split_fn = net.split_fn
     for epoch in range(args.start_epoch, args.epochs):
         while lr_steps and epoch >= lr_steps[0]:
             new_lr = trainer.learning_rate * lr_decay

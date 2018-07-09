@@ -57,7 +57,7 @@ def main2():
 
 def get_dataloader2(feat_shape_fn, dataset, batch_size, args):
     from mxnet import gluon
-    from nddata.anchor import RPNTargetGenerator
+    from ndnet.rpn_target import RPNTargetGenerator
     from nddata.transform import RCNNDefaultTrainTransform, batchify_pad
     from symdata.adapter import AnchorIter
 

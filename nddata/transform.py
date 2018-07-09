@@ -2,9 +2,9 @@ import mxnet as mx
 from mxnet import gluon
 
 from nddata.image import imdecode, random_flip, resize, transform
+from ndnet.rpn_target import RPNTargetGenerator
 from symdata.anchor import AnchorGenerator
 from symdata.bbox import bbox_flip
-from nddata.anchor import RPNTargetGenerator
 
 
 def load_test(filename, short, max_size, mean, std, feat_stride, ag: AnchorGenerator):
