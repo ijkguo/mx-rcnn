@@ -16,7 +16,7 @@ from symnet.logger import logger
 def main():
     args = parse_args()
     dataset = DatasetFactory(args.dataset).get_train(args)
-    net, feat_shape_fn = NetworkFactory(args.network).get_train(args)
+    net = NetworkFactory(args.network).get_train(args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
