@@ -24,7 +24,7 @@ class QuotaSampler(gluon.HybridBlock):
         mask = F.where(pos_mask, F.ones_like(mask), mask)
 
         # shuffle mask
-        rand = F.random.uniform(0, 1, shape=(self._num_input,))
+        rand = F.random.uniform(0, 1, shape=(self._num_input + 100,)).slice_like(ious_argmax)
         index = F.argsort(rand)
         mask = F.take(mask, index)
         ious_argmax = F.take(ious_argmax, index)
