@@ -96,6 +96,7 @@ def train_net(net, train_loader, ctx, args):
 
     # training loop
     split_fn = net.split_fn
+    net.hybridize(static_alloc=True)
     for epoch in range(args.start_epoch, args.epochs):
         while lr_steps and epoch >= lr_steps[0]:
             new_lr = trainer.learning_rate * lr_decay
@@ -106,7 +107,6 @@ def train_net(net, train_loader, ctx, args):
             metric.reset()
         tic = time.time()
         btic = time.time()
-        net.hybridize(static_alloc=True)
         base_lr = trainer.learning_rate
         for i, batch in enumerate(train_loader):
             if epoch == 0 and i <= lr_warmup:
