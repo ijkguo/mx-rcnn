@@ -30,7 +30,7 @@ def resize(im, short, max_size):
     if round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
         short = int(im_size_min * im_scale)
-    im = mx.image.resize_short(im, short)
+    im = mx.image.resize_short(im, short, interp=1)
     return im, im_scale
 
 
