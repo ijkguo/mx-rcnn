@@ -83,7 +83,7 @@ def get_resnet_train(anchor_scales, anchor_ratios, rpn_feature_stride,
 
     # rpn feature
     rpn_conv = mx.symbol.Convolution(
-        data=conv_feat, kernel=(3, 3), pad=(1, 1), num_filter=1024, name="rpn_conv_3x3")
+        data=conv_feat, kernel=(3, 3), pad=(1, 1), num_filter=512, name="rpn_conv_3x3")
     rpn_relu = mx.symbol.Activation(data=rpn_conv, act_type="relu", name="rpn_relu")
 
     # rpn classification
@@ -161,7 +161,7 @@ def get_resnet_test(anchor_scales, anchor_ratios, rpn_feature_stride,
 
     # rpn feature
     rpn_conv = mx.symbol.Convolution(
-        data=conv_feat, kernel=(3, 3), pad=(1, 1), num_filter=1024, name="rpn_conv_3x3")
+        data=conv_feat, kernel=(3, 3), pad=(1, 1), num_filter=512, name="rpn_conv_3x3")
     rpn_relu = mx.symbol.Activation(data=rpn_conv, act_type="relu", name="rpn_relu")
 
     # rpn classification
