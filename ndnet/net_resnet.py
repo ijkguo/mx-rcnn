@@ -165,7 +165,7 @@ class FRCNNResNet(FRCNN):
         if self._rcnn_roi_mode == 'pool':
             pooled_feat = F.ROIPooling(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
         elif self._rcnn_roi_mode == 'align':
-            pooled_feat = F.contrib.ROIAlign(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+            pooled_feat = F.contrib.ROIAlign(feat, rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride, sample_ratio=2)
         else:
             raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
 
