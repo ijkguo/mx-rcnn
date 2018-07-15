@@ -43,11 +43,12 @@ class NormalizedSimpleBoxCenterEncoder(gluon.HybridBlock):
 
 
 class NormalizedBoxCenterDecoder(gluon.HybridBlock):
-    def __init__(self, stds=(0.1, 0.1, 0.2, 0.2), means=(0., 0., 0., 0.)):
+    def __init__(self, stds=(0.1, 0.1, 0.2, 0.2), means=(0., 0., 0., 0.), clip=4.42):
         super(NormalizedBoxCenterDecoder, self).__init__()
         assert len(stds) == 4, "Box Decoder requires 4 std values."
         self._stds = stds
         self._means = means
+        self._clip = clip
 
     def hybrid_forward(self, F, targets, boxes):
         # targets: (..., 4) tx, ty, tw, th
@@ -56,8 +57,8 @@ class NormalizedBoxCenterDecoder(gluon.HybridBlock):
         a = F.split(boxes, axis=-1, num_outputs=4)
         ox = F.broadcast_add(F.broadcast_mul(p[0] * self._stds[0] + self._means[0], a[2]), a[0])
         oy = F.broadcast_add(F.broadcast_mul(p[1] * self._stds[1] + self._means[1], a[3]), a[1])
-        ow = F.broadcast_mul(F.exp(p[2] * self._stds[2]) + self._means[2], a[2]) / 2
-        oh = F.broadcast_mul(F.exp(p[3] * self._stds[3]) + self._means[3], a[3]) / 2
+        ow = F.broadcast_mul(F.minimum(F.exp(p[2] * self._stds[2] + self._means[2]), self._clip), a[2]) / 2
+        oh = F.broadcast_mul(F.minimum(F.exp(p[3] * self._stds[3] + self._means[3]), self._clip), a[3]) / 2
         return F.concat(ox - ow, oy - oh, ox + ow, oy + oh, dim=-1)
 
 
