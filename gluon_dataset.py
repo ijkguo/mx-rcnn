@@ -48,7 +48,7 @@ class COCO:
 
     def get_dataset(self, imageset):
         splits = imageset.split('+')
-        return self._ds_cls(splits=splits, skip_empty=self._is_train)
+        return self._ds_cls(splits=splits, skip_empty=self._is_train, use_crowd=not self._is_train)
 
     def get_metric(self, dataset):
         return self._mt_cls(dataset, save_prefix='coco', cleanup=True)
