@@ -1,9 +1,8 @@
-class ResNet50:
+class ResNetV2a:
     def __init__(self, is_train):
-        from ndnet.net_resnet import FRCNNResNet, get_feat_size
+        from ndnet.net_rcnn import get_frcnn_resnet50_v2a
         self._is_train = is_train
-        self._net_cls = FRCNNResNet
-        self._as_fn = get_feat_size
+        self._net_cls = get_frcnn_resnet50_v2a
 
     def set_args(self, args):
         if self._is_train:
@@ -28,7 +27,7 @@ class ResNet50:
 
 class NetworkFactory:
     NETWORKS = {
-        'resnet50': ResNet50
+        'resnet50_v2a': ResNetV2a
     }
     def __init__(self, network):
         if network not in self.NETWORKS:
