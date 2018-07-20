@@ -21,7 +21,7 @@ class RCNNDetector(gluon.HybridBlock):
 
         # cls [C, N, 1] -> det [C, N, 5]
         det = F.concat(cls, bboxes, dim=-1)
-        det = F.contrib.box_nms(det, overlap_thresh=self._rcnn_nms_thresh, topk=self._rcnn_nms_topk,
+        det = F.contrib.box_nms(det, valid_thresh=0.0001, overlap_thresh=self._rcnn_nms_thresh, topk=self._rcnn_nms_topk,
                                 id_index=-1, score_index=0, coord_start=1, force_suppress=True)
         scores = F.slice_axis(det, axis=-1, begin=0, end=1)
         bboxes = F.slice_axis(det, axis=-1, begin=1, end=5)
