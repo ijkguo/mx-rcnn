@@ -160,31 +160,3 @@ class FRCNN(HybridBlock):
         ret_scores = F.stack(*ret_scores, axis=0)
         ret_bboxes = F.stack(*ret_bboxes, axis=0)
         return ret_ids, ret_scores, ret_bboxes
-
-
-def get_frcnn_resnet50_v1a(**kwargs):
-    from .net_resnet_v1a import ResNetV1a
-    backbone = ResNetV1a(layers=(3, 4, 6, 3), prefix='')
-    features = nn.HybridSequential()
-    for layer in ['conv1', 'bn1', 'relu', 'maxpool', 'layer1', 'layer2', 'layer3']:
-        features.add(getattr(backbone, layer))
-    top_features = nn.HybridSequential()
-    for layer in ['layer4']:
-        top_features.add(getattr(backbone, layer))
-    rpn = RPN(1024, len(kwargs['rpn_anchor_scales']) * len(kwargs['rpn_anchor_ratios']))
-    rcnn = RCNN(2048, kwargs['rcnn_num_classes'])
-    return FRCNN(features, top_features, rpn, rcnn, **kwargs)
-
-
-def get_frcnn_resnet50_v2a(**kwargs):
-    from .net_resnet_v2a import ResNetV2a
-    backbone = ResNetV2a(layers=(3, 4, 6, 3), prefix='')
-    features = nn.HybridSequential()
-    for layer in ['layer0', 'layer1', 'layer2', 'layer3']:
-        features.add(getattr(backbone, layer))
-    top_features = nn.HybridSequential()
-    for layer in ['layer4']:
-        top_features.add(getattr(backbone, layer))
-    rpn = RPN(1024, len(kwargs['rpn_anchor_scales']) * len(kwargs['rpn_anchor_ratios']))
-    rcnn = RCNN(2048, kwargs['rcnn_num_classes'])
-    return FRCNN(features, top_features, rpn, rcnn, **kwargs)
