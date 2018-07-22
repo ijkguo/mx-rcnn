@@ -1,5 +1,5 @@
 from mxnet import gluon
-from ndnet.bbox import BBoxCornerToCenter
+from ndnet.bbox import BBoxCornerToCenter, BBoxCenterToCorner
 from gluoncv.nn.coder import SigmoidClassEncoder
 
 __all__ = ['SigmoidClassEncoder', 'MultiClassEncoder',
@@ -49,6 +49,8 @@ class NormalizedBoxCenterDecoder(gluon.HybridBlock):
         self._stds = stds
         self._means = means
         self._clip = clip
+        with self.name_scope():
+            self.center_to_corner = BBoxCenterToCorner()
 
     def hybrid_forward(self, F, targets, boxes):
         # targets: (..., 4) tx, ty, tw, th
@@ -59,7 +61,7 @@ class NormalizedBoxCenterDecoder(gluon.HybridBlock):
         oy = F.broadcast_add(F.broadcast_mul(p[1] * self._stds[1] + self._means[1], a[3]), a[1])
         ow = F.broadcast_mul(F.minimum(F.exp(p[2] * self._stds[2] + self._means[2]), self._clip), a[2]) / 2
         oh = F.broadcast_mul(F.minimum(F.exp(p[3] * self._stds[3] + self._means[3]), self._clip), a[3]) / 2
-        return F.concat(ox - ow, oy - oh, ox + ow, oy + oh, dim=-1)
+        return self.center_to_corner(F.concat(ox, oy, ow, oh, dim=-1))
 
 
 class NormalizedBoxCenterEncoder(gluon.HybridBlock):
@@ -69,20 +71,20 @@ class NormalizedBoxCenterEncoder(gluon.HybridBlock):
             self.corner_to_center = BBoxCornerToCenter()
             self.box_encoder = NormalizedSimpleBoxCenterEncoder(stds, means)
 
-    def hybrid_forward(self, F, samples, matches, anchors, refs):
+    def hybrid_forward(self, F, samples, matches, anchors, ref_boxes):
+        # transform based on x, y, w, h
+        ref_boxes = self.corner_to_center(ref_boxes)
+        anchors = self.corner_to_center(anchors)
         # refs [B, M, 4], anchors [B, N, 4], samples [B, N], matches [B, N]
         # refs [B, M, 4] -> reshape [B, 1, M, 4] -> repeat [B, N, M, 4]
-        ref_boxes = F.repeat(refs.reshape((0, 1, -1, 4)), axis=1, repeats=matches.shape[1])
+        ref_boxes = F.repeat(ref_boxes.reshape((0, 1, -1, 4)), axis=1, repeats=matches.shape[1])
         # refs [B, N, M, 4] -> 4 * [B, N, M]
         ref_boxes = F.split(ref_boxes, axis=-1, num_outputs=4, squeeze_axis=True)
         # refs 4 * [B, N, M] -> pick from matches [B, N, 1] -> concat to [B, N, 4]
         ref_boxes = F.concat(*[F.pick(ref_boxes[i], matches, axis=2).reshape((0, -1, 1)) \
             for i in range(4)], dim=2)
-        # transform based on x, y, w, h
         # g [B, N, 4], a [B, N, 4] -> codecs [B, N, 4]
-        g = self.corner_to_center(ref_boxes)
-        a = self.corner_to_center(anchors)
-        codecs = self.box_encoder(g, a)
+        codecs = self.box_encoder(ref_boxes, anchors)
         # samples [B, N] -> [B, N, 1] -> [B, N, 4] -> boolean
         temp = F.tile(samples.reshape((0, -1, 1)), reps=(1, 1, 4)) > 0.5
         # fill targets and masks [B, N, 4]
@@ -100,10 +102,13 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
             self.corner_to_center = BBoxCornerToCenter()
             self.box_encoder = NormalizedSimpleBoxCenterEncoder(stds, means)
 
-    def hybrid_forward(self, F, samples, matches, anchors, labels, refs, **kwargs):
+    def hybrid_forward(self, F, samples, matches, anchors, labels, ref_boxes, **kwargs):
+        # transform based on x, y, w, h
+        ref_boxes = self.corner_to_center(ref_boxes)
+        anchors = self.corner_to_center(anchors)
         # refs [B, M, 4], anchors [B, N, 4], samples [B, N], matches [B, N]
         # refs [B, M, 4] -> reshape [B, 1, M, 4] -> repeat [B, N, M, 4]
-        ref_boxes = F.repeat(refs.reshape((0, 1, -1, 4)), axis=1, repeats=self._num_sample)
+        ref_boxes = F.repeat(ref_boxes.reshape((0, 1, -1, 4)), axis=1, repeats=self._num_sample)
         # refs [B, N, M, 4] -> 4 * [B, N, M]
         ref_boxes = F.split(ref_boxes, axis=-1, num_outputs=4, squeeze_axis=True)
         # refs 4 * [B, N, M] -> pick from matches [B, N, 1] -> concat to [B, N, 4]
@@ -113,11 +118,8 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
         ref_labels = F.repeat(labels.reshape((0, 1, -1)), axis=1, repeats=self._num_sample)
         # labels [B, N, M] -> pick from matches [B, N] -> [B, N, 1]
         ref_labels = F.pick(ref_labels, matches, axis=2).reshape((0, -1, 1))
-        # transform based on x, y, w, h
         # g [B, N, 4] a [B, N, 4] -> codecs [B, N, 4]
-        g = self.corner_to_center(ref_boxes)
-        a = self.corner_to_center(anchors)
-        codecs = self.box_encoder(g, a)
+        codecs = self.box_encoder(ref_boxes, anchors)
         # samples [B, N] -> [B, N, 1] -> [B, N, 4] -> get +1 class
         # only the positive samples have targets
         # note that iou with padded 0 box is always 0, thus no targets
