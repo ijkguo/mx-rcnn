@@ -1,6 +1,5 @@
 import mxnet as mx
 import numpy as np
-from ndnet.bbox import BBoxSplit
 from ndnet.coder import SigmoidClassEncoder, NormalizedBoxCenterEncoder
 from gluoncv.nn.matcher import MaximumMatcher, BipartiteMatcher, CompositeMatcher
 from gluoncv.nn.sampler import QuotaSampler
@@ -13,7 +12,6 @@ class RPNTargetGenerator:
         self._neg_iou_thresh = neg_iou_thresh
         self._pos_ratio = pos_ratio
         self._stds = stds
-        self._bbox_split = BBoxSplit(axis=-1)
         self._matcher = CompositeMatcher([BipartiteMatcher(), MaximumMatcher(pos_iou_thresh)])
         self._sampler = QuotaSampler(num_sample, pos_iou_thresh, neg_iou_thresh, 0., pos_ratio)
         self._cls_encoder = SigmoidClassEncoder()
@@ -21,7 +19,7 @@ class RPNTargetGenerator:
 
     def forward(self, bbox, anchor, width, height):
         # anchor with shape (N, 4)
-        a_xmin, a_ymin, a_xmax, a_ymax = self._bbox_split(anchor)
+        a_xmin, a_ymin, a_xmax, a_ymax = mx.nd.split(anchor, num_outputs=4, axis=-1)
 
         # mask out invalid anchors, (N, 4)
         invalid_mask = ((a_xmin >= 0) * (a_ymin >= 0) * (a_xmax <= width) * (a_ymax <= height)) <= 0

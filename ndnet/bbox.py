@@ -1,7 +1,6 @@
 from mxnet import gluon
-from gluoncv.nn.bbox import BBoxSplit
 
-__all__ = ['BBoxSplit', 'BBoxCornerToCenter', 'BBoxCenterToCorner', 'BBoxClipper']
+__all__ = ['BBoxCornerToCenter', 'BBoxCenterToCorner', 'BBoxClipper']
 
 
 class BBoxCornerToCenter(gluon.HybridBlock):
