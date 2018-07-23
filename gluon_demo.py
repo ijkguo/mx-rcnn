@@ -31,7 +31,7 @@ def demo_net(net, class_names, args):
 
     # forward
     im_tensor = im_tensor.as_in_context(ctx)
-    anchors = anchors.as_in_context(anchors)
+    anchors = anchors.as_in_context(ctx)
     im_info = im_info.as_in_context(ctx)
 
     ids, scores, bboxes = net(im_tensor, anchors, im_info)
