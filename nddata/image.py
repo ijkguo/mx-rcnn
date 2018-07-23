@@ -22,15 +22,15 @@ def random_flip(src, px=0):
 
 def resize(im, short, max_size):
     """Return resized image (NDArray) and scale (float)"""
-    im_shape = im.shape
-    im_size_min = min(im_shape[0:2])
-    im_size_max = max(im_shape[0:2])
+    h, w = im.shape[:2]
+    im_size_min = min(h, w)
+    im_size_max = max(h, w)
     im_scale = float(short) / float(im_size_min)
     # prevent bigger axis from being more than max_size:
     if round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
-        short = int(im_size_min * im_scale)
-    im = mx.image.resize_short(im, short, interp=1)
+    new_h, new_w = int(round(h * im_scale)), int(round(w * im_scale))
+    im = mx.image.imresize(im, new_w, new_h, interp=1)
     return im, im_scale
 
 
