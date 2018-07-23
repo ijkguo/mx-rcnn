@@ -5,13 +5,12 @@ from ndnet.coder import NormalizedBoxCenterDecoder
 
 class Proposal(gluon.HybridBlock):
     def __init__(self, rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size,
-                 output_score=False, **kwargs):
+                 **kwargs):
         super(Proposal, self).__init__(**kwargs)
         self._rpn_pre_topk = rpn_pre_topk
         self._rpn_post_topk = rpn_post_topk
         self._rpn_nms_thresh = rpn_nms_thresh
         self._rpn_min_size = rpn_min_size
-        self._output_score = output_score
 
         with self.name_scope():
             self._bbox_corner2center = BBoxCornerToCenter()
@@ -53,6 +52,4 @@ class Proposal(gluon.HybridBlock):
         rpn_scores = F.slice_axis(result, axis=-1, begin=0, end=1)
         rpn_bbox = F.slice_axis(result, axis=-1, begin=1, end=None)
 
-        if self._output_score:
-            return rpn_bbox, rpn_scores
-        return rpn_bbox
+        return rpn_bbox, rpn_scores

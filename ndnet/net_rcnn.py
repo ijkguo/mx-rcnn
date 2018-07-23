@@ -88,7 +88,7 @@ class FRCNN(HybridBlock):
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
         with autograd.pause():
             rpn_cls_prob = F.sigmoid(rpn_cls)
-            rois = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
+            rois, _ = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
 
         # generate targets
         if autograd.is_training():
