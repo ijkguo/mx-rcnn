@@ -36,8 +36,8 @@ class Proposal(gluon.HybridBlock):
         # remove min_size
         x_ctr, y_ctr, width, height = self._bbox_corner2center_split(boxes)
         invalid = (width < self._rpn_min_size) + (height < self._rpn_min_size) \
-                  + (x_ctr > im_info.slice_axis(axis=-1, begin=1, end=2)) \
-                  + (y_ctr > im_info.slice_axis(axis=-1, begin=0, end=1))
+                  + F.broadcast_greater_equal(x_ctr, im_info.slice_axis(axis=-1, begin=1, end=2)) \
+                  + F.broadcast_greater_equal(y_ctr, im_info.slice_axis(axis=-1, begin=0, end=1))
         score = F.where(invalid, F.zeros_like(invalid), score)
         invalid = F.repeat(invalid, axis=-1, repeats=4)
         boxes = F.where(invalid, F.ones_like(invalid) * -1, boxes)
