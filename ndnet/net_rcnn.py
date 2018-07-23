@@ -11,15 +11,15 @@ from .rcnn_inference import RCNNDetector
 
 
 class RPN(HybridBlock):
-    def __init__(self, in_channels, num_anchors, **kwargs):
+    def __init__(self, rpn_channels, num_anchors, **kwargs):
         super(RPN, self).__init__(**kwargs)
         self._num_anchors = num_anchors
 
         weight_initializer = mx.initializer.Normal(0.01)
         with self.name_scope():
-            self.rpn_conv = nn.Conv2D(in_channels=in_channels, channels=in_channels, kernel_size=(3, 3), padding=(1, 1), weight_initializer=weight_initializer)
-            self.conv_cls = nn.Conv2D(in_channels=in_channels, channels=num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
-            self.conv_reg = nn.Conv2D(in_channels=in_channels, channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
+            self.rpn_conv = nn.Conv2D(channels=rpn_channels, kernel_size=(3, 3), padding=(1, 1), weight_initializer=weight_initializer)
+            self.conv_cls = nn.Conv2D(channels=num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
+            self.conv_reg = nn.Conv2D(channels=4 * num_anchors, kernel_size=(1, 1), padding=(0, 0), weight_initializer=weight_initializer)
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
@@ -29,11 +29,11 @@ class RPN(HybridBlock):
 
 
 class RCNN(HybridBlock):
-    def __init__(self, in_units, num_classes, **kwargs):
+    def __init__(self, num_classes, **kwargs):
         super(RCNN, self).__init__(**kwargs)
         with self.name_scope():
-            self.cls = nn.Dense(in_units=in_units, units=num_classes, weight_initializer=mx.initializer.Normal(0.01))
-            self.reg = nn.Dense(in_units=in_units, units=4 * num_classes, weight_initializer=mx.initializer.Normal(0.001))
+            self.cls = nn.Dense(units=num_classes, weight_initializer=mx.initializer.Normal(0.01))
+            self.reg = nn.Dense(units=4 * num_classes, weight_initializer=mx.initializer.Normal(0.001))
 
     def hybrid_forward(self, F, x):
         cls = self.cls(x)
@@ -42,11 +42,13 @@ class RCNN(HybridBlock):
 
 
 class FRCNN(HybridBlock):
-    def __init__(self, features, top_features, rpn, rcnn,
+    def __init__(self, features, top_features, batch_images=1, train_patterns=None,
+                 img_short=600, img_max_size=1000, img_means=(0., 0., 0.), img_stds=(0., 0., 0.), clip=4.42,
                  rpn_feature_stride=16, rpn_anchor_scales=(8, 16, 32), rpn_anchor_ratios=(0.5, 1, 2),
-                 rpn_pre_topk=6000, rpn_post_topk=300, rpn_nms_thresh=0.7, rpn_min_size=16,
+                 rpn_channels=1024, rpn_nms_thresh=0.7, rpn_min_size=16,
+                 rpn_train_pre_topk=12000, rpn_train_post_topk=2000, rpn_test_pre_topk=6000, rpn_test_post_topk=300,
                  rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_roi_mode='align',
-                 rcnn_num_classes=21, rcnn_batch_size=1, rcnn_batch_rois=128, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
+                 rcnn_num_classes=21, rcnn_batch_rois=128, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
                  rpn_batch_rois=256, rpn_fg_overlap=0.7, rpn_bg_overlap=0.3, rpn_fg_fraction=0.5,  # only used for RPNTarget
                  rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5,  # only used for RCNNTarget
                  rcnn_nms_thresh=0.3, rcnn_nms_topk=-1,  # only used for RCNN inference
@@ -56,23 +58,32 @@ class FRCNN(HybridBlock):
         self._rcnn_roi_mode = rcnn_roi_mode
         self._rcnn_pooled_size = rcnn_pooled_size
         self._rcnn_num_classes = rcnn_num_classes
-        self._rcnn_batch_size = rcnn_batch_size
+        self._batch_images = batch_images
+        self._rpn_test_post_topk = rpn_test_post_topk
         self._rcnn_batch_rois = rcnn_batch_rois
 
-        self.anchor_generator = AnchorGenerator(
+        self.img_short = img_short
+        self.img_max_size = img_max_size
+        self.img_means = img_means
+        self.img_stds = img_stds
+        self.train_patterns = train_patterns
+        ag = AnchorGenerator(
             feat_stride=rpn_feature_stride, anchor_scales=rpn_anchor_scales, anchor_ratios=rpn_anchor_ratios)
+        alloc_size = img_max_size * 1.5 / rpn_feature_stride
+        self.anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
         self.anchor_target = RPNTargetGenerator(
             num_sample=rpn_batch_rois, pos_iou_thresh=rpn_fg_overlap, neg_iou_thresh=rpn_bg_overlap,
             pos_ratio=rpn_fg_fraction, stds=(1.0, 1.0, 1.0, 1.0))
-        self.batchify_fn = batchify_append if rcnn_batch_size == 1 else batchify_pad
-        self.split_fn = split_append if rcnn_batch_size == 1 else split_pad
+        self.batchify_fn = batchify_append if batch_images == 1 else batchify_pad
+        self.split_fn = split_append if batch_images == 1 else split_pad
 
         self.features = features
         self.top_features = top_features
-        self.rpn = rpn
-        self.rcnn = rcnn
-        self.proposal = Proposal(rpn_pre_topk, rpn_post_topk, rpn_nms_thresh, rpn_min_size)
-        self.rcnn_sampler = RCNNTargetSampler(rcnn_batch_size, rcnn_batch_rois, rpn_post_topk, rcnn_fg_fraction, rcnn_fg_overlap)
+        self.rpn = RPN(rpn_channels, len(rpn_anchor_scales) * len(rpn_anchor_ratios))
+        self.rcnn = RCNN(rcnn_num_classes)
+        self.proposal = Proposal(clip, rpn_nms_thresh, rpn_min_size,
+            rpn_train_pre_topk, rpn_train_post_topk, rpn_test_pre_topk, rpn_test_post_topk)
+        self.rcnn_sampler = RCNNTargetSampler(batch_images, rcnn_batch_rois, rpn_train_post_topk, rcnn_fg_fraction, rcnn_fg_overlap)
         self.rcnn_target = RCNNTargetGenerator(rcnn_batch_rois, rcnn_num_classes, rcnn_bbox_stds)
         self.rcnn_detect = RCNNDetector(rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk)
 
@@ -86,25 +97,23 @@ class FRCNN(HybridBlock):
 
         # generate proposals
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
-        with autograd.pause():
-            rpn_cls_prob = F.sigmoid(rpn_cls)
-            rois, _ = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
+        rpn_cls_prob = F.sigmoid(F.stop_gradient(rpn_cls))
+        rois, _ = self.proposal(rpn_cls_prob, F.stop_gradient(rpn_reg), anchors, im_info)
 
         # generate targets
         if autograd.is_training():
-            with autograd.pause():
-                rois, samples, matches = self.rcnn_sampler(rois, gt_boxes)
-                rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
-                rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
-                rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
-                rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
+            rois, samples, matches = self.rcnn_sampler(F.stop_gradient(rois), gt_boxes)
+            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
+            rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
+            rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
+            rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
 
         # create batch id and reshape for roi pooling
-        with autograd.pause():
-            rois = rois.reshape((-3, 0))
-            roi_batch_id = F.arange(0, self._rcnn_batch_size, repeat=self._rcnn_batch_rois).reshape((-1, 1))
-            rois = F.concat(roi_batch_id, rois, dim=-1)
-            rois = F.stop_gradient(rois)
+        num_rois = self._rcnn_batch_rois if autograd.is_training() else self._rpn_test_post_topk
+        rois = rois.reshape((-3, 0))
+        roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois).reshape((-1, 1))
+        rois = F.concat(roi_batch_id, rois, dim=-1)
+        rois = F.stop_gradient(rois)
 
         # pool to roi features
         if self._rcnn_roi_mode == 'pool':
@@ -123,11 +132,11 @@ class FRCNN(HybridBlock):
 
         # rois [B, N, 4]
         rois = F.slice_axis(rois, axis=-1, begin=1, end=None)
-        rois = F.reshape(rois, (self._rcnn_batch_size, self._rcnn_batch_rois, 4))
+        rois = F.reshape(rois, (self._batch_images, num_rois, 4))
 
         # class id [C, N, 1]
-        ids = F.arange(1, self._rcnn_num_classes, repeat=self._rcnn_batch_rois)
-        ids = F.reshape(ids, (self._rcnn_num_classes - 1, self._rcnn_batch_rois, 1))
+        ids = F.arange(1, self._rcnn_num_classes, repeat=num_rois)
+        ids = F.reshape(ids, (self._rcnn_num_classes - 1, num_rois, 1))
 
         # window [height, width] for clipping
         im_info = F.slice_axis(im_info, axis=-1, begin=0, end=2)
@@ -135,18 +144,18 @@ class FRCNN(HybridBlock):
         # cls [B, C, N, 1]
         rcnn_cls = F.softmax(rcnn_cls, axis=-1)
         rcnn_cls = F.slice_axis(rcnn_cls, axis=-1, begin=1, end=None)
-        rcnn_cls = F.reshape(rcnn_cls, (self._rcnn_batch_size, self._rcnn_batch_rois, self._rcnn_num_classes - 1, 1))
+        rcnn_cls = F.reshape(rcnn_cls, (self._batch_images, num_rois, self._rcnn_num_classes - 1, 1))
         rcnn_cls = F.transpose(rcnn_cls, (0, 2, 1, 3))
 
         # reg [B, C, N, 4]
         rcnn_reg = F.slice_axis(rcnn_reg, axis=-1, begin=4, end=None)
-        rcnn_reg = F.reshape(rcnn_reg, (self._rcnn_batch_size, self._rcnn_batch_rois, self._rcnn_num_classes - 1, 4))
+        rcnn_reg = F.reshape(rcnn_reg, (self._batch_images, num_rois, self._rcnn_num_classes - 1, 4))
         rcnn_reg = F.transpose(rcnn_reg, (0, 2, 1, 3))
 
         ret_ids = []
         ret_scores = []
         ret_bboxes = []
-        for i in range(self._rcnn_batch_size):
+        for i in range(self._batch_images):
             b_rois = F.squeeze(F.slice_axis(rois, axis=0, begin=i, end=i+1), axis=0)
             b_cls = F.squeeze(F.slice_axis(rcnn_cls, axis=0, begin=i, end=i+1), axis=0)
             b_reg = F.squeeze(F.slice_axis(rcnn_reg, axis=0, begin=i, end=i+1), axis=0)

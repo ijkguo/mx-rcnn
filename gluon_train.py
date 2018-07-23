@@ -1,31 +1,67 @@
 import argparse
-import ast
 import pprint
 import time
 
 import mxnet as mx
+import gluoncv as gcv
 from mxnet import autograd, gluon
 
-from gluon_dataset import DatasetFactory
-from gluon_network import NetworkFactory
+from ndnet.net_all import get_net
 from nddata.transform import RCNNDefaultTrainTransform
 from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
 from symnet.logger import logger
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train Faster R-CNN network',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--network', type=str, default='resnet50_v2a', help='base network')
+    parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
+    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
+    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
+    parser.add_argument('--epochs', type=str, default='', help='training epochs')
+    parser.add_argument('--lr', type=str, default='', help='base learning rate')
+    parser.add_argument('--wd', type=str, default='', help='weight decay')
+    parser.add_argument('--lr-decay-epoch', type=str, default='', help='epoch to decay lr')
+    parser.add_argument('--lr-warmup', type=str, default='', help='warmup iterations')
+    parser.add_argument('--resume', type=str, default='', help='path to last saved model')
+    parser.add_argument('--start-epoch', type=int, default=0, help='start epoch for resuming')
+    parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
+    parser.add_argument('--save-prefix', type=str, default='', help='saving params prefix')
+    parser.add_argument('--batch-images', type=int, default=1, help='batch size per gpu')
+    args = parser.parse_args()
+    args.pretrained = args.pretrained if args.pretrained else 'model/{}_0000.params'.format(args.network)
+    args.save_prefix = args.save_prefix if args.save_prefix else 'model/{}_{}'.format(args.network, args.dataset)
+    if args.dataset == 'voc':
+        args.epochs = int(args.epochs) if args.epochs else 20
+        args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '14,20'
+        args.lr = float(args.lr) if args.lr else 0.001
+        args.lr_warmup = args.lr_warmup if args.lr_warmup else -1
+        args.wd = float(args.wd) if args.wd else 5e-4
+    else:
+        args.epochs = int(args.epochs) if args.epochs else 24
+        args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '16,21'
+        args.lr = float(args.lr) if args.lr else 0.00125
+        args.lr_warmup = args.lr_warmup if args.lr_warmup else 8000
+        args.wd = float(args.wd) if args.wd else 1e-4
+        batch_size = len(args.gpus.split(',')) * args.batch_images
+        if batch_size == 1:
+            args.lr_warmup = -1
+        else:
+            args.lr *= batch_size
+            args.lr_warmup /= batch_size
+    return args
+
+
 def main():
     args = parse_args()
-    dataset = DatasetFactory(args.dataset).get_train(args)
-    net = NetworkFactory(args.network).get_train(args)
+    dataset = get_dataset(args.dataset, args)
+    net = get_net(args.network, args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    batch_size = args.rcnn_batch_size * len(ctx)
-    if args.dataset == 'coco' and batch_size > 1:
-        args.lr *= batch_size
-        args.lr_warmup /= batch_size
-    else:
-        args.lr_warmup = -1
+    batch_size = args.batch_images * len(ctx)
 
     # load params
     if args.resume.strip():
@@ -41,15 +77,27 @@ def main():
     train_net(net, train_loader, ctx, args)
 
 
+def get_dataset(dataset, args):
+    if dataset == 'voc':
+        imageset = args.imageset if args.imageset else '2007_trainval'
+        splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in imageset.split('+')]
+        train_dataset = gcv.data.VOCDetection(splits=splits)
+    elif dataset == 'coco':
+        imageset = args.imageset if args.imageset else 'instances_train2017'
+        splits = imageset.split('+')
+        train_dataset = gcv.data.COCODetection(splits=splits, skip_empty=True, use_crowd=False)
+    else:
+        raise NotImplementedError('Dataset {} not implemented'.format(dataset))
+    return train_dataset
+
+
 def get_dataloader(net, dataset, batch_size, args):
     # load training data
-    train_transform = RCNNDefaultTrainTransform(short=args.img_short_side, max_size=args.img_long_side,
-                                                mean=args.img_pixel_means, std=args.img_pixel_stds,
-                                                feat_stride=args.rpn_feat_stride, ag=net.anchor_generator,
-                                                asf=net.anchor_shape_fn, rtg=net.anchor_target)
+    train_transform = RCNNDefaultTrainTransform(
+        short=net.img_short, max_size=net.img_max_size, mean=net.img_means, std=net.img_stds,
+        anchors=net.anchors, asf=net.anchor_shape_fn, rtg=net.anchor_target)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
-                                         batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn,
-                                         last_batch="rollover", num_workers=4)
+        batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn, last_batch="rollover", num_workers=4)
     return train_loader
 
 
@@ -62,10 +110,10 @@ def train_net(net, train_loader, ctx, args):
     logger.info('called with args\n{}'.format(pprint.pformat(vars(args))))
 
     # loss
-    rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(weight=1. / args.rpn_batch_rois)
-    rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9, weight=1. / args.rpn_batch_rois)
-    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss(axis=1, sparse_label=True, weight=1. / args.rcnn_batch_rois)
-    rcnn_reg_loss = gluon.loss.HuberLoss(rho=1, weight=1. / args.rcnn_batch_rois)
+    rpn_cls_loss = gluon.loss.SigmoidBinaryCrossEntropyLoss()
+    rpn_reg_loss = gluon.loss.HuberLoss(rho=1. / 9)
+    rcnn_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss()
+    rcnn_reg_loss = gluon.loss.HuberLoss(rho=1)
     metrics = [mx.metric.Loss('RPN_CE'),
                mx.metric.Loss('RPN_SmoothL1'),
                mx.metric.Loss('RCNN_CE'),
@@ -82,12 +130,12 @@ def train_net(net, train_loader, ctx, args):
     lr_warmup = float(args.lr_warmup)  # avoid int division
 
     # optimizer
-    logger.info('training params\n{}'.format(pprint.pformat(list(net.collect_params(args.net_train_patterns).keys()))))
+    logger.info('training params\n{}'.format(pprint.pformat(list(net.collect_params(net.train_patterns).keys()))))
     logger.info('lr {} lr_decay {}'.format(args.lr, lr_steps))
     net.collect_params().setattr('grad_req', 'null')
-    net.collect_params(args.net_train_patterns).setattr('grad_req', 'write')
+    net.collect_params(net.train_patterns).setattr('grad_req', 'write')
     trainer = gluon.Trainer(
-        net.collect_params(args.net_train_patterns),
+        net.collect_params(net.train_patterns),
         'sgd',
         {'learning_rate': args.lr,
          'wd': args.wd,
@@ -125,11 +173,13 @@ def train_net(net, train_loader, ctx, args):
                 for data, anchors, im_info, gt_bboxes, rpn_label, rpn_weight, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
                     rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = net(data, anchors, im_info, gt_bboxes)
                     # rpn loss
-                    rpn_loss1 = rpn_cls_loss(rpn_cls, rpn_label, rpn_weight) * rpn_label.size / rpn_label.shape[0]
-                    rpn_loss2 = rpn_reg_loss(rpn_reg, rpn_bbox_target, rpn_bbox_weight) * rpn_bbox_target.size / rpn_bbox_target.shape[0]
+                    num_rpn_pos = (rpn_label >= 0).sum()
+                    rpn_loss1 = rpn_cls_loss(rpn_cls, rpn_label, rpn_weight) * rpn_label.size / rpn_label.shape[0] / num_rpn_pos
+                    rpn_loss2 = rpn_reg_loss(rpn_reg, rpn_bbox_target, rpn_bbox_weight) * rpn_bbox_target.size / rpn_bbox_target.shape[0] / num_rpn_pos
                     # rcnn loss
-                    rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label) * rcnn_label.size / rcnn_label.shape[0]
-                    rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_target.size / rcnn_bbox_weight.shape[0]
+                    num_rcnn_pos = (rcnn_label >= 0).sum()
+                    rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label) * rcnn_label.size / rcnn_label.shape[0] / num_rcnn_pos
+                    rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_target.size / rcnn_bbox_weight.shape[0] / num_rcnn_pos
                     # loss for backprop
                     losses.append(rpn_loss1.sum() + rpn_loss2.sum() + rcnn_loss1.sum() + rcnn_loss2.sum())
                     # loss for metrics
@@ -160,63 +210,6 @@ def train_net(net, train_loader, ctx, args):
         logger.info('[Epoch {}] Training cost: {:.3f}, {}'.format(
             epoch, (time.time() - tic), msg))
         net.save_parameters('{:s}_{:04d}.params'.format(args.save_prefix, epoch + 1))
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster R-CNN network',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--network', type=str, default='resnet50', help='base network')
-    parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
-    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
-    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
-    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
-    parser.add_argument('--epochs', type=int, default=20, help='training epochs')
-    parser.add_argument('--lr', type=float, default=0.001, help='base learning rate')
-    parser.add_argument('--wd', type=float, default=5e-4, help='weight decay')
-    parser.add_argument('--lr-decay-epoch', type=str, default='14', help='epoch to decay lr')
-    parser.add_argument('--lr-warmup', type=str, default='', help='warmup iterations')
-    parser.add_argument('--resume', type=str, default='', help='path to last saved model')
-    parser.add_argument('--start-epoch', type=int, default=0, help='start epoch for resuming')
-    parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
-    parser.add_argument('--save-prefix', type=str, default='', help='saving params prefix')
-    # faster rcnn params
-    parser.add_argument('--img-short-side', type=int, default=600)
-    parser.add_argument('--img-long-side', type=int, default=1000)
-    parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
-    parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
-    parser.add_argument('--net-train-patterns', type=str, default='')
-    parser.add_argument('--rpn-feat-stride', type=int, default=16)
-    parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
-    parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
-    parser.add_argument('--rpn-pre-nms-topk', type=int, default=12000)
-    parser.add_argument('--rpn-post-nms-topk', type=int, default=2000)
-    parser.add_argument('--rpn-nms-thresh', type=float, default=0.7)
-    parser.add_argument('--rpn-min-size', type=int, default=16)
-    parser.add_argument('--rpn-batch-rois', type=int, default=256)
-    parser.add_argument('--rpn-fg-fraction', type=float, default=0.5)
-    parser.add_argument('--rpn-fg-overlap', type=float, default=0.7)
-    parser.add_argument('--rpn-bg-overlap', type=float, default=0.3)
-    parser.add_argument('--rcnn-feat-stride', type=int, default=16)
-    parser.add_argument('--rcnn-pooled-size', type=str, default='(14, 14)')
-    parser.add_argument('--rcnn-roi-mode', type=str, default='align')
-    parser.add_argument('--rcnn-num-classes', type=int, default=21)
-    parser.add_argument('--rcnn-batch-size', type=int, default=1)
-    parser.add_argument('--rcnn-batch-rois', type=int, default=128)
-    parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
-    parser.add_argument('--rcnn-fg-fraction', type=float, default=0.25)
-    parser.add_argument('--rcnn-fg-overlap', type=float, default=0.5)
-    parser.add_argument('--rcnn-nms-thresh', type=float, default=0.3)
-    parser.add_argument('--rcnn-nms-topk', type=int, default=-1)
-    args = parser.parse_args()
-    args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
-    args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
-    args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
-    args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
-    args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
-    args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
-    if not args.save_prefix:
-        args.save_prefix = 'model/{}_{}'.format(args.network, args.dataset)
-    return args
 
 
 if __name__ == '__main__':

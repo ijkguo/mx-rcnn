@@ -3,11 +3,10 @@ from mxnet import gluon
 
 from nddata.image import imdecode, random_flip, resize, transform
 from ndnet.rpn_target import RPNTargetGenerator
-from symdata.anchor import AnchorGenerator
 from symdata.bbox import bbox_flip
 
 
-def load_test(filename, short, max_size, mean, std, feat_stride, ag: AnchorGenerator):
+def load_test(filename, short, max_size, mean, std, anchors, asf):
     # read and transform image
     im_orig = imdecode(filename)
     im, im_scale = resize(im_orig, short, max_size)
@@ -17,9 +16,9 @@ def load_test(filename, short, max_size, mean, std, feat_stride, ag: AnchorGener
     # transform into tensor and normalize
     im_tensor = transform(im, mean, std)
 
-    # generate and reshape anchors
-    alloc_size = int(round(max_size * 1.5 / feat_stride))
-    anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
+    # compute real anchor shape and slice anchors to this shape
+    feat_height, feat_width = asf(height, width)
+    anchors = anchors[:feat_height, :feat_width, :]
 
     # for 1-batch inference purpose, cannot use batchify (or nd.stack) to expand dims
     im_tensor = im_tensor.expand_dims(0)
@@ -91,13 +90,13 @@ def split_append(batch, ctx_list):
 
 
 class RCNNDefaultValTransform(object):
-    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator):
+    def __init__(self, short, max_size, mean, std, anchors, asf):
         self._short = short
         self._max_size = max_size
         self._mean = mean
         self._std = std
-        alloc_size = int(round(max_size * 1.5 / feat_stride))
-        self._anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
+        self._anchors = anchors
+        self._asf = asf
 
     def __call__(self, src, label):
         # resize image
@@ -108,18 +107,20 @@ class RCNNDefaultValTransform(object):
         # transform into tensor and normalize
         im_tensor = transform(im, self._mean, self._std)
         label = mx.nd.array(label, ctx=src.context)
-        anchors = self._anchors.as_in_context(src.context)
+
+        # compute real anchor shape and slice anchors to this shape
+        feat_height, feat_width = self._asf(height, width)
+        anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(src.context)
         return im_tensor, anchors, im_info, label
 
 
 class RCNNDefaultTrainTransform(object):
-    def __init__(self, short, max_size, mean, std, feat_stride, ag: AnchorGenerator, asf, rtg: RPNTargetGenerator):
+    def __init__(self, short, max_size, mean, std, anchors, asf, rtg: RPNTargetGenerator):
         self._short = short
         self._max_size = max_size
         self._mean = mean
         self._std = std
-        alloc_size = int(round(max_size * 1.5 / feat_stride))
-        self._anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
+        self._anchors = anchors
         self._asf = asf
         self._rtg = rtg
 

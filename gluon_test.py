@@ -1,21 +1,33 @@
 import argparse
-import ast
 import pprint
 
 import mxnet as mx
+import gluoncv as gcv
 from mxnet import gluon
 from tqdm import tqdm
 
-from gluon_dataset import DatasetFactory
-from gluon_network import NetworkFactory
+from ndnet.net_all import get_net
 from nddata.transform import RCNNDefaultValTransform
 from symnet.logger import logger
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--network', type=str, default='resnet50_v2a', help='base network')
+    parser.add_argument('--pretrained', type=str, default='', help='path to trained model')
+    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
+    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
+    parser.add_argument('--save-json', action='store_true', help='save coco output json')
+    args = parser.parse_args()
+    return args
+
+
 def main():
     args = parse_args()
-    dataset, metric = DatasetFactory(args.dataset).get_test(args)
-    net = NetworkFactory(args.network).get_test(args)
+    dataset, metric = get_dataset(args.dataset, args)
+    net = get_net(args.network, args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
@@ -30,14 +42,29 @@ def main():
     test_net(net, val_loader, metric, len(dataset), ctx, args)
 
 
+def get_dataset(dataset, args):
+    if dataset == 'voc':
+        imageset = args.imageset if args.imageset else '2007_test'
+        splits = [(int(s.split('_')[0]), s.split('_')[1]) for s in imageset.split('+')]
+        val_dataset = gcv.data.VOCDetection(splits=splits)
+        val_metric = gcv.utils.metrics.VOC07MApMetric(iou_thresh=0.5, class_names=val_dataset.classes)
+    elif dataset == 'coco':
+        imageset = args.imageset if args.imageset else 'instances_val2017'
+        splits = imageset.split('+')
+        val_dataset = gcv.data.COCODetection(splits=splits, skip_empty=False, use_crowd=True)
+        val_metric = gcv.utils.metrics.COCODetectionMetric(val_dataset, save_prefix='coco', cleanup=not args.save_json)
+    else:
+        raise NotImplementedError('Dataset {} not implemented'.format(dataset))
+    return val_dataset, val_metric
+
+
 def get_dataloader(net, dataset, batch_size, args):
     # load testing data
-    val_transform = RCNNDefaultValTransform(short=args.img_short_side, max_size=args.img_long_side,
-                                            mean=args.img_pixel_means, std=args.img_pixel_stds,
-                                            feat_stride=args.rpn_feat_stride, ag=net.anchor_generator)
+    val_transform = RCNNDefaultValTransform(
+        short=net.img_short, max_size=net.img_max_size, mean=net.img_means, std=net.img_stds,
+        anchors=net.anchors, asf=net.anchor_shape_fn)
     val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
-                                       batch_size=batch_size, shuffle=False, batchify_fn=net.batchify_fn,
-                                       last_batch="keep", num_workers=4)
+        batch_size=batch_size, shuffle=False, batchify_fn=net.batchify_fn, last_batch="keep", num_workers=4)
     return val_loader
 
 
@@ -90,54 +117,6 @@ def test_net(net, val_loader, metric, size, ctx, args):
     # print
     for k, v in zip(names, values):
         print(k, v)
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Test a Faster R-CNN network',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--network', type=str, default='resnet50', help='base network')
-    parser.add_argument('--params', type=str, default='', help='path to trained model')
-    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
-    parser.add_argument('--imageset', type=str, default='', help='imageset splits')
-    parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
-    # faster rcnn params
-    parser.add_argument('--img-short-side', type=int, default=600)
-    parser.add_argument('--img-long-side', type=int, default=1000)
-    parser.add_argument('--img-pixel-means', type=str, default='(0.0, 0.0, 0.0)')
-    parser.add_argument('--img-pixel-stds', type=str, default='(1.0, 1.0, 1.0)')
-    parser.add_argument('--rpn-feat-stride', type=int, default=16)
-    parser.add_argument('--rpn-anchor-scales', type=str, default='(8, 16, 32)')
-    parser.add_argument('--rpn-anchor-ratios', type=str, default='(0.5, 1, 2)')
-    parser.add_argument('--rpn-pre-nms-topk', type=int, default=6000)
-    parser.add_argument('--rpn-post-nms-topk', type=int, default=300)
-    parser.add_argument('--rpn-nms-thresh', type=float, default=0.7)
-    parser.add_argument('--rpn-min-size', type=int, default=16)
-    parser.add_argument('--rpn-batch-rois', type=int, default=256)
-    parser.add_argument('--rpn-fg-fraction', type=float, default=0.5)
-    parser.add_argument('--rpn-fg-overlap', type=float, default=0.7)
-    parser.add_argument('--rpn-bg-overlap', type=float, default=0.3)
-    parser.add_argument('--rcnn-feat-stride', type=int, default=16)
-    parser.add_argument('--rcnn-pooled-size', type=str, default='(14, 14)')
-    parser.add_argument('--rcnn-roi-mode', type=str, default='align')
-    parser.add_argument('--rcnn-num-classes', type=int, default=21)
-    parser.add_argument('--rcnn-batch-size', type=int, default=1)
-    parser.add_argument('--rcnn-batch-rois', type=int, default=300)
-    parser.add_argument('--rcnn-bbox-stds', type=str, default='(0.1, 0.1, 0.2, 0.2)')
-    parser.add_argument('--rcnn-fg-fraction', type=float, default=0.25)
-    parser.add_argument('--rcnn-fg-overlap', type=float, default=0.5)
-    parser.add_argument('--rcnn-nms-thresh', type=float, default=0.3)
-    parser.add_argument('--rcnn-nms-topk', type=int, default=-1)
-    args = parser.parse_args()
-    args.img_pixel_means = ast.literal_eval(args.img_pixel_means)
-    args.img_pixel_stds = ast.literal_eval(args.img_pixel_stds)
-    args.rpn_anchor_scales = ast.literal_eval(args.rpn_anchor_scales)
-    args.rpn_anchor_ratios = ast.literal_eval(args.rpn_anchor_ratios)
-    args.rcnn_pooled_size = ast.literal_eval(args.rcnn_pooled_size)
-    args.rcnn_bbox_stds = ast.literal_eval(args.rcnn_bbox_stds)
-    args.rcnn_batch_rois = args.rpn_post_nms_topk
-    if not args.params:
-        args.params = 'model/{}_{}_0020.params'.format(args.network, args.dataset)
-    return args
 
 
 if __name__ == '__main__':
