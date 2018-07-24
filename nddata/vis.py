@@ -39,7 +39,7 @@ def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
         rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
                              fill=False, edgecolor=colors[id], linewidth=2, alpha=1)
         ax.add_patch(rect)
-        ax.text(bbox[0], bbox[1] - 2, '{:s} {:2f}'.format(class_names[id], score),
+        ax.text(bbox[0], bbox[1] - 2, '{:s} {:.2f}'.format(class_names[id], score),
                 fontsize=15, family='serif', color='white',
                 bbox=dict(facecolor=colors[id], alpha=0.4, pad=0, edgecolor='none'))
     return ax
