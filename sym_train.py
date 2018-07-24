@@ -3,10 +3,10 @@ import ast
 import pprint
 
 import mxnet as mx
+from mxnet.module import Module
 
 from symdata.loader import AnchorGenerator, AnchorSampler, AnchorLoader
 from symnet.logger import logger
-from symnet.module import MutableModule
 from symnet.model import load_param, infer_data_shape, check_shape, initialize_frcnn, get_fixed_params
 from symnet.metric import RPNAccMetric, RPNLogLossMetric, RPNL1LossMetric, RCNNAccMetric, RCNNLogLossMetric, RCNNL1LossMetric
 
@@ -94,10 +94,9 @@ def train_net(sym, roidb, args):
                         'clip_gradient': 5}
 
     # train
-    mod = MutableModule(sym, data_names=data_names, label_names=label_names,
-                        logger=logger, context=ctx, work_load_list=None,
-                        max_data_shapes=data_shapes, max_label_shapes=label_shapes,
-                        fixed_param_names=fixed_param_names)
+    mod = Module(sym, data_names=data_names, label_names=label_names,
+                 logger=logger, context=ctx, work_load_list=None,
+                 fixed_param_names=fixed_param_names)
     mod.fit(train_data, eval_metric=eval_metrics, epoch_end_callback=epoch_end_callback,
             batch_end_callback=batch_end_callback, kvstore='device',
             optimizer='sgd', optimizer_params=optimizer_params,
@@ -107,7 +106,7 @@ def train_net(sym, roidb, args):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--network', type=str, default='resnet50', help='base network')
+    parser.add_argument('--network', type=str, default='vgg16', help='base network')
     parser.add_argument('--pretrained', type=str, default='', help='path to pretrained model')
     parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
     parser.add_argument('--imageset', type=str, default='', help='imageset splits')
@@ -175,7 +174,6 @@ def get_coco(args):
     from symimdb.coco import coco
     if not args.imageset:
         args.imageset = 'train2017'
-    args.rpn_anchor_scales = (2, 4, 8, 16, 32)
     args.rcnn_num_classes = len(coco.classes)
 
     isets = args.imageset.split('+')
