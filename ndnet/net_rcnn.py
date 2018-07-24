@@ -7,7 +7,7 @@ from nddata.transform import batchify_append, batchify_pad, split_append, split_
 from .rpn_target import RPNTargetGenerator
 from .rpn_inference import Proposal
 from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator
-from .rcnn_inference import RCNNDetector
+from .rcnn_inference import RCNNBatchDetector
 
 
 class RPN(HybridBlock):
@@ -85,7 +85,7 @@ class FRCNN(HybridBlock):
             rpn_train_pre_topk, rpn_train_post_topk, rpn_test_pre_topk, rpn_test_post_topk)
         self.rcnn_sampler = RCNNTargetSampler(batch_images, rcnn_batch_rois, rpn_train_post_topk, rcnn_fg_fraction, rcnn_fg_overlap)
         self.rcnn_target = RCNNTargetGenerator(rcnn_batch_rois, rcnn_num_classes, rcnn_bbox_stds)
-        self.rcnn_detect = RCNNDetector(clip, rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk)
+        self.rcnn_detect = RCNNBatchDetector(batch_images, clip, rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk)
 
     def anchor_shape_fn(self, im_height, im_width):
         feat_sym = self.features(mx.sym.var(name='data'))
@@ -152,20 +152,6 @@ class FRCNN(HybridBlock):
         rcnn_reg = F.reshape(rcnn_reg, (self._batch_images, num_rois, self._rcnn_num_classes - 1, 4))
         rcnn_reg = F.transpose(rcnn_reg, (0, 2, 1, 3))
 
-        ret_ids = []
-        ret_scores = []
-        ret_bboxes = []
-        for i in range(self._batch_images):
-            b_rois = F.squeeze(F.slice_axis(rois, axis=0, begin=i, end=i+1), axis=0)
-            b_cls = F.squeeze(F.slice_axis(rcnn_cls, axis=0, begin=i, end=i+1), axis=0)
-            b_reg = F.squeeze(F.slice_axis(rcnn_reg, axis=0, begin=i, end=i+1), axis=0)
-            b_im_info = F.squeeze(F.slice_axis(im_info, axis=0, begin=i, end=i+1), axis=0)
-            scores, bboxes = self.rcnn_detect(b_rois, b_cls, b_reg, b_im_info)
-            b_ids = F.where(scores < 0, F.ones_like(ids) * -1, ids)
-            ret_ids.append(b_ids.reshape((-1, 1)))
-            ret_scores.append(scores.reshape((-1, 1)))
-            ret_bboxes.append(bboxes.reshape((-1, 4)))
-        ret_ids = F.stack(*ret_ids, axis=0)
-        ret_scores = F.stack(*ret_scores, axis=0)
-        ret_bboxes = F.stack(*ret_bboxes, axis=0)
+        # ret_ids [B, C, topk, 1], ret_scores [B, C, topk, 1], ret_bboxes [B, C, topk, 4]
+        ret_ids, ret_scores, ret_bboxes = self.rcnn_detect(ids, rois, rcnn_cls, rcnn_reg, im_info)
         return ret_ids, ret_scores, ret_bboxes
