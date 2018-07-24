@@ -16,12 +16,14 @@ def vis_detection(im_orig, detections, class_names, thresh=0.7):
 
 
 def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
+    import random
     import numpy as np
     import matplotlib.pyplot as plt
 
-    fig = plt.figure(frameon=False, figsize=(15, 15))
-    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    fig = plt.figure(frameon=False, figsize=(10, 10))
+    ax = plt.axes()
     ax.imshow(im_orig)
+    colors = [(random.random(), random.random(), random.random()) for _ in class_names]
 
     # Display in largest to smallest order to reduce occlusion
     areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
@@ -29,15 +31,15 @@ def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
 
     for i in sorted_inds:
         bbox = boxes[i]
-        score = scores[i]
-        id = int(labels[i])
+        score = scores.flat[i]
+        id = int(labels.flat[i])
         if score < thresh:
             continue
 
         rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
-                             fill=False, edgecolor='g', linewidth=2, alpha=1)
+                             fill=False, edgecolor=colors[id], linewidth=2, alpha=1)
         ax.add_patch(rect)
         ax.text(bbox[0], bbox[1] - 2, '{:s} {:2f}'.format(class_names[id], score),
                 fontsize=15, family='serif', color='white',
-                bbox=dict(facecolor='g', alpha=0.4, pad=0, edgecolor='none'))
-    plt.show()
+                bbox=dict(facecolor=colors[id], alpha=0.4, pad=0, edgecolor='none'))
+    return ax
