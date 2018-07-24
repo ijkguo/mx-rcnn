@@ -13,3 +13,31 @@ def vis_detection(im_orig, detections, class_names, thresh=0.7):
             plt.gca().text(x1, y1 - 2, '{:s} {:.3f}'.format(class_names[cls], conf),
                            bbox=dict(facecolor=colors[cls], alpha=0.5), fontsize=12, color='white')
     plt.show()
+
+
+def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(frameon=False, figsize=(15, 15))
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.imshow(im_orig)
+
+    # Display in largest to smallest order to reduce occlusion
+    areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    sorted_inds = np.argsort(-areas)
+
+    for i in sorted_inds:
+        bbox = boxes[i]
+        score = scores[i]
+        id = int(labels[i])
+        if score < thresh:
+            continue
+
+        rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
+                             fill=False, edgecolor='g', linewidth=2, alpha=1)
+        ax.add_patch(rect)
+        ax.text(bbox[0], bbox[1] - 2, '{:s} {:2f}'.format(class_names[id], score),
+                fontsize=15, family='serif', color='white',
+                bbox=dict(facecolor='g', alpha=0.4, pad=0, edgecolor='none'))
+    plt.show()
