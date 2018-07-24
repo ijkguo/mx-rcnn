@@ -4,11 +4,11 @@
 
 ### Set up environment
 * Require latest MXNet. Set environment variable by `export MXNET_CUDNN_AUTOTUNE_DEFAULT=0`.
-* Install Python package `mxnet` or `mxnet-cu90`, `cython` then `opencv-python matplotlib pycocotools tqdm`.
+* Install Python package `mxnet` (cpu inference only) or `mxnet-cu90` (gpu training), `cython` then `opencv-python matplotlib pycocotools tqdm`.
 
 ### Out-of-box inference models
-Download any of the following models and run `python3 sym_demo.py  --image $YOUR_IMAGE$ --params $MODEL_FILE$ --network $Network$ --dataset $Dataset$` to get single image inference.
-For example `python3 sym_demo.py --image myimage.jpg --params vgg16_voc0712.params --network vgg16 --dataset voc`, add `--gpu 0` to use GPU optionally.
+Download any of the following models to the current directory and run `python3 demo.py --dataset $Dataset$ --network $Network$ --params $MODEL_FILE$ --image $YOUR_IMAGE$` to get single image inference.
+For example `python3 demo.py --dataset voc --network vgg16 --params vgg16_voc0712.params --image myimage.jpg`, add `--gpu 0` to use GPU optionally.
 Different network has different configuration. Different dataset has different object class names. You must pass them explicitly as command line arguments.
 
 | Network | Dataset | Imageset | Reference | Result | Link  |
@@ -20,7 +20,7 @@ Different network has different configuration. Different dataset has different o
 | resnet101 | coco | train2017/val2017 | 27.2 | 26.1 | [Dropbox](https://www.dropbox.com/s/bfuy2uo1q1nwqjr/resnet_coco-0010.params?dl=0) |
 
 ### Download data and label
-Follow `py-faster-rcnn` for data preparation instructions.
+Make a directory `data` and follow `py-faster-rcnn` for data preparation instructions.
 * [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/) should be in `data/VOCdevkit` containing `VOC2007`, `VOC2012` and `annotations`.
 * [MSCOCO](http://mscoco.org/dataset/) should be in `data/coco` containing `train2017`, `val2017` and `annotations/instances_train2017.json`, `annotations/instances_val2017.json`.
 
@@ -29,10 +29,10 @@ Follow `py-faster-rcnn` for data preparation instructions.
 * [ResNet](https://github.com/tornadomeet/ResNet) should be at `model/resnet-101-0000.params` from [MXNet model zoo](http://data.dmlc.ml/models/imagenet/resnet/).
 
 ### Training and evaluation
-Use `python3 sym_train.py --pretrained $IMAGENET_MODEL_FILE$ --network $Network$ --dataset $Dataset$ --gpus $GPUS$` to train,
-for example, `python3 sym_train.py --pretrained model/vgg16-0000.params --network vgg16 --dataset voc --gpus 0,1$`.
-Use `python3 sym_test.py --params $MODEL_FILE$ --network $Network --dataset $Dataset$ --gpu $GPU$` to evaluate,
-for example, `python3 sym_test.py --params model/vgg16-0010.params --network vgg16 --dataset voc --gpu 0$`.
+Use `python3 sym_train.py --dataset $Dataset$ --network $Network$ --pretrained $IMAGENET_MODEL_FILE$ --gpus $GPUS$` to train,
+for example, `python3 train.py --dataset voc --network vgg16 --pretrained model/vgg16-0000.params --gpus 0,1`.
+Use `python3 sym_test.py --dataset $Dataset$ --network $Network$ --params $MODEL_FILE$ --gpu $GPU$` to evaluate,
+for example, `python3 test.py --dataset voc --network vgg16 --params model/vgg16-0010.params --gpu 0`.
 
 ### History
 * May 25, 2016: We released Fast R-CNN implementation.
