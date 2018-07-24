@@ -4,10 +4,10 @@ from ndnet.coder import NormalizedBoxCenterDecoder
 
 
 class RCNNDetector(gluon.HybridBlock):
-    def __init__(self, rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk):
+    def __init__(self, clip, rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk):
         super(RCNNDetector, self).__init__()
         self._bbox_corner2center = BBoxCornerToCenter()
-        self._bbox_decoder = NormalizedBoxCenterDecoder(stds=rcnn_bbox_stds)
+        self._bbox_decoder = NormalizedBoxCenterDecoder(stds=rcnn_bbox_stds, clip=clip)
         self._bbox_clip = BBoxClipper()
         self._rcnn_num_classes = rcnn_num_classes
         self._rcnn_nms_thresh = rcnn_nms_thresh

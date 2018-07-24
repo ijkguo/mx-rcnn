@@ -85,7 +85,7 @@ class FRCNN(HybridBlock):
             rpn_train_pre_topk, rpn_train_post_topk, rpn_test_pre_topk, rpn_test_post_topk)
         self.rcnn_sampler = RCNNTargetSampler(batch_images, rcnn_batch_rois, rpn_train_post_topk, rcnn_fg_fraction, rcnn_fg_overlap)
         self.rcnn_target = RCNNTargetGenerator(rcnn_batch_rois, rcnn_num_classes, rcnn_bbox_stds)
-        self.rcnn_detect = RCNNDetector(rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk)
+        self.rcnn_detect = RCNNDetector(clip, rcnn_bbox_stds, rcnn_num_classes, rcnn_nms_thresh, rcnn_nms_topk)
 
     def anchor_shape_fn(self, im_height, im_width):
         feat_sym = self.features(mx.sym.var(name='data'))
