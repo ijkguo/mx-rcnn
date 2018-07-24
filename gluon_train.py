@@ -57,7 +57,7 @@ def parse_args():
 def main():
     args = parse_args()
     dataset = get_dataset(args.dataset, args)
-    net = get_net(args.network, args)
+    net = get_net('_'.join((args.network, args.dataset)), args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]

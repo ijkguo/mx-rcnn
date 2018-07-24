@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument('--imageset', type=str, default='', help='imageset splits')
     parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
     parser.add_argument('--save-json', action='store_true', help='save coco output json')
+    parser.add_argument('--batch-images', type=int, default=1, help='batch size per gpu')
     args = parser.parse_args()
     return args
 
@@ -27,14 +28,14 @@ def parse_args():
 def main():
     args = parse_args()
     dataset, metric = get_dataset(args.dataset, args)
-    net = get_net(args.network, args)
+    net = get_net('_'.join((args.network, args.dataset)), args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
-    batch_size = args.rcnn_batch_size * len(ctx)
+    batch_size = args.batch_images * len(ctx)
 
     # load model
-    net.load_parameters(args.params)
+    net.load_parameters(args.pretrained)
     net.collect_params().reset_ctx(ctx)
 
     # load testing data

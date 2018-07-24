@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='', help='gpu device eg. 0')
     parser.add_argument('--vis', action='store_true', help='display results')
     parser.add_argument('--vis-thresh', type=float, default=0.7, help='threshold display boxes')
+    parser.add_argument('--batch-images', type=int, default=1, help='batch size per gpu')
     args = parser.parse_args()
     return args
 
@@ -26,7 +27,7 @@ def parse_args():
 def main():
     args = parse_args()
     class_names = get_class_names(args.dataset, args)
-    net = get_net(args.network, args)
+    net = get_net('_'.join((args.network, args.dataset)), args)
     demo_net(net, class_names, args)
 
 
@@ -50,7 +51,7 @@ def demo_net(net, class_names, args):
         ctx = mx.cpu(0)
 
     # load model
-    net.load_parameters(args.params)
+    net.load_parameters(args.pretrained)
     net.collect_params().reset_ctx(ctx)
 
     # load single test

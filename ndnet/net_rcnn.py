@@ -69,7 +69,7 @@ class FRCNN(HybridBlock):
         self.train_patterns = train_patterns
         ag = AnchorGenerator(
             feat_stride=rpn_feature_stride, anchor_scales=rpn_anchor_scales, anchor_ratios=rpn_anchor_ratios)
-        alloc_size = img_max_size * 1.5 / rpn_feature_stride
+        alloc_size = int(img_max_size * 1.5 / rpn_feature_stride)
         self.anchors = mx.nd.array(ag.generate(alloc_size, alloc_size)).reshape((alloc_size, alloc_size, -1))
         self.anchor_target = RPNTargetGenerator(
             num_sample=rpn_batch_rois, pos_iou_thresh=rpn_fg_overlap, neg_iou_thresh=rpn_bg_overlap,
