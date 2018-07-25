@@ -11,7 +11,7 @@ class RPNTargetSampler(gluon.Block):
         self._max_pos = int(round(num_sample * pos_ratio))
         self._pos_iou_thresh = pos_iou_thresh
         self._neg_iou_thresh = neg_iou_thresh
-        self._eps = np.spacing(1.0)
+        self._eps = np.spacing(np.float32(1.0))
 
     def forward(self, ious):
         # ious (N, M) i.e. (num_anchors, num_gt)
@@ -56,6 +56,8 @@ class RPNTargetSampler(gluon.Block):
                 np.where(samples < 0)[0], size=(num_neg - max_neg), replace=False)
             samples[disable_indices] = 0
 
+        # convert to ndarray
+        samples = mx.nd.array(samples, ctx=matches.context)
         return samples, matches
 
 
@@ -84,7 +86,7 @@ class RPNTargetGenerator:
         ious[invalid_mask, :] = -1
 
         # matches (N) values [0, M), samples (N) values +1 pos -1 neg 0 ignore
-        matches, samples = self._sampler(ious)
+        samples, matches = self._sampler(ious)
 
         # training targets for RPN
         cls_target, cls_mask = self._cls_encoder(samples)

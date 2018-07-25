@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--log-interval', type=int, default=100, help='logging mini batch interval')
     parser.add_argument('--save-prefix', type=str, default='', help='saving params prefix')
     parser.add_argument('--batch-images', type=int, default=1, help='batch size per gpu')
+    parser.add_argument('--num-workers', type=int, default=4, help='number of data loading workers')
     args = parser.parse_args()
     args.pretrained = args.pretrained if args.pretrained else 'model/{}_0000.params'.format(args.network)
     args.save_prefix = args.save_prefix if args.save_prefix else 'model/{}_{}'.format(args.network, args.dataset)
@@ -97,7 +98,7 @@ def get_dataloader(net, dataset, batch_size, args):
         short=net.img_short, max_size=net.img_max_size, mean=net.img_means, std=net.img_stds,
         anchors=net.anchors, asf=net.anchor_shape_fn, rtg=net.anchor_target)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
-        batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn, last_batch="rollover", num_workers=4)
+        batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn, last_batch="rollover", num_workers=args.num_workers)
     return train_loader
 
 
