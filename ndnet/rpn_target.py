@@ -19,9 +19,9 @@ class RPNTargetSampler(gluon.Block):
         # return: samples (num_anchors,) value 1: pos, -1: neg, 0: ignore
         matches = mx.nd.argmax(ious, axis=1)
 
-        # samples init with -1
+        # samples init with 0 (ignore)
         ious_max_per_anchor = mx.nd.max(ious, axis=1)
-        samples = mx.nd.ones_like(ious_max_per_anchor)
+        samples = mx.nd.zeros_like(ious_max_per_anchor)
 
         # set argmax (1, num_gt)
         ious_max_per_gt = mx.nd.max(ious, axis=0, keepdims=True)
