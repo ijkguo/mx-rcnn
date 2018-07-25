@@ -56,21 +56,22 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dataset = get_dataset(args.dataset, args)
-    net = get_net('_'.join((args.network, args.dataset)), not args.resume.strip(), args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.batch_images * len(ctx)
 
-    # load params
+    # load model
     if args.resume.strip():
+        net = get_net('_'.join((args.network, args.dataset)), False, args)
         net.load_parameters(args.resume.strip())
     else:
+        net = get_net('_'.join((args.network, args.dataset)), True, args)
         net.collect_params('.*rpn|.*dense').initialize()
     net.collect_params().reset_ctx(ctx)
 
     # load training data
+    dataset = get_dataset(args.dataset, args)
     train_loader = get_dataloader(net, dataset, batch_size, args)
 
     train_net(net, train_loader, ctx, args)

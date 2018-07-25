@@ -26,9 +26,22 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    # setup context
+    if args.gpu:
+        ctx = mx.gpu(int(args.gpu))
+    else:
+        ctx = mx.cpu(0)
+
+    # load model
+    net = get_net('_'.join((args.network, args.dataset)), False, args)
+    net.load_parameters(args.pretrained)
+    net.collect_params().reset_ctx(ctx)
+
+    # load data
     class_names = get_class_names(args.dataset, args)
-    net = get_net('_'.join((args.network, args.dataset)), args)
-    demo_net(net, class_names, args)
+
+    demo_net(net, class_names, ctx, args)
 
 
 def get_class_names(dataset, args):
@@ -40,19 +53,9 @@ def get_class_names(dataset, args):
         raise NotImplementedError('Dataset {} not implemented'.format(dataset))
 
 
-def demo_net(net, class_names, args):
+def demo_net(net, class_names, ctx, args):
     # print config
     print('called with args\n{}'.format(pprint.pformat(vars(args))))
-
-    # setup context
-    if args.gpu:
-        ctx = mx.gpu(int(args.gpu))
-    else:
-        ctx = mx.cpu(0)
-
-    # load model
-    net.load_parameters(args.pretrained)
-    net.collect_params().reset_ctx(ctx)
 
     # load single test
     im_tensor, anchors, im_info, im_orig = load_test(

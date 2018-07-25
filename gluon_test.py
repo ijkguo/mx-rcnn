@@ -27,19 +27,20 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dataset, metric = get_dataset(args.dataset, args)
-    net = get_net('_'.join((args.network, args.dataset)), args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
     batch_size = args.batch_images * len(ctx)
 
     # load model
+    net = get_net('_'.join((args.network, args.dataset)), False, args)
     net.load_parameters(args.pretrained)
     net.collect_params().reset_ctx(ctx)
 
     # load testing data
+    dataset, metric = get_dataset(args.dataset, args)
     val_loader = get_dataloader(net, dataset, batch_size, args)
+
     test_net(net, val_loader, metric, len(dataset), ctx, args)
 
 
