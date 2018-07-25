@@ -158,7 +158,7 @@ class RCNNDefaultTrainTransform(object):
         anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(im_tensor.context)
 
         # assign anchors
-        boxes = gt_bboxes[:, :4].expand_dims(axis=0)
+        boxes = gt_bboxes[:, :4]
         cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors.reshape(-1, 4), im_width, im_height)
 
         cls_target = cls_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))

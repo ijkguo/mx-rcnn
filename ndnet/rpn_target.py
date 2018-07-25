@@ -1,8 +1,62 @@
 import mxnet as mx
+from mxnet import gluon
 import numpy as np
 from ndnet.coder import SigmoidClassEncoder, NormalizedBoxCenterEncoder
-from gluoncv.nn.matcher import MaximumMatcher, BipartiteMatcher, CompositeMatcher
-from gluoncv.nn.sampler import QuotaSampler
+
+
+class RPNTargetSampler(gluon.Block):
+    def __init__(self, num_sample, pos_iou_thresh, neg_iou_thresh, pos_ratio):
+        super(RPNTargetSampler, self).__init__()
+        self._num_sample = num_sample
+        self._max_pos = int(round(num_sample * pos_ratio))
+        self._pos_iou_thresh = pos_iou_thresh
+        self._neg_iou_thresh = neg_iou_thresh
+        self._eps = np.spacing(1.0)
+
+    def forward(self, ious):
+        # ious (N, M) i.e. (num_anchors, num_gt)
+        # return: matches (num_anchors,) value [0, M)
+        # return: samples (num_anchors,) value 1: pos, -1: neg, 0: ignore
+        matches = mx.nd.argmax(ious, axis=1)
+
+        # samples init with -1
+        ious_max_per_anchor = mx.nd.max(ious, axis=1)
+        samples = mx.nd.ones_like(ious_max_per_anchor)
+
+        # set argmax (1, num_gt)
+        ious_max_per_gt = mx.nd.max(ious, axis=0, keepdims=True)
+        # ious (num_anchor, num_gt) >= argmax (1, num_gt) -> mark row as positive
+        mask = mx.nd.broadcast_greater(ious + self._eps, ious_max_per_gt)
+        # reduce column (num_anchor, num_gt) -> (num_anchor)
+        mask = mx.nd.sum(mask, axis=1)
+        # row maybe sampled by 2 columns but still only matches to most overlapping gt
+        samples = mx.nd.where(mask, mx.nd.ones_like(samples), samples)
+
+        # set positive overlap to 1
+        samples = mx.nd.where(ious_max_per_anchor >= self._pos_iou_thresh,
+                              mx.nd.ones_like(samples), samples)
+        # set negative overlap to -1
+        samples = mx.nd.where(ious_max_per_anchor < self._neg_iou_thresh,
+                              mx.nd.ones_like(samples) * -1, samples)
+
+        # subsample fg labels
+        samples = samples.asnumpy()
+        num_pos = int((samples > 0).sum())
+        if num_pos > self._max_pos:
+            disable_indices = np.random.choice(
+                np.where(samples > 0)[0], size=(num_pos - self._max_pos), replace=False)
+            samples[disable_indices] = 0  # use 0 to ignore
+
+        # subsample bg labels
+        num_neg = int((samples < 0).sum())
+        # if pos_sample is less than quota, we can have negative samples filling the gap
+        max_neg = self._num_sample - min(num_pos, self._max_pos)
+        if num_neg > max_neg:
+            disable_indices = np.random.choice(
+                np.where(samples < 0)[0], size=(num_neg - max_neg), replace=False)
+            samples[disable_indices] = 0
+
+        return samples, matches
 
 
 class RPNTargetGenerator:
@@ -12,8 +66,7 @@ class RPNTargetGenerator:
         self._neg_iou_thresh = neg_iou_thresh
         self._pos_ratio = pos_ratio
         self._stds = stds
-        self._matcher = CompositeMatcher([BipartiteMatcher(), MaximumMatcher(pos_iou_thresh)])
-        self._sampler = QuotaSampler(num_sample, pos_iou_thresh, neg_iou_thresh, 0., pos_ratio)
+        self._sampler = RPNTargetSampler(num_sample, pos_iou_thresh, neg_iou_thresh, pos_ratio)
         self._cls_encoder = SigmoidClassEncoder()
         self._box_encoder = NormalizedBoxCenterEncoder(stds=stds)
 
@@ -27,13 +80,15 @@ class RPNTargetGenerator:
 
         # calculate ious between (N, 4) anchors and (M, 4) bbox ground-truths
         # ious is (N, M)
-        ious = mx.nd.contrib.box_iou(anchor, bbox, format='corner').transpose((1, 0, 2))
-        ious[:, invalid_mask, :] = -1
-        matches = self._matcher(ious)
-        samples = self._sampler(matches, ious)
+        ious = mx.nd.contrib.box_iou(anchor, bbox, format='corner')
+        ious[invalid_mask, :] = -1
+
+        # matches (N) values [0, M), samples (N) values +1 pos -1 neg 0 ignore
+        matches, samples = self._sampler(ious)
 
         # training targets for RPN
         cls_target, cls_mask = self._cls_encoder(samples)
+        # box encoder is expecting (B, N), (B, N), (B, N, 4), (B, M, 4)
         box_target, box_mask = self._box_encoder(
-            samples, matches, anchor.expand_dims(axis=0), bbox)
+            samples.expand_dims(axis=0), matches.expand_dims(0), anchor.expand_dims(axis=0), bbox.expand_dims(0))
         return cls_target, box_target, box_mask
