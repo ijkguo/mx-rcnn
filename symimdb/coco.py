@@ -89,8 +89,8 @@ class coco(IMDB):
             y1 = np.minimum(height - 1, np.maximum(0, y1))
             x2 = np.minimum(width - 1, np.maximum(0, x2))
             y2 = np.minimum(height - 1, np.maximum(0, y2))
-            # require non-zero seg area and moe than 1x1 box size
-            if obj['area'] >= 0 and x2 > x1 and y2 > y1:
+            # require non crowd objects, non-zero seg area and moe than 1x1 box size
+            if obj['iscrowd'] == 0 and obj['area'] > 0 and x2 > x1 and y2 > y1:
                 obj['clean_bbox'] = [x1, y1, x2, y2]
                 valid_objs.append(obj)
         objs = valid_objs
@@ -98,11 +98,9 @@ class coco(IMDB):
 
         boxes = np.zeros((num_objs, 4), dtype=np.float32)
         gt_classes = np.zeros((num_objs,), dtype=np.int32)
-        is_crowd = np.zeros((num_objs,), dtype=np.int32)
         for ix, obj in enumerate(objs):
             boxes[ix, :] = obj['clean_bbox']
             gt_classes[ix] = coco_ind_to_class_ind[obj['category_id']]
-            is_crowd[ix] = obj['iscrowd']
 
         roi_rec = {'index': index,
                    'image': filename,
@@ -110,7 +108,6 @@ class coco(IMDB):
                    'width': width,
                    'boxes': boxes,
                    'gt_classes': gt_classes,
-                   'is_crowd': is_crowd,
                    'flipped': False}
         return roi_rec
 
