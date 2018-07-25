@@ -57,7 +57,7 @@ def parse_args():
 def main():
     args = parse_args()
     dataset = get_dataset(args.dataset, args)
-    net = get_net('_'.join((args.network, args.dataset)), args)
+    net = get_net('_'.join((args.network, args.dataset)), not args.resume.strip(), args)
 
     # setup multi-gpu
     ctx = [mx.gpu(int(i)) for i in args.gpus.split(',')]
@@ -67,7 +67,6 @@ def main():
     if args.resume.strip():
         net.load_parameters(args.resume.strip())
     else:
-        net.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
         net.collect_params('.*rpn|.*dense').initialize()
     net.collect_params().reset_ctx(ctx)
 

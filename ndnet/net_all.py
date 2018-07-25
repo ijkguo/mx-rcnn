@@ -10,20 +10,22 @@ __all__ = ['get_net',
            'resnet50_v2a_coco']
 
 
-def get_net(network, args):
+def get_net(network, pretrained_base, args):
     networks = {'resnet50_v1a_voc': resnet50_v1a_voc,
                 'resnet50_v1a_coco': resnet50_v1a_coco,
                 'resnet50_v2a_voc': resnet50_v2a_voc,
                 'resnet50_v2a_coco': resnet50_v2a_coco}
     try:
-        net = networks[network](args)
+        net = networks[network](pretrained_base, args)
     except KeyError:
         raise NotImplementedError('Network {} not implemented'.format(network))
     return net
 
 
-def resnet50_v1a_voc(args):
+def resnet50_v1a_voc(pretrained_base, args):
     backbone = ResNetV1a(layers=(3, 4, 6, 3), prefix='')
+    if pretrained_base:
+        backbone.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
     features = nn.HybridSequential()
     for layer in ['conv1', 'bn1', 'relu', 'maxpool', 'layer1', 'layer2', 'layer3']:
         features.add(getattr(backbone, layer))
@@ -41,8 +43,10 @@ def resnet50_v1a_voc(args):
         rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.3, rcnn_nms_topk=-1)
 
 
-def resnet50_v1a_coco(args):
+def resnet50_v1a_coco(pretrained_base, args):
     backbone = ResNetV1a(layers=(3, 4, 6, 3), prefix='')
+    if pretrained_base:
+        backbone.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
     features = nn.HybridSequential()
     for layer in ['conv1', 'bn1', 'relu', 'maxpool', 'layer1', 'layer2', 'layer3']:
         features.add(getattr(backbone, layer))
@@ -60,8 +64,10 @@ def resnet50_v1a_coco(args):
         rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.5, rcnn_nms_topk=-1)
 
 
-def resnet50_v2a_voc(args):
+def resnet50_v2a_voc(pretrained_base, args):
     backbone = ResNetV2a(layers=(3, 4, 6, 3), prefix='')
+    if pretrained_base:
+        backbone.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
     features = nn.HybridSequential()
     for layer in ['layer0', 'layer1', 'layer2', 'layer3']:
         features.add(getattr(backbone, layer))
@@ -79,8 +85,10 @@ def resnet50_v2a_voc(args):
         rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.3, rcnn_nms_topk=-1)
 
 
-def resnet50_v2a_coco(args):
+def resnet50_v2a_coco(pretrained_base, args):
     backbone = ResNetV2a(layers=(3, 4, 6, 3), prefix='')
+    if pretrained_base:
+        backbone.load_parameters(args.pretrained, allow_missing=True, ignore_extra=True)
     features = nn.HybridSequential()
     for layer in ['layer0', 'layer1', 'layer2', 'layer3']:
         features.add(getattr(backbone, layer))
