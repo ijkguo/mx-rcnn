@@ -118,26 +118,39 @@ class AnchorSampler:
             # overlap between the anchors and the gt boxes
             # overlaps (ex, gt)
             overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes.astype(np.float))
+
+            # fg anchors: anchor with highest overlap for each gt
             gt_max_overlaps = overlaps.max(axis=0)
+            argmax_inds = np.where(overlaps == gt_max_overlaps)[0]
+            labels[argmax_inds] = 1
 
-            # fg anchors: anchor with highest overlap for each gt; or overlap > iou thresh
-            fg_inds = np.where((overlaps >= self._fg_overlap) | (overlaps == gt_max_overlaps))[0]
+            # fg anchors: anchor with overlap > iou thresh
+            max_overlaps = overlaps.max(axis=1)
+            labels[max_overlaps >= self._fg_overlap] = 1
 
-            # subsample to num_fg
-            if len(fg_inds) > self._num_fg:
-                fg_inds = np.random.choice(fg_inds, size=self._num_fg, replace=False)
+            # bg anchors: anchor with overlap < iou thresh
+            labels[max_overlaps < self._bg_overlap] = 1
 
-            # bg anchor: anchor with overlap < iou thresh but not highest overlap for some gt
-            bg_inds = np.where((overlaps < self._bg_overlap) & (overlaps < gt_max_overlaps))[0]
+            # sanity check
+            fg_inds = np.where(labels == 1)[0]
+            bg_inds = np.where(labels == 0)[0]
+            assert len(np.intersect1d(fg_inds, bg_inds)) == 0
 
-            if len(bg_inds) > self._num_batch - len(fg_inds):
-                bg_inds = np.random.choice(bg_inds, size=self._num_batch - len(fg_inds), replace=False)
+            # subsample positive anchors
+            cur_fg = len(fg_inds)
+            if cur_fg > self._num_fg:
+                disable_inds = np.random.choice(fg_inds, size=(cur_fg - self._num_fg), replace=False)
+                labels[disable_inds] = -1
 
-            # assign label
-            labels[fg_inds] = 1
-            labels[bg_inds] = 0
+            # subsample negative anchors
+            cur_bg = len(bg_inds)
+            max_neg = self._num_batch - min(self._num_fg, cur_fg)
+            if cur_bg > max_neg:
+                disable_inds = np.random.choice(bg_inds, size=(cur_bg - max_neg), replace=False)
+                labels[disable_inds] = -1
 
             # assign to argmax overlap
+            fg_inds = np.where(labels == 1)[0]
             argmax_overlaps = overlaps.argmax(axis=1)
             bbox_targets[fg_inds, :] = bbox_transform(anchors[fg_inds, :], gt_boxes[argmax_overlaps[fg_inds], :],
                                                       box_stds=(1.0, 1.0, 1.0, 1.0))
