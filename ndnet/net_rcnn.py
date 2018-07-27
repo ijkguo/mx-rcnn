@@ -97,13 +97,14 @@ class FRCNN(HybridBlock):
 
         # generate proposals
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
-        rpn_cls_prob = F.sigmoid(F.stop_gradient(rpn_cls))
-        rois, _ = self.proposal(rpn_cls_prob, F.stop_gradient(rpn_reg), anchors, im_info)
+        rpn_cls_prob, rpn_reg = F.sigmoid(F.stop_gradient(rpn_cls)), F.stop_gradient(rpn_reg)
+        rois, scores = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
+        rois, scores = F.stop_gradient(rois), F.stop_gradient(scores)
 
         # generate targets
         if autograd.is_training():
-            rois, samples, matches = self.rcnn_sampler(F.stop_gradient(rois), gt_boxes)
-            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
+            rois, samples, matches = self.rcnn_sampler(rois, scores, gt_boxes)
+            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, scores, samples, matches)
             rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
             rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
             rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
