@@ -104,7 +104,7 @@ class FRCNN(HybridBlock):
         # generate targets
         if autograd.is_training():
             rois, samples, matches = self.rcnn_sampler(rois, scores, gt_boxes)
-            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, scores, samples, matches)
+            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
             rcnn_label = F.stop_gradient(rcnn_label.reshape(-3))
             rcnn_bbox_target = F.stop_gradient(rcnn_bbox_target.reshape((-3, -3)))
             rcnn_bbox_weight = F.stop_gradient(rcnn_bbox_weight.reshape((-3, -3)))
