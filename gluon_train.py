@@ -171,7 +171,7 @@ def train_net(net, train_loader, ctx, args):
             metric_losses = [[] for _ in metrics]
             add_losses = [[] for _ in metrics2]
             with autograd.record():
-                for data, anchors, im_info, gt_bboxes, rpn_label, rpn_weight, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
+                for data, anchors, im_info, gt_bboxes, rpn_label, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
                     rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = net(data, anchors, im_info, gt_bboxes)
                     # rpn loss
                     num_rpn_pos = (rpn_label >= 0).sum()
@@ -188,7 +188,7 @@ def train_net(net, train_loader, ctx, args):
                     metric_losses[1].append(rpn_loss2.sum())
                     metric_losses[2].append(rcnn_loss1.sum())
                     metric_losses[3].append(rcnn_loss2.sum())
-                    add_losses[0].append(([rpn_label, rpn_weight], [rpn_cls]))
+                    add_losses[0].append(([rpn_label, rpn_label >= 0], [rpn_cls]))
                     add_losses[1].append(([rpn_bbox_target, rpn_bbox_weight], [rpn_reg]))
                     add_losses[2].append(([rcnn_label], [rcnn_cls]))
                     add_losses[3].append(([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg]))
