@@ -36,8 +36,8 @@ class RPNTargetSampler(gluon.Block):
         samples = mx.nd.where(ious_max_per_anchor >= self._pos_iou_thresh,
                               mx.nd.ones_like(samples), samples)
         # set negative overlap to -1
-        samples = mx.nd.where(ious_max_per_anchor < self._neg_iou_thresh,
-                              mx.nd.ones_like(samples) * -1, samples)
+        tmp = (ious_max_per_anchor < self._neg_iou_thresh) * (ious_max_per_anchor >= 0)
+        samples = mx.nd.where(tmp, mx.nd.ones_like(samples) * -1, samples)
 
         # subsample fg labels
         samples = samples.asnumpy()
@@ -73,17 +73,15 @@ class RPNTargetGenerator:
         self._box_encoder = NormalizedBoxCenterEncoder(stds=stds)
 
     def forward(self, bbox, anchor, width, height):
-        # anchor with shape (N, 4)
-        a_xmin, a_ymin, a_xmax, a_ymax = mx.nd.split(anchor, num_outputs=4, axis=-1)
-
-        # mask out invalid anchors, (N, 4)
-        invalid_mask = ((a_xmin >= 0) * (a_ymin >= 0) * (a_xmax <= width) * (a_ymax <= height)) <= 0
-        invalid_mask = mx.nd.array(np.where(invalid_mask.asnumpy() > 0)[0], ctx=anchor.context)
-
         # calculate ious between (N, 4) anchors and (M, 4) bbox ground-truths
         # ious is (N, M)
         ious = mx.nd.contrib.box_iou(anchor, bbox, format='corner')
-        ious[invalid_mask, :] = -1
+
+        # mask out invalid anchors, (N, 4)
+        a_xmin, a_ymin, a_xmax, a_ymax = mx.nd.split(anchor, num_outputs=4, axis=-1)
+        invalid_mask = (a_xmin < 0) + (a_ymin < 0) + (a_xmax >= width) + (a_ymax >= height)
+        invalid_mask = mx.nd.repeat(invalid_mask, repeats=bbox.shape[0], axis=-1)
+        ious = mx.nd.where(invalid_mask, mx.nd.ones_like(ious) * -1, ious)
 
         # matches (N) values [0, M), samples (N) values +1 pos -1 neg 0 ignore
         samples, matches = self._sampler(ious)
