@@ -15,7 +15,7 @@ def vis_detection(im_orig, detections, class_names, thresh=0.7):
     plt.show()
 
 
-def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
+def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7, thresh_hi=None):
     import random
     import numpy as np
     import matplotlib.pyplot as plt
@@ -33,7 +33,9 @@ def vis_detection_mono(im_orig, boxes, scores, labels, class_names, thresh=0.7):
         bbox = boxes[i]
         score = scores.flat[i]
         id = int(labels.flat[i])
-        if score < thresh:
+        if thresh and score < thresh:
+            continue
+        if thresh_hi and score > thresh_hi:
             continue
 
         rect = plt.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
