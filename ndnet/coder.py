@@ -18,8 +18,10 @@ class MultiClassEncoder(gluon.HybridBlock):
         refs = F.repeat(refs.reshape((0, 1, -1)), axis=1, repeats=self._num_sample)
         # ids (B, N, M) -> (B, M), note no + 1 here (processed in data pipeline)
         target_ids = F.pick(refs, matches, axis=2)
-        # samples 1/0, mask out neg samples to 0
-        targets = F.where(samples > 0.5, target_ids, F.zeros_like(target_ids))
+        # samples 0: set ignore samples to ignore_label
+        targets = F.where(samples > 0.5, target_ids, F.ones_like(target_ids) * self._ignore_label)
+        # samples -1: set negative samples to 0
+        targets = F.where(samples < -0.5, F.zeros_like(targets), targets)
         return targets
 
 
