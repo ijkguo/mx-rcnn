@@ -1,9 +1,19 @@
 from mxnet import gluon
 from ndnet.bbox import BBoxCornerToCenter, BBoxCenterToCorner
-from gluoncv.nn.coder import SigmoidClassEncoder
 
 __all__ = ['SigmoidClassEncoder', 'MultiClassEncoder',
            'NormalizedBoxCenterEncoder', 'NormalizedPerClassBoxCenterEncoder', 'NormalizedBoxCenterDecoder']
+
+
+class SigmoidClassEncoder(gluon.HybridBlock):
+    def __init__(self, **kwargs):
+        super(SigmoidClassEncoder, self).__init__(**kwargs)
+
+    def hybrid_forward(self, F, samples):
+        # notation from samples, 1:pos, 0:ignore, -1:negative
+        target = (samples + 1) / 2.
+        target = F.where(F.abs(samples) < 1e-5, F.ones_like(target) * -1, target)
+        return target
 
 
 class MultiClassEncoder(gluon.HybridBlock):

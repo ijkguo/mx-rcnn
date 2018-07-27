@@ -165,9 +165,4 @@ class RCNNDefaultTrainTransform(object):
         box_target = box_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
         box_mask = box_mask.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
 
-        # need different repr
-        # cls_target = cls_target.reshape((-3, 0)).expand_dims(0)
-        cls_mask = mx.nd.where(cls_target >= 0, mx.nd.ones_like(cls_target), mx.nd.zeros_like(cls_target))
-        cls_target = mx.nd.where(cls_target >= 0, cls_target, mx.nd.zeros_like(cls_target))
-
-        return im_tensor, anchors, im_info, gt_bboxes, cls_target, cls_mask, box_target, box_mask
+        return im_tensor, anchors, im_info, gt_bboxes, cls_target, box_target, box_mask
