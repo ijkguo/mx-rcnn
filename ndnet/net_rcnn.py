@@ -97,8 +97,8 @@ class FRCNN(HybridBlock):
 
         # generate proposals
         rpn_cls, rpn_reg = self.rpn(feat, im_info)
-        rpn_cls_prob, rpn_reg = F.sigmoid(F.stop_gradient(rpn_cls)), F.stop_gradient(rpn_reg)
-        rois, scores = self.proposal(rpn_cls_prob, rpn_reg, anchors, im_info)
+        rpn_cls_prob, rpn_reg_out = F.sigmoid(F.stop_gradient(rpn_cls)), F.stop_gradient(rpn_reg)
+        rois, scores = self.proposal(rpn_cls_prob, rpn_reg_out, anchors, im_info)
         rois, scores = F.stop_gradient(rois), F.stop_gradient(scores)
 
         # generate targets
