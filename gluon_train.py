@@ -174,6 +174,7 @@ def train_net(net, train_loader, ctx, args):
                 for data, anchors, im_info, gt_bboxes, rpn_label, rpn_bbox_target, rpn_bbox_weight in zip(*batch):
                     rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = net(data, anchors, im_info, gt_bboxes)
                     # rpn loss
+                    rpn_cls = rpn_cls.squeeze(axis=-1)
                     num_rpn_pos = (rpn_label >= 0).sum()
                     rpn_loss1 = rpn_cls_loss(rpn_cls, rpn_label, rpn_label >= 0) * rpn_label.size / rpn_label.shape[0] / num_rpn_pos
                     rpn_loss2 = rpn_reg_loss(rpn_reg, rpn_bbox_target, rpn_bbox_weight) * rpn_bbox_target.size / rpn_bbox_target.shape[0] / num_rpn_pos
