@@ -186,3 +186,91 @@ class FRCNN(HybridBlock):
         if autograd.is_training():
             return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
         return self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
+
+
+class MRCNN(FRCNN):
+    def __init__(self, features, top_features, mask_channels=256,
+                 **kwargs):
+        super(MRCNN, self).__init__(features, top_features, **kwargs)
+        init = mx.init.Xavier(rnd_type='gaussian', factor_type='out', magnitude=2)
+        with self.name_scope():
+            self.deconv = nn.Conv2DTranspose(mask_channels, kernel_size=(2, 2), strides=(2, 2), padding=(0, 0), weight_initializer=init)
+            self.mask = nn.Conv2D(self._rcnn_num_classes, kernel_size=(1, 1), strides=(1, 1), padding=(0, 0), weight_initializer=init)
+
+    def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
+        feat = self.features(x)
+
+        # generate proposals
+        rpn_cls, rpn_reg = self.rpn(feat, im_info)
+        rpn_cls_prob, rpn_reg_out = F.sigmoid(F.stop_gradient(rpn_cls)), F.stop_gradient(rpn_reg)
+        rois, scores = self.proposal(rpn_cls_prob, rpn_reg_out, anchors, im_info)
+        rois, scores = F.stop_gradient(rois), F.stop_gradient(scores)
+
+        # generate targets
+        if autograd.is_training():
+            rois, samples, matches = self.rcnn_sampler(rois, scores, gt_boxes)
+            rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
+
+        # create batch id and reshape for roi pooling
+        num_rois = self._rcnn_batch_rois if autograd.is_training() else self._rpn_test_post_topk
+        roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois)
+        padded_rois = F.concat(roi_batch_id.reshape((-1, 1)), rois.reshape((-3, 0)), dim=-1)
+        padded_rois = F.stop_gradient(padded_rois)
+
+        # pool to roi features
+        if self._rcnn_roi_mode == 'pool':
+            pooled_feat = F.ROIPooling(feat, padded_rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+        elif self._rcnn_roi_mode == 'align':
+            pooled_feat = F.contrib.ROIAlign(feat, padded_rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride, sample_ratio=2)
+        else:
+            raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
+
+        # classify pooled features
+        top_feat = self.top_features(pooled_feat)
+        rcnn_cls, rcnn_reg = self.rcnn(top_feat)
+
+        if autograd.is_training():
+            # (B * N, mask_channels, pooled_size * 2, pooled_size * 2)
+            mask_feat = self.deconv(pooled_feat)
+            # (B * N, C, pooled_size * 2, pooled_size * 2)
+            masks = self.mask(mask_feat)
+            # (B * N, C, PS*2, PS*2) -> (B, N, C, PS*2, PS*2)
+            masks = masks.reshape((-4, self._batch_images, num_rois, 0, 0, 0))
+            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, masks, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
+
+        ids, scores, boxes = self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
+
+        # create batch id and reshape for roi pooling
+        num_rois = (self._rcnn_num_classes - 1) * self._rpn_test_post_topk
+        roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois)
+        padded_rois = F.concat(roi_batch_id.reshape((-1, 1)), boxes.reshape((-3, 0)), dim=-1)
+        padded_rois = F.stop_gradient(padded_rois)
+
+        # pool to roi features
+        if self._rcnn_roi_mode == 'pool':
+            pooled_feat = F.ROIPooling(feat, padded_rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride)
+        elif self._rcnn_roi_mode == 'align':
+            pooled_feat = F.contrib.ROIAlign(feat, padded_rois, self._rcnn_pooled_size, 1.0 / self._rcnn_feature_stride, sample_ratio=2)
+        else:
+            raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
+
+        # (B * N, mask_channels, pooled_size * 2, pooled_size * 2)
+        mask_feat = self.deconv(pooled_feat)
+        # (B * N, C, pooled_size * 2, pooled_size * 2)
+        perclass_masks = self.mask(mask_feat)
+        # (B, N, C, pooled_size * 2, pooled_size * 2)
+        perclass_masks = perclass_masks.reshape((-4, self._batch_images, num_rois, 0, 0, 0))
+        # index the B dimension (B * N,)
+        batch_ids = F.arange(0, self._batch_images, repeat=num_rois)
+        # index the N dimension (B * N,)
+        roi_ids = F.tile(F.arange(0, num_rois), reps=self._batch_images)
+        # index the C dimension (B * N,)
+        class_ids = ids.reshape((-1,))
+        # pick from (B, N, C, PS*2, PS*2) -> (B * N, PS*2, PS*2)
+        indices = F.stack(batch_ids, roi_ids, class_ids, axis=0)
+        masks = F.gather_nd(perclass_masks, indices)
+        # (B * N, PS*2, PS*2) -> (B, N, PS*2, PS*2)
+        masks = masks.reshape((-4, self._batch_images, num_rois, 0, 0))
+
+        # ids (B, N, 1), scores (B, N, 1), boxes (B, N, 4), masks (B, N, PS*2, PS*2)
+        return ids, scores, boxes, masks
