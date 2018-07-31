@@ -146,9 +146,9 @@ class FRCNN(HybridBlock):
             ret_bboxes.append(bboxes)
 
         # ret_ids [B, C, topk, 1], ret_scores [B, C, topk, 1], ret_bboxes [B, C, topk, 4]
-        ret_ids = F.stack(*ret_ids, axis=0)
-        ret_scores = F.stack(*ret_scores, axis=0)
-        ret_bboxes = F.stack(*ret_bboxes, axis=0)
+        ret_ids = F.stack(*ret_ids, axis=0).reshape((0, -3, 0))
+        ret_scores = F.stack(*ret_scores, axis=0).reshape((0, -3, 0))
+        ret_bboxes = F.stack(*ret_bboxes, axis=0).reshape((0, -3, 0))
         return ret_ids, ret_scores, ret_bboxes
 
     def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
@@ -168,7 +168,7 @@ class FRCNN(HybridBlock):
         # create batch id and reshape for roi pooling
         num_rois = self._rcnn_batch_rois if autograd.is_training() else self._rpn_test_post_topk
         roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois)
-        padded_rois = F.concat(rois.reshape((-3, 0)), roi_batch_id.reshape((-1, 1)), dim=-1)
+        padded_rois = F.concat(roi_batch_id.reshape((-1, 1)), rois.reshape((-3, 0)), dim=-1)
         padded_rois = F.stop_gradient(padded_rois)
 
         # pool to roi features

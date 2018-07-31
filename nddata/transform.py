@@ -18,7 +18,7 @@ def load_test(filename, short, max_size, mean, std, anchors, asf):
 
     # compute real anchor shape and slice anchors to this shape
     feat_height, feat_width = asf(height, width)
-    anchors = anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
+    anchors = anchors[:feat_height, :feat_width, :].reshape((-1, 4))
 
     # for 1-batch inference purpose, cannot use batchify (or nd.stack) to expand dims
     im_tensor = im_tensor.expand_dims(0)
@@ -110,7 +110,7 @@ class RCNNDefaultValTransform(object):
 
         # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._asf(height, width)
-        anchors = self._anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
         anchors = anchors.as_in_context(src.context)
         return im_tensor, anchors, im_info, label
 
@@ -156,7 +156,7 @@ class RCNNDefaultTrainTransform(object):
 
         # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._asf(im_height, im_width)
-        anchors = self._anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
         anchors = anchors.as_in_context(src.context)
 
         # assign anchors
