@@ -36,10 +36,13 @@ class RCNN(HybridBlock):
         self._batch_images = batch_images
         self._num_classes = num_classes
         with self.name_scope():
+            self.global_avg_pool = nn.GlobalAvgPool2D()
             self.cls = nn.Dense(units=num_classes, weight_initializer=mx.initializer.Normal(0.01))
             self.reg = nn.Dense(units=4 * num_classes, weight_initializer=mx.initializer.Normal(0.001))
 
     def hybrid_forward(self, F, x):
+        # (B * N, channels, 7, 7) -> (B * N, channels)
+        x = self.global_avg_pool(x)
         # (B * N, C) -> (B, N, C)
         cls = self.cls(x).reshape((self._batch_images, -1, self._num_classes))
         # (B * N, C * 4) -> (B, N, C, 4)

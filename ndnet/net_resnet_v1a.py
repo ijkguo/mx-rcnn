@@ -47,9 +47,6 @@ class ResNetV1a(HybridBlock):
             self.layer3 = self._make_layer(stage_index=3, layers=layers[2], in_channels=512, channels=1024, stride=2)
             self.layer4 = self._make_layer(stage_index=4, layers=layers[3], in_channels=1024, channels=2048, stride=2)
 
-            self.layer4.add(nn.GlobalAvgPool2D())
-            self.layer4.add(nn.Flatten())
-
     def _make_layer(self, stage_index, layers, channels, stride, in_channels=0):
         layer = nn.HybridSequential(prefix='stage%d_' % stage_index)
         with layer.name_scope():

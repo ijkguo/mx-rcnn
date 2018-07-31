@@ -53,8 +53,6 @@ class ResNetV2a(HybridBlock):
 
             self.layer4.add(nn.BatchNorm(epsilon=2e-5, use_global_stats=True))
             self.layer4.add(nn.Activation('relu'))
-            self.layer4.add(nn.GlobalAvgPool2D())
-            self.layer4.add(nn.Flatten())
 
     def _make_layer(self, stage_index, layers, channels, stride, in_channels=0):
         layer = nn.HybridSequential(prefix='stage%d_' % stage_index)
