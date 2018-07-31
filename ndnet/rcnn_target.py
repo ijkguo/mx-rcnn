@@ -107,6 +107,11 @@ class RCNNTargetGenerator(gluon.HybridBlock):
         gt_labels = F.slice_axis(gt_boxes, axis=-1, begin=4, end=5)
         gt_boxes = F.slice_axis(gt_boxes, axis=-1, begin=0, end=4)
 
+        # cls_target (B, N)
         cls_target = self._cls_encoder(samples, matches, gt_labels)
+        # box_target, box_weight (C, B, N, 4)
         box_target, box_mask = self._box_encoder(samples, matches, rois, gt_labels, gt_boxes)
+        # modify shapes (C, B, N, 4) -> (B, N, C, 4)
+        box_target = box_target.transpose((1, 2, 0, 3))
+        box_mask = box_mask.transpose((1, 2, 0, 3))
         return cls_target, box_target, box_mask
