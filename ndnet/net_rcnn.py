@@ -188,14 +188,31 @@ class FRCNN(HybridBlock):
         return self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
 
 
+class Mask(HybridBlock):
+    def __init__(self, batch_images, num_classes, mask_channels, **kwargs):
+        super(Mask, self).__init__(**kwargs)
+        self._batch_images = batch_images
+        init = mx.init.Xavier(rnd_type='gaussian', factor_type='out', magnitude=2)
+        with self.name_scope():
+            self.deconv = nn.Conv2DTranspose(mask_channels, kernel_size=(2, 2), strides=(2, 2), padding=(0, 0), weight_initializer=init)
+            self.mask = nn.Conv2D(num_classes, kernel_size=(1, 1), strides=(1, 1), padding=(0, 0), weight_initializer=init)
+
+    def hybrid_forward(self, F, x, **kwargs):
+        # (B * N, mask_channels, pooled_size * 2, pooled_size * 2)
+        x = F.relu(self.deconv(x))
+        # (B * N, C, pooled_size * 2, pooled_size * 2)
+        x = self.mask(x)
+        # (B * N, C, PS*2, PS*2) -> (B, N, C, PS*2, PS*2)
+        x = x.reshape((-4, self._batch_images, -1, 0, 0, 0))
+        return x
+
+
 class MRCNN(FRCNN):
     def __init__(self, features, top_features, mask_channels=256,
                  **kwargs):
         super(MRCNN, self).__init__(features, top_features, **kwargs)
-        init = mx.init.Xavier(rnd_type='gaussian', factor_type='out', magnitude=2)
         with self.name_scope():
-            self.deconv = nn.Conv2DTranspose(mask_channels, kernel_size=(2, 2), strides=(2, 2), padding=(0, 0), weight_initializer=init)
-            self.mask = nn.Conv2D(self._rcnn_num_classes, kernel_size=(1, 1), strides=(1, 1), padding=(0, 0), weight_initializer=init)
+            self.mask = Mask(self._batch_images, self._rcnn_num_classes, mask_channels)
 
     def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
         feat = self.features(x)
@@ -230,13 +247,8 @@ class MRCNN(FRCNN):
         rcnn_cls, rcnn_reg = self.rcnn(top_feat)
 
         if autograd.is_training():
-            # (B * N, mask_channels, pooled_size * 2, pooled_size * 2)
-            mask_feat = self.deconv(pooled_feat)
-            # (B * N, C, pooled_size * 2, pooled_size * 2)
-            masks = self.mask(mask_feat)
-            # (B * N, C, PS*2, PS*2) -> (B, N, C, PS*2, PS*2)
-            masks = masks.reshape((-4, self._batch_images, num_rois, 0, 0, 0))
-            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, masks, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
+            rcnn_mask = self.mask(top_feat)
+            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_mask, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
 
         ids, scores, boxes = self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
 
@@ -254,12 +266,8 @@ class MRCNN(FRCNN):
         else:
             raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
 
-        # (B * N, mask_channels, pooled_size * 2, pooled_size * 2)
-        mask_feat = self.deconv(pooled_feat)
-        # (B * N, C, pooled_size * 2, pooled_size * 2)
-        perclass_masks = self.mask(mask_feat)
         # (B, N, C, pooled_size * 2, pooled_size * 2)
-        perclass_masks = perclass_masks.reshape((-4, self._batch_images, num_rois, 0, 0, 0))
+        rcnn_mask = self.mask(pooled_feat)
         # index the B dimension (B * N,)
         batch_ids = F.arange(0, self._batch_images, repeat=num_rois)
         # index the N dimension (B * N,)
@@ -268,7 +276,7 @@ class MRCNN(FRCNN):
         class_ids = ids.reshape((-1,))
         # pick from (B, N, C, PS*2, PS*2) -> (B * N, PS*2, PS*2)
         indices = F.stack(batch_ids, roi_ids, class_ids, axis=0)
-        masks = F.gather_nd(perclass_masks, indices)
+        masks = F.gather_nd(rcnn_mask, indices)
         # (B * N, PS*2, PS*2) -> (B, N, PS*2, PS*2)
         masks = masks.reshape((-4, self._batch_images, num_rois, 0, 0))
 
