@@ -143,7 +143,7 @@ class NormalizedPerClassBoxCenterEncoder(gluon.HybridBlock):
             out_targets.append(targets)
             # but mask out the one not belong to this class [B, N, 1] -> [B, N, 4]
             out_masks.append(masks * same_cid.repeat(axis=-1, repeats=4))
-        # targets, masks C * [B, N, 4] -> [C, B, N, 4] -> [B, N, C, 4]
-        all_targets = F.stack(*out_targets, axis=0).transpose((1, 2, 0, 3))
-        all_masks = F.stack(*out_masks, axis=0).transpose((1, 2, 0, 3))
+        # targets, masks C * [B, N, 4] -> [C, B, N, 4]
+        all_targets = F.stack(*out_targets, axis=0)
+        all_masks = F.stack(*out_masks, axis=0)
         return all_targets, all_masks
