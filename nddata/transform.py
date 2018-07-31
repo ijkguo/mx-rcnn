@@ -18,7 +18,7 @@ def load_test(filename, short, max_size, mean, std, anchors, asf):
 
     # compute real anchor shape and slice anchors to this shape
     feat_height, feat_width = asf(height, width)
-    anchors = anchors[:feat_height, :feat_width, :]
+    anchors = anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
 
     # for 1-batch inference purpose, cannot use batchify (or nd.stack) to expand dims
     im_tensor = im_tensor.expand_dims(0)
@@ -110,7 +110,8 @@ class RCNNDefaultValTransform(object):
 
         # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._asf(height, width)
-        anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(src.context)
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
+        anchors = anchors.as_in_context(src.context)
         return im_tensor, anchors, im_info, label
 
 
@@ -155,14 +156,10 @@ class RCNNDefaultTrainTransform(object):
 
         # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._asf(im_height, im_width)
-        anchors = self._anchors[:feat_height, :feat_width, :].as_in_context(im_tensor.context)
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((feat_height * feat_width, 4))
+        anchors = anchors.as_in_context(src.context)
 
         # assign anchors
         boxes = gt_bboxes[:, :4]
-        cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors.reshape(-1, 4), im_width, im_height)
-
-        cls_target = cls_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
-        box_target = box_target.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
-        box_mask = box_mask.reshape((feat_height, feat_width, -1)).transpose((2, 0, 1))
-
+        cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors, im_width, im_height)
         return im_tensor, anchors, im_info, gt_bboxes, cls_target, box_target, box_mask

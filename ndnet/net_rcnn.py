@@ -23,8 +23,10 @@ class RPN(HybridBlock):
 
     def hybrid_forward(self, F, x, im_info):
         x = F.relu(self.rpn_conv(x))
-        cls = self.conv_cls(x)
-        reg = self.conv_reg(x)
+        # (B, N, H, W) -> (B, H * W * N, 1)
+        cls = self.conv_cls(x).transpose((0, 2, 3, 1)).reshape((0, -1, 1))
+        # (B, N * 4, H, W) -> (B, H * W * N, 4)
+        reg = self.conv_reg(x).transpose((0, 2, 3, 1)).reshape((0, -1, 4))
         return cls, reg
 
 

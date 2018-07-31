@@ -21,18 +21,11 @@ class Proposal(gluon.HybridBlock):
             self._bbox_clip = BBoxClipper()
             self._bbox_corner2center_split = BBoxCornerToCenter(split=True)
 
-    def hybrid_forward(self, F, cls, reg, anchors, im_info, **kwargs):
+    def hybrid_forward(self, F, score, bbox_reg, anchors, im_info, **kwargs):
         if autograd.is_training():
             pre_topk, post_topk = self._rpn_train_pre_topk, self._rpn_train_post_topk
         else:
             pre_topk, post_topk = self._rpn_test_pre_topk, self._rpn_test_post_topk
-
-        # anchors [B, H, W, N*4] -> split 1st dim [B, 1, H, W, N*4] -> slice 2, 3 dim -> reshape [B, H * W * N, 4]
-        anchors = F.slice_like(anchors.reshape((-4, -1, 1, -2)), reg, axes=(2, 3)).reshape((0, -1, 4))
-
-        # reshape input [B, N*4, H, W] -> [B, H * W * N, 4]
-        score = cls.transpose((0, 2, 3, 1)).reshape((0, -1, 1))
-        bbox_reg = reg.transpose((0, 2, 3, 1)).reshape((0, -1, 4))
 
         # decode bbox
         boxes = self._bbox_decode(bbox_reg, self._bbox_corner2center(anchors))
