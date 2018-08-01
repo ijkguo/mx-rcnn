@@ -293,6 +293,8 @@ class MRCNN(FRCNN):
         masks = F.gather_nd(rcnn_mask, indices)
         # (B * N, PS*2, PS*2) -> (B, N, PS*2, PS*2)
         masks = masks.reshape((-4, self._batch_images, num_rois, 0, 0))
+        # output prob
+        masks = F.sigmoid(masks)
 
         # ids (B, N, 1), scores (B, N, 1), boxes (B, N, 4), masks (B, N, PS*2, PS*2)
         return ids, scores, boxes, masks
