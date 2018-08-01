@@ -29,13 +29,13 @@ def bbox_overlaps(boxes, query_boxes):
     k_ = query_boxes.shape[0]
     overlaps = np.zeros((n_, k_), dtype=np.float)
     for k in range(k_):
-        query_box_area = (query_boxes[k, 2] - query_boxes[k, 0] + 1) * (query_boxes[k, 3] - query_boxes[k, 1] + 1)
+        query_box_area = (query_boxes[k, 2] - query_boxes[k, 0]) * (query_boxes[k, 3] - query_boxes[k, 1])
         for n in range(n_):
-            iw = min(boxes[n, 2], query_boxes[k, 2]) - max(boxes[n, 0], query_boxes[k, 0]) + 1
+            iw = min(boxes[n, 2], query_boxes[k, 2]) - max(boxes[n, 0], query_boxes[k, 0])
             if iw > 0:
-                ih = min(boxes[n, 3], query_boxes[k, 3]) - max(boxes[n, 1], query_boxes[k, 1]) + 1
+                ih = min(boxes[n, 3], query_boxes[k, 3]) - max(boxes[n, 1], query_boxes[k, 1])
                 if ih > 0:
-                    box_area = (boxes[n, 2] - boxes[n, 0] + 1) * (boxes[n, 3] - boxes[n, 1] + 1)
+                    box_area = (boxes[n, 2] - boxes[n, 0]) * (boxes[n, 3] - boxes[n, 1])
                     all_area = float(box_area + query_box_area - iw * ih)
                     overlaps[n, k] = iw * ih / all_area
     return overlaps
@@ -44,19 +44,17 @@ def bbox_overlaps(boxes, query_boxes):
 def clip_boxes(boxes, im_shape):
     """
     Clip boxes to image boundaries.
-    :param boxes: [N, 4* num_classes]
-    :param im_shape: tuple of 2
-    :return: [N, 4* num_classes]
+    :param boxes: [..., 4] e.g. [B, N, 4], [N, num_classes * 4]
+    :param im_shape: tuple of 2 (height, width)
+    :return: same shape as boxes [..., 4]
     """
-    # x1 >= 0
-    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
-    # y1 >= 0
-    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
-    # x2 < im_shape[1]
-    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
-    # y2 < im_shape[0]
-    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
-    return boxes
+    orig_shape = boxes.shape
+    boxes = boxes.reshape([-1, 4])
+    h, w = im_shape
+    boxes[:, [0, 1]] = np.maximum(boxes[:, [0, 1]], 0)
+    boxes[:, 2] = np.minimum(boxes[:, 2], w)
+    boxes[:, 3] = np.minimum(boxes[:, 3], h)
+    return boxes.reshape(orig_shape)
 
 
 def bbox_transform(ex_rois, gt_rois, box_stds):
@@ -68,15 +66,15 @@ def bbox_transform(ex_rois, gt_rois, box_stds):
     """
     assert ex_rois.shape[0] == gt_rois.shape[0], 'inconsistent rois number'
 
-    ex_widths = ex_rois[:, 2] - ex_rois[:, 0] + 1.0
-    ex_heights = ex_rois[:, 3] - ex_rois[:, 1] + 1.0
-    ex_ctr_x = ex_rois[:, 0] + 0.5 * (ex_widths - 1.0)
-    ex_ctr_y = ex_rois[:, 1] + 0.5 * (ex_heights - 1.0)
+    ex_widths = ex_rois[:, 2] - ex_rois[:, 0]
+    ex_heights = ex_rois[:, 3] - ex_rois[:, 1]
+    ex_ctr_x = ex_rois[:, 0] + 0.5 * ex_widths
+    ex_ctr_y = ex_rois[:, 1] + 0.5 * ex_heights
 
-    gt_widths = gt_rois[:, 2] - gt_rois[:, 0] + 1.0
-    gt_heights = gt_rois[:, 3] - gt_rois[:, 1] + 1.0
-    gt_ctr_x = gt_rois[:, 0] + 0.5 * (gt_widths - 1.0)
-    gt_ctr_y = gt_rois[:, 1] + 0.5 * (gt_heights - 1.0)
+    gt_widths = gt_rois[:, 2] - gt_rois[:, 0]
+    gt_heights = gt_rois[:, 3] - gt_rois[:, 1]
+    gt_ctr_x = gt_rois[:, 0] + 0.5 * gt_widths
+    gt_ctr_y = gt_rois[:, 1] + 0.5 * gt_heights
 
     targets_dx = (gt_ctr_x - ex_ctr_x) / (ex_widths + 1e-14) / box_stds[0]
     targets_dy = (gt_ctr_y - ex_ctr_y) / (ex_heights + 1e-14) / box_stds[1]
@@ -98,10 +96,10 @@ def bbox_pred(boxes, box_deltas, box_stds):
     if boxes.shape[0] == 0:
         return np.zeros((0, box_deltas.shape[1]))
 
-    widths = boxes[:, 2] - boxes[:, 0] + 1.0
-    heights = boxes[:, 3] - boxes[:, 1] + 1.0
-    ctr_x = boxes[:, 0] + 0.5 * (widths - 1.0)
-    ctr_y = boxes[:, 1] + 0.5 * (heights - 1.0)
+    widths = boxes[:, 2] - boxes[:, 0]
+    heights = boxes[:, 3] - boxes[:, 1]
+    ctr_x = boxes[:, 0] + 0.5 * widths
+    ctr_y = boxes[:, 1] + 0.5 * heights
 
     dx = box_deltas[:, 0::4] * box_stds[0]
     dy = box_deltas[:, 1::4] * box_stds[1]
@@ -115,13 +113,13 @@ def bbox_pred(boxes, box_deltas, box_stds):
 
     pred_boxes = np.zeros(box_deltas.shape)
     # x1
-    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * (pred_w - 1.0)
+    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
     # y1
-    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * (pred_h - 1.0)
+    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
     # x2
-    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * (pred_w - 1.0)
+    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w
     # y2
-    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * (pred_h - 1.0)
+    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h
 
     return pred_boxes
 

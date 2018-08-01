@@ -90,8 +90,8 @@ class PascalVOC(IMDB):
             bbox = obj.find('bndbox')
             obj_dict['bbox'] = [float(bbox.find('xmin').text),
                                 float(bbox.find('ymin').text),
-                                float(bbox.find('xmax').text),
-                                float(bbox.find('ymax').text)]
+                                float(bbox.find('xmax').text) + 1,
+                                float(bbox.find('ymax').text) + 1]
             objects.append(obj_dict)
         return height, width, objects
 

@@ -83,12 +83,12 @@ class coco(IMDB):
             x, y, w, h = obj['bbox']
             # xywh to xyxy
             x1, y1 = x, y
-            x2, y2 = x1 + np.maximum(0, w - 1), y1 + np.maximum(0, h - 1)
-            # clip to [0, w/h - 1]
-            x1 = np.minimum(width - 1, np.maximum(0, x1))
-            y1 = np.minimum(height - 1, np.maximum(0, y1))
-            x2 = np.minimum(width - 1, np.maximum(0, x2))
-            y2 = np.minimum(height - 1, np.maximum(0, y2))
+            x2, y2 = x1 + np.maximum(0, w), y1 + np.maximum(0, h)
+            # clip to [0, w/h]
+            x1 = np.minimum(width, np.maximum(0, x1))
+            y1 = np.minimum(height, np.maximum(0, y1))
+            x2 = np.minimum(width, np.maximum(0, x2))
+            y2 = np.minimum(height, np.maximum(0, y2))
             # require non crowd objects, non-zero seg area and moe than 1x1 box size
             if obj['iscrowd'] == 0 and obj['area'] > 0 and x2 > x1 and y2 > y1:
                 obj['clean_bbox'] = [x1, y1, x2, y2]
@@ -146,8 +146,8 @@ class coco(IMDB):
             scores = dets[:, -1]
             xs = dets[:, 0]
             ys = dets[:, 1]
-            ws = dets[:, 2] - xs + 1
-            hs = dets[:, 3] - ys + 1
+            ws = dets[:, 2] - xs
+            hs = dets[:, 3] - ys
             result = [{'image_id': index,
                        'category_id': cat_id,
                        'bbox': [xs[k], ys[k], ws[k], hs[k]],
