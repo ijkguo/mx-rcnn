@@ -70,6 +70,7 @@ class FRCNN(HybridBlock):
         self._batch_images = batch_images
         self._rpn_test_post_topk = rpn_test_post_topk
         self._rcnn_batch_rois = rcnn_batch_rois
+        self._rcnn_nms_topk = rcnn_nms_topk
 
         self.img_short = img_short
         self.img_max_size = img_max_size
@@ -139,9 +140,8 @@ class FRCNN(HybridBlock):
         # per batch predict, nms, each class has topk outputs
         ret_ids, ret_scores, ret_bboxes = [], [], []
         for rois, cls, reg, window in zip(rcnn_rois, rcnn_cls, rcnn_reg, im_info):
-            scores, bboxes = self.rcnn_detect(rois, cls, reg, window)
-            ids = F.where(scores < 0, F.ones_like(ids) * -1, ids)
-            ret_ids.append(ids)
+            cids, scores, bboxes = self.rcnn_detect(rois, ids, cls, reg, window)
+            ret_ids.append(cids)
             ret_scores.append(scores)
             ret_bboxes.append(bboxes)
 
@@ -253,7 +253,8 @@ class MRCNN(FRCNN):
         ids, scores, boxes = self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
 
         # create batch id and reshape for roi pooling
-        num_rois = (self._rcnn_num_classes - 1) * self._rpn_test_post_topk
+        num_rois = min(self._rpn_test_post_topk, self._rcnn_nms_topk) if self._rcnn_nms_topk > 0 else self._rpn_test_post_topk
+        num_rois = (self._rcnn_num_classes - 1) * num_rois
         roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois)
         padded_rois = F.concat(roi_batch_id.reshape((-1, 1)), boxes.reshape((-3, 0)), dim=-1)
         padded_rois = F.stop_gradient(padded_rois)

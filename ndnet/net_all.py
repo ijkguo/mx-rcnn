@@ -85,7 +85,7 @@ def resnet50_v1a_mask(pretrained_base, args):
         rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_roi_mode='align',
         mask_channels=256,
         rcnn_num_classes=81, rcnn_batch_rois=512, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
-        rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.5, rcnn_nms_topk=-1)
+        rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.5, rcnn_nms_topk=100)
 
 
 def resnet50_v2a_voc(pretrained_base, args):
