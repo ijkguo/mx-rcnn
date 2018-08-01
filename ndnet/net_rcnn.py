@@ -266,8 +266,10 @@ class MRCNN(FRCNN):
         else:
             raise ValueError("Invalid roi mode: {}".format(self._rcnn_roi_mode))
 
+        # run top_features again
+        top_feat = self.top_features(pooled_feat)
         # (B, N, C, pooled_size * 2, pooled_size * 2)
-        rcnn_mask = self.mask(pooled_feat)
+        rcnn_mask = self.mask(top_feat)
         # index the B dimension (B * N,)
         batch_ids = F.arange(0, self._batch_images, repeat=num_rois)
         # index the N dimension (B * N,)
