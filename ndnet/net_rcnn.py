@@ -208,9 +208,10 @@ class Mask(HybridBlock):
 
 
 class MRCNN(FRCNN):
-    def __init__(self, features, top_features, mask_channels=256,
+    def __init__(self, features, top_features, mask_channels=256, rcnn_max_dets=1000,
                  **kwargs):
         super(MRCNN, self).__init__(features, top_features, **kwargs)
+        self._rcnn_max_dets = rcnn_max_dets
         with self.name_scope():
             self.mask = Mask(self._batch_images, self._rcnn_num_classes, mask_channels)
 
@@ -250,12 +251,22 @@ class MRCNN(FRCNN):
             rcnn_mask = self.mask(top_feat)
             return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_mask, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
 
+        # ids, scores, boxes (B, N * (C - 1), X) (X = 1, 1, 4)
         ids, scores, boxes = self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
 
-        # create batch id and reshape for roi pooling
-        num_rois = min(self._rpn_test_post_topk, self._rcnn_nms_topk) if self._rcnn_nms_topk > 0 else self._rpn_test_post_topk
-        num_rois = (self._rcnn_num_classes - 1) * num_rois
+        # (B, N * (C - 1), 1) -> (B, N * (C - 1)) -> (B, topk)
+        num_rois = self._rcnn_max_dets
+        order = F.argsort(scores.squeeze(axis=-1), axis=1, is_ascend=False)
+        topk = F.slice_axis(order, axis=1, begin=0, end=num_rois)
+
+        # pick from (B, N * (C - 1), X) to (B * topk, X) -> (B, topk, X)
         roi_batch_id = F.arange(0, self._batch_images, repeat=num_rois)
+        indices = F.stack(roi_batch_id, topk.reshape((-1,)), axis=0)
+        ids = F.gather_nd(ids, indices).reshape((-4, self._batch_images, num_rois, 1))
+        scores = F.gather_nd(scores, indices).reshape((-4, self._batch_images, num_rois, 1))
+        boxes = F.gather_nd(boxes, indices).reshape((-4, self._batch_images, num_rois, 4))
+
+        # create batch id and reshape for roi pooling
         padded_rois = F.concat(roi_batch_id.reshape((-1, 1)), boxes.reshape((-3, 0)), dim=-1)
         padded_rois = F.stop_gradient(padded_rois)
 

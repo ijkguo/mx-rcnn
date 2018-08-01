@@ -83,7 +83,7 @@ def resnet50_v1a_mask(pretrained_base, args):
         rpn_channels=1024, rpn_nms_thresh=0.7, rpn_min_size=0,
         rpn_train_pre_topk=12000, rpn_train_post_topk=2000, rpn_test_pre_topk=6000, rpn_test_post_topk=1000,
         rcnn_feature_stride=16, rcnn_pooled_size=(14, 14), rcnn_roi_mode='align',
-        mask_channels=256,
+        mask_channels=256, rcnn_max_dets=1000,
         rcnn_num_classes=81, rcnn_batch_rois=512, rcnn_bbox_stds=(0.1, 0.1, 0.2, 0.2),
         rcnn_fg_fraction=0.25, rcnn_fg_overlap=0.5, rcnn_nms_thresh=0.5, rcnn_nms_topk=100)
 
