@@ -21,7 +21,7 @@ class COCOSegmentation(Dataset):
                'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
                'scissors', 'teddy bear', 'hair drier', 'toothbrush']
 
-    def __init__(self, root=os.path.join('~', 'mxnet', 'datasets', 'mscoco'), splits=('val2017',)):
+    def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'coco'), splits=('val2017',)):
         super(COCOSegmentation, self).__init__(root)
         self.splits = splits
         self.coco_ind_to_class_ind, self.class_ind_to_coco_ind = \
@@ -89,7 +89,7 @@ class COCOSegmentation(Dataset):
                 x2 = np.minimum(width, np.maximum(0, x2))
                 y2 = np.minimum(height, np.maximum(0, y2))
                 # require non crowd objects, non-zero seg area and moe than 1x1 box size
-                if obj['iscrowd'] == 0 and obj['area'] > 0 and x2 > x1 and y2 > y1:
+                if obj['iscrowd'] == 0 and obj['area'] > 1 and x2 > x1 and y2 > y1 and (x2 - x1) * (y2 - y1) >= 4:
                     obj['clean_bbox'] = [x1, y1, x2, y2]
                     valid_objs.append(obj)
 
@@ -100,6 +100,9 @@ class COCOSegmentation(Dataset):
             objs = valid_objs
             num_objs = len(objs)
 
+            # skip empty images
+            if not num_objs:
+                continue
             boxes = np.zeros((num_objs, 4), dtype=np.float32)
             classes = np.zeros((num_objs, 1), dtype=np.int32)
             segms = []
