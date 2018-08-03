@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument('--gpus', type=str, default='0', help='gpu devices eg. 0,1')
     parser.add_argument('--save-json', action='store_true', help='save coco output json')
     parser.add_argument('--batch-images', type=int, default=1, help='batch size per gpu')
+    parser.add_argument('--num-workers', type=int, default=4, help='number of data loading workers')
     args = parser.parse_args()
     return args
 
@@ -60,13 +61,13 @@ def get_dataset(dataset, args):
     return val_dataset, val_metric
 
 
-def get_dataloader(net, dataset, batch_size, args):
+def get_dataloader(net, dataset, batch_size, args, shuffle=False):
     # load testing data
     val_transform = RCNNDefaultValTransform(
         short=net.img_short, max_size=net.img_max_size, mean=net.img_means, std=net.img_stds,
         anchors=net.anchors, asf=net.anchor_shape_fn)
     val_loader = gluon.data.DataLoader(dataset.transform(val_transform),
-        batch_size=batch_size, shuffle=False, batchify_fn=net.batchify_fn, last_batch="keep", num_workers=4)
+        batch_size=batch_size, shuffle=shuffle, batchify_fn=net.batchify_fn, last_batch="keep", num_workers=args.num_workers)
     return val_loader
 
 

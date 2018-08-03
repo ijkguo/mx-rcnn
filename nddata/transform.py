@@ -163,3 +163,29 @@ class RCNNDefaultTrainTransform(object):
         boxes = gt_bboxes[:, :4]
         cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors, im_width, im_height)
         return im_tensor, anchors, im_info, gt_bboxes, cls_target, box_target, box_mask
+
+
+class MaskDefaultValTransform(object):
+    def __init__(self, short, max_size, mean, std, anchors, asf):
+        self._short = short
+        self._max_size = max_size
+        self._mean = mean
+        self._std = std
+        self._anchors = anchors
+        self._asf = asf
+
+    def __call__(self, src, label, mask):
+        # resize image
+        im, im_scale = resize(src, self._short, self._max_size)
+        height, width = im.shape[:2]
+        im_info = mx.nd.array([height, width, im_scale], ctx=src.context)
+
+        # transform into tensor and normalize
+        im_tensor = transform(im, self._mean, self._std)
+        label = mx.nd.array(label, ctx=src.context)
+
+        # compute real anchor shape and slice anchors to this shape
+        feat_height, feat_width = self._asf(height, width)
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
+        anchors = anchors.as_in_context(src.context)
+        return im_tensor, anchors, im_info, label, mask

@@ -92,13 +92,13 @@ def get_dataset(dataset, args):
     return train_dataset
 
 
-def get_dataloader(net, dataset, batch_size, args):
+def get_dataloader(net, dataset, batch_size, args, shuffle=True):
     # load training data
     train_transform = RCNNDefaultTrainTransform(
         short=net.img_short, max_size=net.img_max_size, mean=net.img_means, std=net.img_stds,
         anchors=net.anchors, asf=net.anchor_shape_fn, rtg=net.anchor_target)
     train_loader = gluon.data.DataLoader(dataset.transform(train_transform),
-        batch_size=batch_size, shuffle=True, batchify_fn=net.batchify_fn, last_batch="rollover", num_workers=args.num_workers)
+        batch_size=batch_size, shuffle=shuffle, batchify_fn=net.batchify_fn, last_batch="rollover", num_workers=args.num_workers)
     return train_loader
 
 

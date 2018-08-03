@@ -24,7 +24,7 @@ class COCOSegmentationMetric(mx.metric.EvalMetric):
             else:
                 return a
 
-        for bbox, label, score, mask in zip(*_asnumpy(x) for x in [bboxes, labels, scores, masks]):
+        for bbox, label, score, mask in zip(*[_asnumpy(x) for x in [bboxes, labels, scores, masks]]):
             valid_pred = np.where((label >= 0) & (score >= 0.001))[0]
             label = label.flat[valid_pred].astype('int32')
             score = score.flat[valid_pred].astype('float32')
