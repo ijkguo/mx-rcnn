@@ -188,4 +188,4 @@ class MaskDefaultValTransform(object):
         feat_height, feat_width = self._asf(height, width)
         anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
         anchors = anchors.as_in_context(src.context)
-        return im_tensor, anchors, im_info, label, mask
+        return im_tensor, anchors, im_info, label
