@@ -162,7 +162,6 @@ class PascalVOC(IMDB):
                                           ovthresh=0.5, use_07_metric=use_07_metric)
             aps.append(ap)
 
-        for cls, ap in zip(self.classes, aps):
             logger.info('AP for {} = {:.4f}'.format(cls, ap))
         logger.info('Mean AP = {:.4f}'.format(np.mean(aps)))
 
