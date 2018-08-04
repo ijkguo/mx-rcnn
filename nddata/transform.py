@@ -4,6 +4,7 @@ from mxnet import gluon
 from nddata.image import imdecode, random_flip, resize, transform
 from ndnet.rpn_target import RPNTargetGenerator
 from symdata.bbox import bbox_flip
+from symdata.mask import polys_flip, polys_to_mask
 
 
 def load_test(filename, short, max_size, mean, std, anchors, asf):
@@ -152,7 +153,7 @@ class RCNNDefaultTrainTransform(object):
         gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
 
         # convert to ndarray
-        gt_bboxes = mx.nd.array(gt_bboxes, ctx=im_tensor.context)
+        gt_bboxes = mx.nd.array(gt_bboxes, ctx=src.context)
 
         # compute real anchor shape and slice anchors to this shape
         feat_height, feat_width = self._asf(im_height, im_width)
@@ -189,3 +190,66 @@ class MaskDefaultValTransform(object):
         anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
         anchors = anchors.as_in_context(src.context)
         return im_tensor, anchors, im_info, label
+
+
+class MaskDefaultTrainTransform(object):
+    def __init__(self, short, max_size, mean, std, anchors, asf, rtg: RPNTargetGenerator):
+        self._short = short
+        self._max_size = max_size
+        self._mean = mean
+        self._std = std
+        self._anchors = anchors
+        self._asf = asf
+        self._rtg = rtg
+
+    def __call__(self, src, label, segm):
+        # random flip image
+        im, flip_x = random_flip(src, px=0.5)
+
+        # resize image
+        im, im_scale = resize(im, self._short, self._max_size)
+        im_height, im_width = im.shape[:2]
+        im_info = mx.nd.array([im_height, im_width, im_scale], ctx=src.context)
+
+        # transform into tensor and normalize
+        im_tensor = transform(im, self._mean, self._std)
+
+        # label is (np.array) gt_boxes [n, 6] (x1, y1, x2, y2, cls, difficult)
+        # proposal target input (x1, y1, x2, y2)
+        # important: need to copy this np.array (numpy will keep this array)
+        gt_bboxes = label[:, :5].copy()
+
+        # resize bbox
+        gt_bboxes[:, :4] *= im_scale
+
+        # add 1 to gt_bboxes for bg class
+        gt_bboxes[:, 4] += 1
+
+        # random flip bbox
+        gt_bboxes = bbox_flip(gt_bboxes, im_width, flip_x)
+
+        # convert to ndarray
+        gt_bboxes = mx.nd.array(gt_bboxes, ctx=src.context)
+
+        # gt_masks (n, im_height, im_width) of uint8 -> np.float32 (cannot take uint8)
+        gt_masks = []
+        for polys in segm:
+            # resize poly
+            polys = [poly * im_scale for poly in polys]
+            # random flip
+            polys = polys_flip(polys, im_width, flip_x)
+            # poly to mask
+            mask = mx.nd.array(polys_to_mask(polys, im_height, im_width), ctx=src.context)
+            gt_masks.append(mask)
+        # n * (im_height, im_width) -> (n, im_height, im_width)
+        gt_masks = mx.nd.stack(*gt_masks, axis=0)
+
+        # compute real anchor shape and slice anchors to this shape
+        feat_height, feat_width = self._asf(im_height, im_width)
+        anchors = self._anchors[:feat_height, :feat_width, :].reshape((-1, 4))
+        anchors = anchors.as_in_context(src.context)
+
+        # assign anchors
+        boxes = gt_bboxes[:, :4]
+        cls_target, box_target, box_mask = self._rtg.forward(boxes, anchors, im_width, im_height)
+        return im_tensor, anchors, im_info, gt_bboxes, gt_masks, cls_target, box_target, box_mask

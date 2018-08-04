@@ -42,7 +42,7 @@ class COCOSegmentation(Dataset):
         ids = self.roidb[idx]['classes']
         boxes = self.roidb[idx]['boxes']
         segms = self.roidb[idx]['segms']
-        return img, np.hstack((ids, boxes)), segms
+        return img, np.hstack((boxes, ids)), segms
 
     def _load_coco(self, split):
         # example: annotations/instances_train2017.json
