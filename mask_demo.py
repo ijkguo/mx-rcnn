@@ -2,19 +2,20 @@ import argparse
 import pprint
 
 import mxnet as mx
-import gluoncv as gcv
 
-from ndnet.net_all import get_net
+from ndimdb.coco import COCOSegmentation
 from nddata.transform import load_test
-from nddata.vis import vis_detection
+from nddata.vis import vis_detection_mask
+from ndnet.net_all import get_net
+from symdata.mask import mask_resize_fill
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network',
+    parser = argparse.ArgumentParser(description='Demonstrate a Mask R-CNN network',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--network', type=str, default='resnet50_v2a', help='base network')
     parser.add_argument('--pretrained', type=str, default='', help='path to trained model')
-    parser.add_argument('--dataset', type=str, default='voc', help='training dataset')
+    parser.add_argument('--dataset', type=str, default='mask', help='training dataset')
     parser.add_argument('--image', type=str, default='', help='path to test image')
     parser.add_argument('--gpu', type=str, default='', help='gpu device eg. 0')
     parser.add_argument('--vis', action='store_true', help='display results')
@@ -45,10 +46,8 @@ def main():
 
 
 def get_class_names(dataset, args):
-    if dataset == 'voc':
-        return gcv.data.VOCDetection.CLASSES
-    elif dataset == 'coco':
-        return gcv.data.COCODetection.CLASSES
+    if dataset == 'mask':
+        return COCOSegmentation.classes
     else:
         raise NotImplementedError('Dataset {} not implemented'.format(dataset))
 
@@ -66,24 +65,36 @@ def demo_net(net, class_names, ctx, args):
     im_tensor = im_tensor.as_in_context(ctx)
     anchors = anchors.as_in_context(ctx)
     im_info = im_info.as_in_context(ctx)
+    im_shape = im_orig.shape[:2]
 
-    ids, scores, bboxes = net(im_tensor, anchors, im_info)
-    det = mx.nd.concat(ids, scores, bboxes, dim=-1)[0]
+    ids, scores, bboxes, masks = net(im_tensor, anchors, im_info)
 
     # remove background class
-    det[:, 0] -= 1
+    ids -= 1
     # scale back images
-    det[:, 2:6] /= im_info[:, 2]
+    bboxes /= im_info[:, 2]
+
+    # convert to numpy
+    ids = ids.asnumpy()[0]
+    scores = scores.asnumpy()[0]
+    bboxes = bboxes.asnumpy()[0]
+    masks = masks.asnumpy()[0]
 
     # print out
-    for [cls, conf, x1, y1, x2, y2] in det.asnumpy():
+    full_masks = []
+    for i in range(len(ids)):
+        cls = ids[i][0]
+        conf = scores[i][0]
+        x1, y1, x2, y2 = bboxes[i]
+        mask = masks[i]
+        full_masks.append(mask_resize_fill((x1, y1, x2, y2), mask, im_shape))
         if cls >= 0 and conf > args.vis_thresh:
             print(class_names[int(cls)], conf, [x1, y1, x2, y2])
 
     # if vis
     if args.vis:
         import matplotlib.pyplot as plt
-        vis_detection(im_orig.asnumpy(), det.asnumpy(), class_names, thresh=args.vis_thresh)
+        vis_detection_mask(im_orig.asnumpy(), bboxes, scores, ids, full_masks, class_names, thresh=args.vis_thresh)
         plt.show()
 
 

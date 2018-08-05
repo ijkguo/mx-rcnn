@@ -65,7 +65,9 @@ def demo_net(sym, class_names, args):
 
     # if vis
     if args.vis:
+        import matplotlib.pyplot as plt
         vis_detection(im_orig, det, class_names, thresh=args.vis_thresh)
+        plt.show()
 
 
 def parse_args():
