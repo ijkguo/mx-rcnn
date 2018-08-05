@@ -173,7 +173,7 @@ def train_net(net, train_loader, ctx, args):
                     num_rcnn_pos = (rcnn_label >= 0).sum()
                     rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label, rcnn_label >= 0) * rcnn_label.size / rcnn_label.shape[0] / num_rcnn_pos
                     rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_target.size / rcnn_bbox_weight.shape[0] / num_rcnn_pos
-                    rcnn_loss3 = rcnn_mask_loss(rcnn_mask, rcnn_mask_target, rcnn_mask_weight) * rcnn_mask_target.size / rcnn_mask_target.shape[0] / num_rcnn_pos
+                    rcnn_loss3 = rcnn_mask_loss(rcnn_mask, rcnn_mask_target, rcnn_mask_weight) * rcnn_mask_target.size / rcnn_mask_target.shape[0] / num_rcnn_pos / rcnn_mask_target.shape[-1] / rcnn_mask_target.shape[-2]
                     # loss for backprop
                     losses.append(rpn_loss1.sum() + rpn_loss2.sum() + rcnn_loss1.sum() + rcnn_loss2.sum() + rcnn_loss3.sum())
                     # loss for metrics
