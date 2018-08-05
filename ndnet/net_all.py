@@ -79,7 +79,7 @@ def resnet50_v1a_mask(pretrained_base, args):
     for layer in ['layer4']:
         top_features.add(getattr(backbone, layer))
     return MRCNN(
-        features, top_features, batch_images=args.batch_images, train_patterns='|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv']),
+        features, top_features, batch_images=args.batch_images, train_patterns='|'.join(['.*rpn', '.*dense', '.*mask', '.*stage(2|3|4)_conv']),
         img_short=800, img_max_size=1333, img_means=(122.7717, 115.9465, 102.9801), img_stds=(1.0, 1.0, 1.0), clip=4.42,
         rpn_feature_stride=16, rpn_anchor_scales=(2, 4, 8, 16, 32), rpn_anchor_ratios=(0.5, 1, 2),
         rpn_channels=1024, rpn_nms_thresh=0.7, rpn_min_size=0,
@@ -143,7 +143,7 @@ def resnet50_v2a_mask(pretrained_base, args):
     for layer in ['layer4']:
         top_features.add(getattr(backbone, layer))
     return MRCNN(
-        features, top_features, batch_images=args.batch_images, train_patterns='|'.join(['.*rpn', '.*dense', '.*stage(2|3|4)_conv']),
+        features, top_features, batch_images=args.batch_images, train_patterns='|'.join(['.*rpn', '.*dense', '.*mask', '.*stage(2|3|4)_conv']),
         img_short=800, img_max_size=1333, img_means=(0.0, 0.0, 0.0), img_stds=(1.0, 1.0, 1.0), clip=4.42,
         rpn_feature_stride=16, rpn_anchor_scales=(2, 4, 8, 16, 32), rpn_anchor_ratios=(0.5, 1, 2),
         rpn_channels=1024, rpn_nms_thresh=0.7, rpn_min_size=0,

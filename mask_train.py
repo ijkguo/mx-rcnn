@@ -61,7 +61,7 @@ def main():
         net.load_parameters(args.resume.strip())
     else:
         net = get_net('_'.join((args.network, args.dataset)), True, args)
-        net.collect_params('.*rpn|.*dense').initialize()
+        net.collect_params('.*rpn|.*dense|.*mask').initialize()
     net.collect_params().reset_ctx(ctx)
 
     # load training data
