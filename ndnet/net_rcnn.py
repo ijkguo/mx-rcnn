@@ -6,7 +6,7 @@ from symdata.anchor import AnchorGenerator
 from nddata.transform import batchify_append, batchify_pad, split_append, split_pad
 from .rpn_target import RPNTargetGenerator
 from .rpn_inference import Proposal
-from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator
+from .rcnn_target import RCNNTargetSampler, RCNNTargetGenerator, MaskTargetGenerator
 from .rcnn_inference import RCNNDetector
 
 
@@ -214,8 +214,10 @@ class MRCNN(FRCNN):
         self._rcnn_max_dets = rcnn_max_dets
         with self.name_scope():
             self.mask = Mask(self._batch_images, self._rcnn_num_classes, mask_channels)
+            self.mask_target = MaskTargetGenerator(self._batch_images,
+                self._rcnn_batch_rois, self._rcnn_num_classes, self._rcnn_pooled_size)
 
-    def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None):
+    def hybrid_forward(self, F, x, anchors, im_info, gt_boxes=None, gt_masks=None):
         feat = self.features(x)
 
         # generate proposals
@@ -228,6 +230,7 @@ class MRCNN(FRCNN):
         if autograd.is_training():
             rois, samples, matches = self.rcnn_sampler(rois, scores, gt_boxes)
             rcnn_label, rcnn_bbox_target, rcnn_bbox_weight = self.rcnn_target(rois, gt_boxes, samples, matches)
+            rcnn_mask_target, rcnn_mask_weight = self.mask_target(rois, gt_masks, matches, rcnn_label)
 
         # create batch id and reshape for roi pooling
         num_rois = self._rcnn_batch_rois if autograd.is_training() else self._rpn_test_post_topk
@@ -249,7 +252,7 @@ class MRCNN(FRCNN):
 
         if autograd.is_training():
             rcnn_mask = self.mask(top_feat)
-            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_mask, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight
+            return rpn_cls, rpn_reg, rcnn_cls, rcnn_reg, rcnn_mask, rcnn_label, rcnn_bbox_target, rcnn_bbox_weight, rcnn_mask_target, rcnn_mask_weight
 
         # ids, scores, boxes (B, N * (C - 1), X) (X = 1, 1, 4)
         ids, scores, boxes = self.fastrcnn_inference(F, rois, rcnn_cls, rcnn_reg, im_info, num_rois)
