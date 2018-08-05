@@ -8,7 +8,7 @@ from mxnet import autograd, gluon
 from ndimdb.coco import COCOSegmentation
 from nddata.transform import MaskDefaultTrainTransform
 from ndnet.net_all import get_net
-from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric
+from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric, MaskAccMetric
 from symnet.logger import logger
 
 
@@ -114,7 +114,8 @@ def train_net(net, train_loader, ctx, args):
     rpn_bbox_metric = RPNL1LossMetric()
     rcnn_acc_metric = RCNNAccMetric()
     rcnn_bbox_metric = RCNNL1LossMetric()
-    metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric]
+    mask_acc_metric = MaskAccMetric()
+    metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric, mask_acc_metric]
 
     # learning rate
     lr_decay = 0.1
@@ -186,6 +187,7 @@ def train_net(net, train_loader, ctx, args):
                     add_losses[1].append(([rpn_bbox_target, rpn_bbox_weight], [rpn_reg]))
                     add_losses[2].append(([rcnn_label], [rcnn_cls]))
                     add_losses[3].append(([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg]))
+                    add_losses[4].append(([rcnn_mask_target, rcnn_mask_weight], [rcnn_mask]))
                 autograd.backward(losses)
                 for metric, record in zip(metrics, metric_losses):
                     metric.update(0, record)

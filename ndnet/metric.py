@@ -79,3 +79,25 @@ class RCNNL1LossMetric(mx.metric.EvalMetric):
 
         self.sum_metric += loss.asscalar()
         self.num_inst += num_inst.asscalar()
+
+
+class MaskAccMetric(mx.metric.EvalMetric):
+    def __init__(self):
+        super(MaskAccMetric, self).__init__('MaskAcc')
+
+    def update(self, labels, preds):
+        # label = [rcnn_mask_target, rcnn_mask_weight]
+        # pred = [rcnn_mask]
+        rcnn_mask_target, rcnn_mask_weight = labels
+        rcnn_mask = preds[0]
+
+        # calculate num_inst
+        num_inst = mx.nd.sum(rcnn_mask_weight)
+
+        # rcnn_mask (b, n, c, h, w)
+        pred_label = mx.nd.sigmoid(rcnn_mask) >= 0.5
+        # label (b, 1, h, w)
+        num_acc = mx.nd.sum((pred_label == rcnn_mask_target) * rcnn_mask_weight)
+
+        self.sum_metric += num_acc.asscalar()
+        self.num_inst += num_inst.asscalar()
