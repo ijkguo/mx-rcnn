@@ -8,7 +8,7 @@ from mxnet import autograd, gluon
 from ndimdb.coco import COCOSegmentation
 from nddata.transform import MaskDefaultTrainTransform
 from ndnet.net_all import get_net
-from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric, MaskAccMetric
+from ndnet.metric import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, RCNNL1LossMetric, MaskAccMetric, MaskFGAccMetric
 from symnet.logger import logger
 
 
@@ -115,7 +115,8 @@ def train_net(net, train_loader, ctx, args):
     rcnn_acc_metric = RCNNAccMetric()
     rcnn_bbox_metric = RCNNL1LossMetric()
     mask_acc_metric = MaskAccMetric()
-    metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric, mask_acc_metric]
+    mask_fgacc_metric = MaskFGAccMetric()
+    metrics2 = [rpn_acc_metric, rpn_bbox_metric, rcnn_acc_metric, rcnn_bbox_metric, mask_acc_metric, mask_fgacc_metric]
 
     # learning rate
     lr_decay = 0.1
@@ -174,7 +175,7 @@ def train_net(net, train_loader, ctx, args):
                     num_rcnn_pos = (rcnn_label >= 0).sum()
                     rcnn_loss1 = rcnn_cls_loss(rcnn_cls, rcnn_label, rcnn_label >= 0) * rcnn_label.size / rcnn_label.shape[0] / num_rcnn_pos
                     rcnn_loss2 = rcnn_reg_loss(rcnn_reg, rcnn_bbox_target, rcnn_bbox_weight) * rcnn_bbox_target.size / rcnn_bbox_weight.shape[0] / num_rcnn_pos
-                    rcnn_loss3 = rcnn_mask_loss(rcnn_mask, rcnn_mask_target, rcnn_mask_weight) * rcnn_mask_target.size / rcnn_mask_target.shape[0] / num_rcnn_pos / rcnn_mask_target.shape[-1] / rcnn_mask_target.shape[-2]
+                    rcnn_loss3 = rcnn_mask_loss(rcnn_mask, rcnn_mask_target, rcnn_mask_weight) * rcnn_mask_target.size / rcnn_mask_target.shape[0] / rcnn_mask_weight.sum()
                     # loss for backprop
                     losses.append(rpn_loss1.sum() + rpn_loss2.sum() + rcnn_loss1.sum() + rcnn_loss2.sum() + rcnn_loss3.sum())
                     # loss for metrics
@@ -188,6 +189,7 @@ def train_net(net, train_loader, ctx, args):
                     add_losses[2].append(([rcnn_label], [rcnn_cls]))
                     add_losses[3].append(([rcnn_bbox_target, rcnn_bbox_weight], [rcnn_reg]))
                     add_losses[4].append(([rcnn_mask_target, rcnn_mask_weight], [rcnn_mask]))
+                    add_losses[5].append(([rcnn_mask_target, rcnn_mask_weight], [rcnn_mask]))
                 autograd.backward(losses)
                 for metric, record in zip(metrics, metric_losses):
                     metric.update(0, record)
