@@ -33,15 +33,18 @@ def polys_flip(polys, width, flip_x=False):
     return [_flip(p, width, flip_x) for p in polys]
 
 
-def mask_resize_fill(box, mask, shape):
+def mask_resize_fill(mask, box, shape):
     """
     resize mask to size of box, then fill into full image
-    :param box: tuple of float (x1, y1, x2, y2)
     :param mask: np.ndarray (M, M)
+    :param box: tuple of float (x1, y1, x2, y2)
     :param shape: tuple of int (height, width)
     :return: np.ndarray (height, width) of uint8
     """
     x1, y1, x2, y2 = box
+    height, width = shape
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(width, x2), min(height, y2)
     x1, y1 = int(x1 + 0.5), int(y1 + 0.5)
     x2, y2 = int(x2 - 0.5), int(y2 - 0.5)
     x2, y2 = max(x1, x2), max(y1, y2)

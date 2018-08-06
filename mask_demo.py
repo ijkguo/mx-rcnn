@@ -87,7 +87,7 @@ def demo_net(net, class_names, ctx, args):
         conf = scores[i][0]
         x1, y1, x2, y2 = bboxes[i]
         mask = masks[i]
-        full_masks.append(mask_resize_fill((x1, y1, x2, y2), mask, im_shape))
+        full_masks.append(mask_resize_fill(mask, (x1, y1, x2, y2), im_shape))
         if cls >= 0 and conf > args.vis_thresh:
             print(class_names[int(cls)], conf, [x1, y1, x2, y2])
 
