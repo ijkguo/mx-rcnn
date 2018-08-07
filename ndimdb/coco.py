@@ -63,7 +63,7 @@ class COCOSegmentation(Dataset):
         # example train2017/000000119993.jpg
         image_file_tmpl = os.path.join(self._root, split, '{}')
 
-        image_ids = coco.getImgIds()
+        image_ids = sorted(coco.getImgIds())
         roidb = []
         for image_id in image_ids:
             im_ann = coco.loadImgs(image_id)[0]
