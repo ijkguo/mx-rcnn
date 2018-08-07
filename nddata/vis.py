@@ -78,7 +78,8 @@ def vis_detection_mask(im_orig, boxes, scores, labels, masks, class_names, thres
                 bbox=dict(facecolor='g', alpha=0.4, pad=0, edgecolor='none'))
         _, contours, _ = cv2.findContours(
             mask.copy(), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+        color = np.random.random(3)
         for c in contours:
-            polygon = plt.Polygon(c.reshape((-1, 2)), fill=True, facecolor=np.random.random(3),
+            polygon = plt.Polygon(c.reshape((-1, 2)), fill=True, facecolor=color,
                                   alpha=0.5, edgecolor='w', linewidth=1.2)
             ax.add_patch(polygon)
