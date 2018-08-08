@@ -106,7 +106,7 @@ def test_net(net, val_loader, metric, size, ctx, args):
                     b_boxes = b_boxes[valid] / im_scale
                     b_masks = b_masks[valid]
 
-                    im_height, im_width = int(im_height / im_scale), int(im_width / im_scale)
+                    im_height, im_width = int(round(im_height / im_scale)), int(round(im_width / im_scale))
                     full_masks = []
                     for bbox, mask in zip(b_boxes, b_masks):
                         full_masks.append(mask_resize_fill(mask, bbox, (im_height, im_width)))
