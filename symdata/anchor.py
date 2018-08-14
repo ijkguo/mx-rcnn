@@ -129,7 +129,7 @@ class AnchorSampler:
             labels[max_overlaps >= self._fg_overlap] = 1
 
             # bg anchors: anchor with overlap < iou thresh
-            labels[max_overlaps < self._bg_overlap] = 1
+            labels[max_overlaps < self._bg_overlap] = 0
 
             # sanity check
             fg_inds = np.where(labels == 1)[0]
