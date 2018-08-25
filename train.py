@@ -165,6 +165,7 @@ def get_voc(args):
     roidb = []
     for iset in isets:
         imdb = PascalVOC(iset, 'data', 'data/VOCdevkit')
+        imdb.filter_roidb()
         imdb.append_flipped_images()
         roidb.extend(imdb.roidb)
     return roidb
